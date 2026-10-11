@@ -25,8 +25,8 @@ public final class TerrainShaderPatch {
 			    int count = int(u_LuceatCount.x);
 			    for (int i = 0; i < count; i++) {
 			        vec4 light = u_LuceatPosRadius[i];
-			        float falloff = clamp(1.0 - distance(pos, light.xyz) / light.w, 0.0, 1.0);
-			        total += u_LuceatColor[i].rgb * falloff * falloff;
+			        float level = max(light.w - distance(pos, light.xyz), 0.0) / 15.0;
+			        total += u_LuceatColor[i].rgb * (1.2 * level / (4.0 - 3.0 * level));
 			    }
 			    return total;
 			}
