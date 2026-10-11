@@ -1,0 +1,67 @@
+package me.bewf.luceat.client.light;
+
+import java.nio.ByteBuffer;
+import java.util.List;
+
+import org.lwjgl.BufferUtils;
+import org.lwjgl.opengl.GL15;
+import org.lwjgl.opengl.GL30;
+import org.lwjgl.opengl.GL31;
+
+import net.minecraft.world.phys.Vec3;
+
+public final class LightBuffer {
+	public static final int MAX_LIGHTS = 16;
+	public static final int BINDING = 7;
+	public static final String BLOCK_NAME = "LuceatLights";
+
+	private static final int SIZE = 16 + MAX_LIGHTS * 32;
+
+	private final ByteBuffer scratch = BufferUtils.createByteBuffer(SIZE);
+	private int handle;
+
+	public void update(List<LightSource> lights, Vec3 camera) {
+		int count = Math.min(lights.size(), MAX_LIGHTS);
+		this.scratch.clear();
+		this.scratch.putFloat(count).putFloat(0.0F).putFloat(0.0F).putFloat(0.0F);
+		for (int i = 0; i < MAX_LIGHTS; i++) {
+			if (i < count) {
+				LightSource light = lights.get(i);
+				this.scratch.putFloat((float) (light.x() - camera.x));
+				this.scratch.putFloat((float) (light.y() - camera.y));
+				this.scratch.putFloat((float) (light.z() - camera.z));
+				this.scratch.putFloat(light.radius());
+			} else {
+				this.scratch.putFloat(0.0F).putFloat(0.0F).putFloat(0.0F).putFloat(0.0F);
+			}
+		}
+		for (int i = 0; i < MAX_LIGHTS; i++) {
+			if (i < count) {
+				LightSource light = lights.get(i);
+				this.scratch.putFloat(light.red()).putFloat(light.green()).putFloat(light.blue()).putFloat(0.0F);
+			} else {
+				this.scratch.putFloat(0.0F).putFloat(0.0F).putFloat(0.0F).putFloat(0.0F);
+			}
+		}
+		this.scratch.flip();
+
+		if (this.handle == 0) {
+			this.handle = GL15.glGenBuffers();
+			GL15.glBindBuffer(GL31.GL_UNIFORM_BUFFER, this.handle);
+			GL15.glBufferData(GL31.GL_UNIFORM_BUFFER, SIZE, GL15.GL_DYNAMIC_DRAW);
+		} else {
+			GL15.glBindBuffer(GL31.GL_UNIFORM_BUFFER, this.handle);
+		}
+		GL15.glBufferSubData(GL31.GL_UNIFORM_BUFFER, 0L, this.scratch);
+		GL15.glBindBuffer(GL31.GL_UNIFORM_BUFFER, 0);
+	}
+
+	public void bind(int program) {
+		int index = GL31.glGetUniformBlockIndex(program, BLOCK_NAME);
+		if (index == GL31.GL_INVALID_INDEX) {
+			return;
+		}
+		GL31.glUniformBlockBinding(program, index, BINDING);
+		GL30.glBindBufferBase(GL31.GL_UNIFORM_BUFFER, BINDING, this.handle);
+	}
+}

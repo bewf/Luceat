@@ -1,0 +1,13 @@
+{
+	"required": false,
+	"package": "me.bewf.luceat.client.mixin",
+	"compatibilityLevel": "JAVA_25",
+	"plugin": "me.bewf.luceat.client.mixin.LuceatMixinPlugin",
+	"client": [
+		"sodium.SodiumChunkRendererMixin",
+		"sodium.SodiumShaderLoaderMixin"
+	],
+	"injectors": {
+		"defaultRequire": 0
+	}
+}

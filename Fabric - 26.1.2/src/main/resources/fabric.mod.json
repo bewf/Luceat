@@ -1,0 +1,35 @@
+{
+	"schemaVersion": 1,
+	"id": "luceat",
+	"version": "${version}",
+	"name": "Luceat",
+	"description": "Dynamic lighting on the GPU. Held and moving lights shade the world per pixel with no chunk rebuilds.",
+	"authors": [
+		"bewf"
+	],
+	"license": "All Rights Reserved",
+	"environment": "client",
+	"entrypoints": {
+		"main": [
+			"me.bewf.luceat.Luceat"
+		],
+		"client": [
+			"me.bewf.luceat.client.LuceatClient"
+		]
+	},
+	"suggests": {
+		"sodium": "*"
+	},
+	"depends": {
+		"fabricloader": ">=0.19.5",
+		"minecraft": "~26.1.2",
+		"java": ">=25",
+		"fabric-api": "*"
+	},
+	"mixins": [
+		{
+			"config": "luceat.client.mixins.json",
+			"environment": "client"
+		}
+	]
+}
