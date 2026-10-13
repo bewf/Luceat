@@ -21,7 +21,7 @@ public final class ItemExporter {
 
         var items = BuiltInRegistries.ITEM.keySet().stream()
                 .map(id -> {
-                    var item = BuiltInRegistries.ITEM.get(id);
+                    var item = BuiltInRegistries.ITEM.getValue(id);
                     String name = id.toString();
 
                     if (name.startsWith("minecraft:")) {
