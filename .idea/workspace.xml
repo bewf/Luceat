@@ -5,10 +5,8 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="3f6898ee-d44c-4f95-af74-e48e77f0d28f" name="Changes" comment="">
-      <change afterPath="$PROJECT_DIR$/Fabric - 26.1.2/src/testmod/java/me/bewf/luceat/client/dev/ItemExporter.java" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/Fabric - 26.1.2/src/testmod/resources/fabric.mod.json" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Fabric - 26.1.2/build.gradle" beforeDir="false" afterPath="$PROJECT_DIR$/Fabric - 26.1.2/build.gradle" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Fabric - 26.1.2/src/testmod/java/me/bewf/luceat/client/dev/ItemExporter.java" beforeDir="false" afterPath="$PROJECT_DIR$/Fabric - 26.1.2/src/testmod/java/me/bewf/luceat/client/dev/ItemExporter.java" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
