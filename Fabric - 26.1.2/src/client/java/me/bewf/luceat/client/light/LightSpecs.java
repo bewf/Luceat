@@ -1,86 +1,62 @@
 package me.bewf.luceat.client.light;
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
-import net.minecraft.core.registries.BuiltInRegistries;
+import me.bewf.luceat.Luceat;
+import me.bewf.luceat.client.light.item.ItemLightRule;
+import me.bewf.luceat.client.light.item.ItemLightRules;
+
 import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.item.Items;
-import net.minecraft.world.level.block.Block;
-import net.minecraft.world.level.block.CampfireBlock;
 
 public final class LightSpecs {
 	private static final LightSpec NONE = new LightSpec(0, 0.0F, 0.0F, 0.0F);
-	private static final Map<Item, LightSpec> CACHE = new HashMap<>();
+	private static final float[] DEFAULT_COLOUR = {1.0F, 0.7F, 0.35F};
+	private static final Map<Item, float[]> COLOURS = new HashMap<>();
 
 	private LightSpecs() {
 	}
 
-	public static LightSpec of(ItemStack stack) {
+	public static void clearCache() {
+		COLOURS.clear();
+	}
+
+	public static LightSpec of(ItemStack stack, boolean submerged) {
 		if (stack.isEmpty()) {
 			return NONE;
 		}
-		return CACHE.computeIfAbsent(stack.getItem(), LightSpecs::resolve);
-	}
-
-	private static LightSpec resolve(Item item) {
-		if (item == Items.LAVA_BUCKET) {
-			return new LightSpec(15, 1.0F, 0.45F, 0.15F);
+		List<ItemLightRule> rules = ItemLightRules.matching(stack);
+		int level = 0;
+		ItemLightRule best = null;
+		for (ItemLightRule rule : rules) {
+			if (submerged && rule.waterSensitive()) {
+				continue;
+			}
+			int ruleLevel = rule.level(stack);
+			if (ruleLevel > 0 && ruleLevel >= level) {
+				level = ruleLevel;
+				best = rule;
+			}
 		}
-		if (item == Items.GLOW_BERRIES) {
-			return new LightSpec(14, 1.0F, 0.8F, 0.4F);
+		if (rules.isEmpty() && stack.getItem() instanceof BlockItem blockItem) {
+			level = ItemLightRule.emission(blockItem.getBlock());
 		}
-		if (!(item instanceof BlockItem blockItem)) {
-			return NONE;
-		}
-		Block block = blockItem.getBlock();
-		if (block instanceof CampfireBlock) {
-			return NONE;
-		}
-		int level = block.defaultBlockState().getLightEmission();
 		if (level <= 0) {
 			return NONE;
 		}
-		String path = BuiltInRegistries.BLOCK.getKey(block).getPath();
-		return colour(level, path);
+		float[] colour = best != null && best.colour() != null ? best.colour() : colourOf(stack);
+		return new LightSpec(level, colour[0], colour[1], colour[2]);
 	}
 
-	private static LightSpec colour(int level, String path) {
-		if (path.contains("soul")) {
-			return new LightSpec(level, 0.3F, 0.75F, 1.0F);
-		}
-		if (path.contains("copper")) {
-			return new LightSpec(level, 0.35F, 1.0F, 0.7F);
-		}
-		if (path.contains("redstone")) {
-			return new LightSpec(level, 1.0F, 0.2F, 0.1F);
-		}
-		if (path.contains("amethyst") || path.contains("crying_obsidian") || path.contains("respawn_anchor")) {
-			return new LightSpec(level, 0.7F, 0.4F, 1.0F);
-		}
-		if (path.contains("sea_lantern") || path.contains("conduit") || path.contains("beacon")) {
-			return new LightSpec(level, 0.7F, 0.95F, 1.0F);
-		}
-		if (path.contains("end_rod")) {
-			return new LightSpec(level, 1.0F, 0.95F, 0.9F);
-		}
-		if (path.contains("verdant")) {
-			return new LightSpec(level, 0.5F, 1.0F, 0.5F);
-		}
-		if (path.contains("pearlescent")) {
-			return new LightSpec(level, 1.0F, 0.6F, 0.9F);
-		}
-		if (path.contains("sculk")) {
-			return new LightSpec(level, 0.3F, 0.8F, 0.9F);
-		}
-		if (path.contains("glow_lichen")) {
-			return new LightSpec(level, 0.7F, 1.0F, 0.8F);
-		}
-		if (path.contains("magma")) {
-			return new LightSpec(level, 1.0F, 0.4F, 0.15F);
-		}
-		return new LightSpec(level, 1.0F, 0.7F, 0.35F);
+	private static float[] colourOf(ItemStack stack) {
+		return COLOURS.computeIfAbsent(stack.getItem(), item -> {
+			float[] estimate = ColourEstimator.estimate(stack);
+			float[] colour = estimate == null ? DEFAULT_COLOUR : estimate;
+			Luceat.LOGGER.info("Light colour for {} is {} {} {} ({})", item, colour[0], colour[1], colour[2], estimate == null ? "default" : "texture");
+			return colour;
+		});
 	}
 }

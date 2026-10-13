@@ -4,7 +4,14 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="3f6898ee-d44c-4f95-af74-e48e77f0d28f" name="Changes" comment="" />
+    <list default="true" id="3f6898ee-d44c-4f95-af74-e48e77f0d28f" name="Changes" comment="">
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Fabric - 26.1.2/src/client/java/me/bewf/luceat/client/LuceatClient.java" beforeDir="false" afterPath="$PROJECT_DIR$/Fabric - 26.1.2/src/client/java/me/bewf/luceat/client/LuceatClient.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Fabric - 26.1.2/src/client/java/me/bewf/luceat/client/light/HeldLights.java" beforeDir="false" afterPath="$PROJECT_DIR$/Fabric - 26.1.2/src/client/java/me/bewf/luceat/client/light/HeldLights.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Fabric - 26.1.2/src/client/java/me/bewf/luceat/client/light/LightEngine.java" beforeDir="false" afterPath="$PROJECT_DIR$/Fabric - 26.1.2/src/client/java/me/bewf/luceat/client/light/LightEngine.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Fabric - 26.1.2/src/client/java/me/bewf/luceat/client/light/LightSpecs.java" beforeDir="false" afterPath="$PROJECT_DIR$/Fabric - 26.1.2/src/client/java/me/bewf/luceat/client/light/LightSpecs.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Fabric - 26.1.2/src/client/java/me/bewf/luceat/client/mixin/EntityRendererMixin.java" beforeDir="false" afterPath="$PROJECT_DIR$/Fabric - 26.1.2/src/client/java/me/bewf/luceat/client/mixin/EntityRendererMixin.java" afterDir="false" />
+    </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
     <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
@@ -31,6 +38,7 @@
   "keyToString": {
     "ModuleVcsDetector.initialDetectionPerformed": "true",
     "RunOnceActivity.ShowReadmeOnStart": "true",
+    "RunOnceActivity.git.unshallow": "true",
     "RunOnceActivity.typescript.service.memoryLimit.init": "true",
     "codeWithMe.voiceChat.enabledByDefault": "false",
     "git-widget-placeholder": "master",
@@ -44,7 +52,6 @@
     "nodejs_package_manager_path": "npm"
   }
 }]]></component>
-  <component name="RunManager" selected="Gradle.Minecraft Client" />
   <component name="SharedIndexes">
     <attachedChunks>
       <set>
