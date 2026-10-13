@@ -8,6 +8,8 @@ import org.lwjgl.opengl.GL15;
 import org.lwjgl.opengl.GL30;
 import org.lwjgl.opengl.GL31;
 
+import me.bewf.luceat.client.config.LuceatConfig;
+
 import net.minecraft.world.phys.Vec3;
 
 public final class LightBuffer {
@@ -15,7 +17,7 @@ public final class LightBuffer {
 	public static final int BINDING = 7;
 	public static final String BLOCK_NAME = "LuceatLights";
 
-	private static final int SIZE = 16 + MAX_LIGHTS * 32;
+	private static final int SIZE = 48 + MAX_LIGHTS * 32;
 
 	private final ByteBuffer scratch = BufferUtils.createByteBuffer(SIZE);
 	private int handle;
@@ -23,7 +25,13 @@ public final class LightBuffer {
 	public void update(List<LightSource> lights, Vec3 camera) {
 		int count = Math.min(lights.size(), MAX_LIGHTS);
 		this.scratch.clear();
-		this.scratch.putFloat(count).putFloat(0.0F).putFloat(0.0F).putFloat(0.0F);
+		LuceatConfig config = LuceatConfig.get();
+		this.scratch.putFloat(count).putFloat(config.shadows ? 1.0F : 0.0F).putFloat(config.brightness).putFloat(Math.max(config.maxBrightness, 0.1F));
+		int blockX = (int) Math.floor(camera.x);
+		int blockY = (int) Math.floor(camera.y);
+		int blockZ = (int) Math.floor(camera.z);
+		this.scratch.putInt(blockX).putInt(blockY).putInt(blockZ).putInt(0);
+		this.scratch.putFloat((float) (camera.x - blockX)).putFloat((float) (camera.y - blockY)).putFloat((float) (camera.z - blockZ)).putFloat(0.0F);
 		for (int i = 0; i < MAX_LIGHTS; i++) {
 			if (i < count) {
 				LightSource light = lights.get(i);

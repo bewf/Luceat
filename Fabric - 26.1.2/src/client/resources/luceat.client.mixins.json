@@ -4,6 +4,7 @@
   "compatibilityLevel": "JAVA_25",
   "plugin": "me.bewf.luceat.client.mixin.LuceatMixinPlugin",
   "client": [
+    "ClientLevelMixin",
     "EntityRendererMixin",
     "ItemInHandRendererMixin",
     "sodium.SodiumChunkRendererMixin",
