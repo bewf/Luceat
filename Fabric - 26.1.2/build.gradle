@@ -17,6 +17,10 @@ repositories {
 	}
 }
 
+sourceSets {
+	testmod
+}
+
 loom {
 	splitEnvironmentSourceSets()
 
@@ -25,15 +29,25 @@ loom {
 			sourceSet sourceSets.main
 			sourceSet sourceSets.client
 		}
+
+		"luceat-testmod" {
+			sourceSet sourceSets.testmod
+		}
+	}
+
+	runs {
+		exporter {
+			inherit client
+			displayName = "Luceat Item Exporter"
+			sourceSet = sourceSets.testmod.name
+			generateRunConfig = true
+		}
 	}
 }
 
 dependencies {
-	// To change the versions see the gradle.properties file
 	minecraft "com.mojang:minecraft:${project.minecraft_version}"
 	implementation "net.fabricmc:fabric-loader:${project.loader_version}"
-
-	// Fabric API. This is technically optional, but you probably want it anyway.
 	implementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_api_version}"
 
 	clientImplementation "maven.modrinth:sodium:${project.sodium_version}"
@@ -53,11 +67,7 @@ tasks.withType(JavaCompile).configureEach {
 }
 
 java {
-	// Loom will automatically attach sourcesJar to a RemapSourcesJar task and to the "build" task
-	// if it is present.
-	// If you remove this line, sources will not be generated.
 	withSourcesJar()
-
 	sourceCompatibility = JavaVersion.VERSION_25
 	targetCompatibility = JavaVersion.VERSION_25
 }
@@ -67,11 +77,10 @@ jar {
 	inputs.property "projectName", projectName
 
 	from("LICENSE") {
-		rename { "${it}_$projectName"}
+		rename { "${it}_${projectName}" }
 	}
 }
 
-// configure the maven publication
 publishing {
 	publications {
 		create("mavenJava", MavenPublication) {
@@ -79,11 +88,32 @@ publishing {
 		}
 	}
 
-	// See https://docs.gradle.org/current/userguide/publishing_maven.html for information on how to set up publishing.
 	repositories {
-		// Add repositories to publish to here.
-		// Notice: This block does NOT have the same function as the block in the top level.
-		// The repositories here will be used for publishing your artifact, not for
-		// retrieving dependencies.
+		// Configure a publishing repository here if needed.
 	}
 }
+
+/*
+ * Separate source set for development-only item exporting.
+ * This source set is not included in the normal Luceat mod JAR.
+ */
+sourceSets {
+	testmod {
+		java.setSrcDirs(["src/testmod/java"])
+		resources.setSrcDirs(["src/testmod/resources"])
+
+		compileClasspath += sourceSets.client.compileClasspath
+		compileClasspath += sourceSets.main.output
+		compileClasspath += sourceSets.client.output
+
+		runtimeClasspath += sourceSets.client.runtimeClasspath
+		runtimeClasspath += sourceSets.main.output
+		runtimeClasspath += sourceSets.client.output
+	}
+}
+
+configurations {
+	testmodImplementation.extendsFrom implementation, clientImplementation
+	testmodRuntimeOnly.extendsFrom runtimeOnly, clientRuntimeOnly
+}
+

@@ -1,0 +1,17 @@
+{
+"schemaVersion": 1,
+"id": "luceat-testmod",
+"version": "1.0.0",
+"name": "Luceat Item Exporter",
+"environment": "client",
+"entrypoints": {
+"client": [
+"me.bewf.luceat.client.dev.ItemExporter"
+]
+},
+"depends": {
+"fabricloader": ">=0.19.5",
+"minecraft": "~26.1.2",
+"java": ">=25"
+}
+}
