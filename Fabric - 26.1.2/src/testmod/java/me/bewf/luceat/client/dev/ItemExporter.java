@@ -1,6 +1,6 @@
-
 package me.bewf.luceat.client.dev;
 
+import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.world.item.BlockItem;
@@ -11,8 +11,12 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.stream.Collectors;
 
-public final class ItemExporter {
-    private ItemExporter() {}
+public final class ItemExporter implements ClientModInitializer {
+
+    @Override
+    public void onInitializeClient() {
+        export();
+    }
 
     public static void export() {
         Path output = FabricLoader.getInstance()
