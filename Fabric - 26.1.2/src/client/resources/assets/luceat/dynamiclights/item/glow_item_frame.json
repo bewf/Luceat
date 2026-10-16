@@ -1,0 +1,7 @@
+{
+	"match": {
+		"items": "minecraft:glow_item_frame"
+	},
+	"luminance": 4,
+	"color": "#62d8b0"
+}

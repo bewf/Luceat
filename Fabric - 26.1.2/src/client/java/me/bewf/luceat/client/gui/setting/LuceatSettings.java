@@ -1,0 +1,122 @@
+package me.bewf.luceat.client.gui.setting;
+
+import java.util.ArrayList;
+import java.util.List;
+
+import me.bewf.luceat.client.config.LuceatConfig;
+import me.bewf.luceat.client.config.ShadowQuality;
+import me.bewf.luceat.client.light.LightSpecs;
+import me.bewf.luceat.client.shadow.ShadowVolume;
+
+public final class LuceatSettings {
+	public static final String LIGHTING = "Lighting";
+	public static final String SHADOWS = "Shadows";
+	public static final String PLACED = "Placed lights";
+	public static final String SOURCES = "Light sources";
+	public static final String GENERAL = "General";
+
+	private LuceatSettings() {
+	}
+
+	public static List<String> sections() {
+		return List.of(LIGHTING, SHADOWS, PLACED, SOURCES, GENERAL);
+	}
+
+	public static List<Setting> create() {
+		LuceatConfig c = LuceatConfig.get();
+		List<Setting> all = new ArrayList<>();
+
+		all.add(new ToggleSetting(LIGHTING, "Luceat",
+			"Turns all of Luceat on or off. When it is off the game looks the way it did before.",
+			Cost.MEDIUM, false, () -> c.enabled, value -> c.enabled = value));
+		all.add(new SliderSetting(LIGHTING, "Light strength",
+			"How bright your lights are. Higher is brighter around the light.",
+			Cost.NONE, false, 0.0F, 3.0F, 0.05F, "x", () -> c.brightness, value -> c.brightness = value));
+		all.add(new SliderSetting(LIGHTING, "Brightness limit",
+			"Stops a lot of lights from adding up to pure white. Lower keeps things softer.",
+			Cost.NONE, false, 0.3F, 2.0F, 0.05F, "x", () -> c.maxBrightness, value -> c.maxBrightness = value));
+		all.add(new SliderSetting(LIGHTING, "Fade in daylight",
+			"The sun already lights things up, so your lights should matter less in the day. Higher fades them out more.",
+			Cost.NONE, false, 0.0F, 1.0F, 0.05F, "", () -> c.daylightFade, value -> c.daylightFade = value));
+		all.add(new SliderSetting(LIGHTING, "Surface direction",
+			"Surfaces that face the light get more of it and surfaces turned away get less. At zero everything is lit the same.",
+			Cost.LOW, false, 0.0F, 1.0F, 0.05F, "", () -> c.directionalShading, value -> c.directionalShading = value));
+		all.add(new ToggleSetting(LIGHTING, "Colours from textures",
+			"Picks the glow colour from the item's own texture, so a texture pack changes the colours too.",
+			Cost.NONE, false, () -> c.textureColours, value -> {
+				c.textureColours = value;
+				LightSpecs.clearCache();
+			}));
+		all.add(new ToggleSetting(LIGHTING, "Glow on enchanted items",
+			"Enchanted items give off a small purple glow while you hold them.",
+			Cost.LOW, false, () -> c.enchantGlow, value -> c.enchantGlow = value));
+
+		all.add(new ToggleSetting(SHADOWS, "Shadows",
+			"Stops light from going through walls and other blocks. This is the most expensive setting.",
+			Cost.HIGH, false, () -> c.shadows, value -> c.shadows = value));
+		all.add(new SliderSetting(SHADOWS, "Shadow darkness",
+			"How dark a shadow gets. At zero the light ignores walls.",
+			Cost.NONE, false, 0.0F, 1.0F, 0.05F, "", () -> c.shadowStrength, value -> c.shadowStrength = value));
+		all.add(new SliderSetting(SHADOWS, "Shadow distance",
+			"Shadows are skipped on things farther from you than this. Lower is faster.",
+			Cost.MEDIUM, false, 8.0F, 128.0F, 8.0F, " blocks", () -> c.shadowDistance, value -> c.shadowDistance = Math.round(value)));
+		all.add(new ToggleSetting(SHADOWS, "Keep lights out of walls",
+			"If a held light would end up inside a wall, it is moved back out so the wall does not go dark.",
+			Cost.LOW, false, () -> c.keepLightOutOfWalls, value -> c.keepLightOutOfWalls = value));
+		all.add(new ChoiceSetting<>(SHADOWS, "Leaves and holes",
+			"Off: leaves, grates and similar blocks work like solid blocks. Fast: they dim the light by how much of the block is see through. Fancy: they cast the real shape of the leaves or holes.",
+			Cost.MEDIUM, true, ShadowQuality.values(), new String[]{"Off", "Fast", "Fancy"}, () -> c.foliageShadows, value -> c.foliageShadows = value));
+		all.add(new ToggleSetting(SHADOWS, "Coloured glass",
+			"Stained glass tints the light that comes through it to the colour of the glass.",
+			Cost.LOW, true, () -> c.glassTint, value -> c.glassTint = value));
+		all.add(new SliderSetting(SHADOWS, "Hole strength",
+			"How solid the parts of leaves and grates count as. Lower lets more light through.",
+			Cost.NONE, true, 0.3F, 1.0F, 0.05F, "", () -> c.cutoutOpacity, value -> c.cutoutOpacity = value));
+
+		all.add(new ToggleSetting(PLACED, "Placed lights",
+			"Torches, lanterns, glowstone, lava and other light blocks you place light up their surroundings with their own colour and cast shadows.",
+			Cost.HIGH, false, () -> c.placedLights, value -> {
+				c.placedLights = value;
+				ShadowVolume.reset();
+			}));
+		all.add(new SliderSetting(PLACED, "Placed light strength",
+			"How bright the light from placed blocks is. Higher is brighter.",
+			Cost.NONE, false, 0.0F, 2.0F, 0.05F, "x", () -> c.placedStrength, value -> c.placedStrength = value));
+		all.add(new SliderSetting(PLACED, "Replace normal light",
+			"How much of the normal Minecraft block light is swapped for Luceat's light. At full, shadows are at their darkest. At zero, placed light blocks look the way they always did.",
+			Cost.NONE, false, 0.0F, 1.0F, 0.05F, "", () -> c.vanillaReplace, value -> c.vanillaReplace = value));
+		all.add(new SliderSetting(PLACED, "Smallest light",
+			"Light blocks dimmer than this are left alone. Raising it skips candles and small buds.",
+			Cost.LOW, false, 1.0F, 15.0F, 1.0F, "", () -> c.placedMinLevel, value -> {
+				c.placedMinLevel = Math.round(value);
+				ShadowVolume.reset();
+			}));
+
+		all.add(new ToggleSetting(SOURCES, "Your held lights",
+			"Items in your hands light up the world around you.",
+			Cost.LOW, false, () -> c.heldLights, value -> c.heldLights = value));
+		all.add(new ToggleSetting(SOURCES, "Other players",
+			"Items other players hold light up the world around them.",
+			Cost.LOW, false, () -> c.otherPlayers, value -> c.otherPlayers = value));
+		all.add(new ToggleSetting(SOURCES, "Mobs holding items",
+			"Mobs that hold a light give off light.",
+			Cost.LOW, false, () -> c.mobs, value -> c.mobs = value));
+		all.add(new ToggleSetting(SOURCES, "Dropped items",
+			"Items lying on the ground give off light.",
+			Cost.LOW, false, () -> c.droppedItems, value -> c.droppedItems = value));
+		all.add(new ToggleSetting(SOURCES, "Water puts out lights",
+			"Torches, campfires and similar items go dark under water.",
+			Cost.NONE, false, () -> c.waterPutsOutLights, value -> c.waterPutsOutLights = value));
+		all.add(new SliderSetting(SOURCES, "Most lights at once",
+			"How many lights are used at the same time. Fewer is faster.",
+			Cost.MEDIUM, false, 1.0F, 32.0F, 1.0F, "", () -> c.maxLights, value -> c.maxLights = Math.round(value)));
+		all.add(new SliderSetting(SOURCES, "Light range",
+			"How far away Luceat looks for other players' and mobs' lights.",
+			Cost.LOW, false, 16.0F, 128.0F, 8.0F, " blocks", () -> c.lightRange, value -> c.lightRange = Math.round(value)));
+
+		all.add(new ToggleSetting(GENERAL, "Update notices",
+			"Checks Modrinth when the game starts and tells you in chat if a new version is out.",
+			Cost.NONE, false, () -> c.updateChecker, value -> c.updateChecker = value));
+		return all;
+	}
+}

@@ -1,22 +1,19 @@
 package me.bewf.luceat.client.light;
 
-import java.io.IOException;
-import java.io.InputStream;
 import java.util.Arrays;
 
 import com.mojang.blaze3d.platform.NativeImage;
-
-import me.bewf.luceat.Luceat;
 
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.item.ItemStackRenderState;
 import net.minecraft.client.resources.model.sprite.Material;
 import net.minecraft.resources.Identifier;
-import net.minecraft.server.packs.resources.Resource;
 import net.minecraft.util.ARGB;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.item.ItemDisplayContext;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.state.BlockState;
 
 public final class ColourEstimator {
 	private static final int MIN_ALPHA = 128;
@@ -26,23 +23,73 @@ public final class ColourEstimator {
 	}
 
 	public static float[] estimate(ItemStack stack) {
-		Identifier texture = textureOf(stack);
-		if (texture == null) {
+		return estimateTexture(textureOf(stack));
+	}
+
+	public static float[] estimateBlock(BlockState state) {
+		if (state.is(Blocks.LAVA)) {
+			return estimateTexture(Identifier.withDefaultNamespace("block/lava_still"));
+		}
+		Material.Baked material = Minecraft.getInstance().getModelManager().getBlockStateModelSet().getParticleMaterial(state);
+		return material == null ? null : estimateTexture(material.sprite().contents().name());
+	}
+
+	public static float[] estimateTexture(Identifier texture) {
+		if (texture == null || texture.getPath().equals("missingno")) {
 			return null;
 		}
-		Identifier file = Identifier.fromNamespaceAndPath(texture.getNamespace(), "textures/" + texture.getPath() + ".png");
-		Minecraft minecraft = Minecraft.getInstance();
-		try {
-			Resource resource = minecraft.getResourceManager().getResource(file).orElse(null);
-			if (resource == null) {
+		try (NativeImage image = TextureFiles.read(texture)) {
+			if (image == null) {
 				return null;
 			}
-			try (InputStream stream = resource.open(); NativeImage image = NativeImage.read(stream)) {
-				return glowColour(image);
+			float[] fromPack = packEmissive(texture, image);
+			return fromPack != null ? fromPack : glowColour(image);
+		}
+	}
+
+	private static float[] packEmissive(Identifier texture, NativeImage albedo) {
+		float[] optifine = emissiveColour(texture, albedo, "_e", false);
+		return optifine != null ? optifine : emissiveColour(texture, albedo, "_s", true);
+	}
+
+	private static float[] emissiveColour(Identifier texture, NativeImage albedo, String suffix, boolean alphaChannel) {
+		Identifier companion = Identifier.fromNamespaceAndPath(texture.getNamespace(), texture.getPath() + suffix);
+		try (NativeImage mask = TextureFiles.read(companion)) {
+			if (mask == null) {
+				return null;
 			}
-		} catch (IOException | RuntimeException e) {
-			Luceat.LOGGER.warn("Could not read texture {}", file, e);
-			return null;
+			float red = 0.0F;
+			float green = 0.0F;
+			float blue = 0.0F;
+			float total = 0.0F;
+			for (int y = 0; y < mask.getHeight(); y++) {
+				for (int x = 0; x < mask.getWidth(); x++) {
+					int argb = mask.getPixel(x, y);
+					float weight;
+					if (alphaChannel) {
+						int alpha = ARGB.alpha(argb);
+						weight = alpha >= 255 ? 0.0F : alpha / 254.0F;
+					} else {
+						weight = ARGB.alpha(argb) < MIN_ALPHA ? 0.0F : Math.max(ARGB.red(argb), Math.max(ARGB.green(argb), ARGB.blue(argb))) / 255.0F;
+					}
+					if (weight <= 0.0F) {
+						continue;
+					}
+					int source = albedo.getPixel(x * albedo.getWidth() / mask.getWidth(), y * albedo.getHeight() / mask.getHeight());
+					if (ARGB.alpha(source) < MIN_ALPHA) {
+						continue;
+					}
+					red += weight * ARGB.red(source) / 255.0F;
+					green += weight * ARGB.green(source) / 255.0F;
+					blue += weight * ARGB.blue(source) / 255.0F;
+					total += weight;
+				}
+			}
+			float peak = Math.max(red, Math.max(green, blue));
+			if (total <= 0.0F || peak <= 0.0F) {
+				return null;
+			}
+			return new float[]{red / peak, green / peak, blue / peak};
 		}
 	}
 

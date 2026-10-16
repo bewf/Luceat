@@ -4,6 +4,8 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 
+import me.bewf.luceat.client.config.LuceatConfig;
+
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.world.entity.Entity;
@@ -12,8 +14,6 @@ import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.phys.Vec3;
 
 public final class EntityLights {
-	private static final double RANGE_SQUARED = 64.0 * 64.0;
-
 	private EntityLights() {
 	}
 
@@ -23,19 +23,23 @@ public final class EntityLights {
 		if (level == null) {
 			return lights;
 		}
+		LuceatConfig config = LuceatConfig.get();
+		double range = config.lightRange;
+		double rangeSquared = range * range;
 		for (Entity entity : level.entitiesForRendering()) {
-			if (entity.distanceToSqr(camera) > RANGE_SQUARED) {
+			if (entity.distanceToSqr(camera) > rangeSquared) {
 				continue;
 			}
 			if (entity instanceof LivingEntity living) {
-				HeldLights.collect(living, partialTick, HeldLights.isFirstPerson(living), lights);
-			} else if (entity instanceof ItemEntity item) {
+				HeldLights.collect(level, living, partialTick, lights);
+			} else if (entity instanceof ItemEntity item && config.droppedItems) {
 				addDropped(lights, item, partialTick);
 			}
 		}
-		if (lights.size() > LightBuffer.MAX_LIGHTS) {
+		int limit = Math.min(config.maxLights, LightBuffer.MAX_LIGHTS);
+		if (lights.size() > limit) {
 			lights.sort(Comparator.comparingDouble(light -> distanceSquared(light, camera)));
-			return new ArrayList<>(lights.subList(0, LightBuffer.MAX_LIGHTS));
+			return new ArrayList<>(lights.subList(0, limit));
 		}
 		return lights;
 	}
@@ -44,7 +48,7 @@ public final class EntityLights {
 		if (entity instanceof LivingEntity living) {
 			return HeldLights.brighten(living, lightCoords);
 		}
-		if (entity instanceof ItemEntity item) {
+		if (entity instanceof ItemEntity item && LuceatConfig.get().droppedItems) {
 			return HeldLights.brighten(LightSpecs.of(item.getItem(), item.isInWater()).level(), lightCoords);
 		}
 		return lightCoords;

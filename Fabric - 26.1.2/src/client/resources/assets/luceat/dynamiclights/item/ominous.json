@@ -1,0 +1,10 @@
+{
+	"match": {
+		"items": [
+			"minecraft:ominous_bottle",
+			"minecraft:ominous_trial_key"
+		]
+	},
+	"luminance": 4,
+	"color": "#4ac0b0"
+}

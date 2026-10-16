@@ -1,6 +1,7 @@
 package me.bewf.luceat.client.shadow;
 
 import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
@@ -15,8 +16,12 @@ import org.lwjgl.opengl.GL13;
 import org.lwjgl.opengl.GL20;
 import org.lwjgl.opengl.GL30;
 
+import me.bewf.luceat.client.config.LuceatConfig;
+import me.bewf.luceat.client.light.PlacedLights;
+
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.core.BlockPos;
+import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.Vec3;
 
 public final class ShadowVolume {
@@ -25,7 +30,7 @@ public final class ShadowVolume {
 	public static final int DIMENSION = CELLS * CELL_SIZE;
 	public static final String SAMPLER = "u_LuceatVoxels";
 
-	private static final int UNIT = 9;
+	private static final int UNIT = 14;
 	private static final int TOTAL = CELLS * CELLS * CELLS;
 	private static final int FILLS_PER_FRAME = 3;
 	private static final int DIRTY_PER_FRAME = 8;
@@ -40,7 +45,7 @@ public final class ShadowVolume {
 	private static final int[] cellZ = new int[TOTAL];
 	private static final boolean[] valid = new boolean[TOTAL];
 	private static final Set<Long> dirty = new HashSet<>();
-	private static final ByteBuffer cellData = BufferUtils.createByteBuffer(CELL_SIZE * CELL_SIZE * CELL_SIZE);
+	private static final ByteBuffer cellData = BufferUtils.createByteBuffer(CELL_SIZE * CELL_SIZE * CELL_SIZE * 2).order(ByteOrder.nativeOrder());
 
 	private static ClientLevel level;
 	private static int texture;
@@ -48,6 +53,18 @@ public final class ShadowVolume {
 	private static int refreshCursor;
 
 	private ShadowVolume() {
+	}
+
+	public static long bytes() {
+		return texture == 0 ? 0L : (long) DIMENSION * DIMENSION * DIMENSION * 2L;
+	}
+
+	public static void reset() {
+		Arrays.fill(valid, false);
+		dirty.clear();
+		Occluders.clear();
+		PatternAtlas.clear();
+		PlacedLights.clear();
 	}
 
 	public static void markDirty(BlockPos pos) {
@@ -60,8 +77,7 @@ public final class ShadowVolume {
 		}
 		if (clientLevel != level) {
 			level = clientLevel;
-			Arrays.fill(valid, false);
-			dirty.clear();
+			reset();
 		}
 		ensureTexture();
 		int centreX = Math.floorDiv((int) Math.floor(camera.x), CELL_SIZE);
@@ -102,7 +118,7 @@ public final class ShadowVolume {
 		GL11.glTexParameteri(GL12.GL_TEXTURE_3D, GL11.GL_TEXTURE_WRAP_S, GL12.GL_CLAMP_TO_EDGE);
 		GL11.glTexParameteri(GL12.GL_TEXTURE_3D, GL11.GL_TEXTURE_WRAP_T, GL12.GL_CLAMP_TO_EDGE);
 		GL11.glTexParameteri(GL12.GL_TEXTURE_3D, GL12.GL_TEXTURE_WRAP_R, GL12.GL_CLAMP_TO_EDGE);
-		GL12.glTexImage3D(GL12.GL_TEXTURE_3D, 0, GL30.GL_R8, DIMENSION, DIMENSION, DIMENSION, 0, GL11.GL_RED, GL11.GL_UNSIGNED_BYTE, (ByteBuffer) null);
+		GL12.glTexImage3D(GL12.GL_TEXTURE_3D, 0, GL30.GL_R16UI, DIMENSION, DIMENSION, DIMENSION, 0, GL30.GL_RED_INTEGER, GL11.GL_UNSIGNED_SHORT, (ByteBuffer) null);
 		GL13.glActiveTexture(previousUnit);
 	}
 
@@ -195,11 +211,18 @@ public final class ShadowVolume {
 		int originY = cy * CELL_SIZE;
 		int originZ = cz * CELL_SIZE;
 		cellData.clear();
+		int slot = index(cx, cy, cz);
+		PlacedLights.forget(slot);
+		int minLevel = LuceatConfig.get().placedMinLevel;
 		for (int z = 0; z < CELL_SIZE; z++) {
 			for (int y = 0; y < CELL_SIZE; y++) {
 				for (int x = 0; x < CELL_SIZE; x++) {
 					pos.set(originX + x, originY + y, originZ + z);
-					cellData.put((byte) Occluders.opacity(level.getBlockState(pos)));
+					BlockState state = level.getBlockState(pos);
+					cellData.putShort((short) Occluders.id(state, level, pos));
+					if (state.getLightEmission() >= minLevel) {
+						PlacedLights.offer(level, slot, originX + x, originY + y, originZ + z, state);
+					}
 				}
 			}
 		}
@@ -207,7 +230,7 @@ public final class ShadowVolume {
 		GL12.glTexSubImage3D(
 			GL12.GL_TEXTURE_3D, 0,
 			Math.floorMod(cx, CELLS) * CELL_SIZE, Math.floorMod(cy, CELLS) * CELL_SIZE, Math.floorMod(cz, CELLS) * CELL_SIZE,
-			CELL_SIZE, CELL_SIZE, CELL_SIZE, GL11.GL_RED, GL11.GL_UNSIGNED_BYTE, cellData
+			CELL_SIZE, CELL_SIZE, CELL_SIZE, GL30.GL_RED_INTEGER, GL11.GL_UNSIGNED_SHORT, cellData
 		);
 		int index = index(cx, cy, cz);
 		cellX[index] = cx;

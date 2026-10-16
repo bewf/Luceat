@@ -13,11 +13,11 @@ import me.bewf.luceat.client.config.LuceatConfig;
 import net.minecraft.world.phys.Vec3;
 
 public final class LightBuffer {
-	public static final int MAX_LIGHTS = 16;
+	public static final int MAX_LIGHTS = 32;
 	public static final int BINDING = 7;
 	public static final String BLOCK_NAME = "LuceatLights";
 
-	private static final int SIZE = 48 + MAX_LIGHTS * 32;
+	private static final int SIZE = 80 + MAX_LIGHTS * 32;
 
 	private final ByteBuffer scratch = BufferUtils.createByteBuffer(SIZE);
 	private int handle;
@@ -27,6 +27,8 @@ public final class LightBuffer {
 		this.scratch.clear();
 		LuceatConfig config = LuceatConfig.get();
 		this.scratch.putFloat(count).putFloat(config.shadows ? 1.0F : 0.0F).putFloat(config.brightness).putFloat(Math.max(config.maxBrightness, 0.1F));
+		this.scratch.putFloat(config.daylightFade).putFloat(config.directionalShading).putFloat(config.shadowStrength).putFloat(config.vanillaReplace);
+		this.scratch.putFloat(config.placedStrength).putFloat(config.shadowDistance).putFloat(0.0F).putFloat(0.0F);
 		int blockX = (int) Math.floor(camera.x);
 		int blockY = (int) Math.floor(camera.y);
 		int blockZ = (int) Math.floor(camera.z);
@@ -46,7 +48,7 @@ public final class LightBuffer {
 		for (int i = 0; i < MAX_LIGHTS; i++) {
 			if (i < count) {
 				LightSource light = lights.get(i);
-				this.scratch.putFloat(light.red()).putFloat(light.green()).putFloat(light.blue()).putFloat(0.0F);
+				this.scratch.putFloat(light.red()).putFloat(light.green()).putFloat(light.blue()).putFloat(light.placed() ? 1.0F : 0.0F);
 			} else {
 				this.scratch.putFloat(0.0F).putFloat(0.0F).putFloat(0.0F).putFloat(0.0F);
 			}

@@ -5,6 +5,7 @@ import java.util.List;
 import java.util.Map;
 
 import me.bewf.luceat.Luceat;
+import me.bewf.luceat.client.config.LuceatConfig;
 import me.bewf.luceat.client.light.item.ItemLightRule;
 import me.bewf.luceat.client.light.item.ItemLightRules;
 
@@ -14,6 +15,7 @@ import net.minecraft.world.item.ItemStack;
 
 public final class LightSpecs {
 	private static final LightSpec NONE = new LightSpec(0, 0.0F, 0.0F, 0.0F);
+	private static final LightSpec ENCHANT_GLOW = new LightSpec(2, 0.62F, 0.38F, 1.0F);
 	private static final float[] DEFAULT_COLOUR = {1.0F, 0.7F, 0.35F};
 	private static final Map<Item, float[]> COLOURS = new HashMap<>();
 
@@ -24,10 +26,12 @@ public final class LightSpecs {
 		COLOURS.clear();
 	}
 
-	public static LightSpec of(ItemStack stack, boolean submerged) {
+	public static LightSpec of(ItemStack stack, boolean wet) {
 		if (stack.isEmpty()) {
 			return NONE;
 		}
+		LuceatConfig config = LuceatConfig.get();
+		boolean submerged = wet && config.waterPutsOutLights;
 		List<ItemLightRule> rules = ItemLightRules.matching(stack);
 		int level = 0;
 		ItemLightRule best = null;
@@ -45,13 +49,19 @@ public final class LightSpecs {
 			level = ItemLightRule.emission(blockItem.getBlock());
 		}
 		if (level <= 0) {
+			if (config.enchantGlow && rules.isEmpty() && stack.hasFoil()) {
+				return ENCHANT_GLOW;
+			}
 			return NONE;
 		}
-		float[] colour = best != null && best.colour() != null ? best.colour() : colourOf(stack);
+		float[] colour = best != null && best.colour() != null ? best.colour() : colourOf(stack, config.textureColours);
 		return new LightSpec(level, colour[0], colour[1], colour[2]);
 	}
 
-	private static float[] colourOf(ItemStack stack) {
+	private static float[] colourOf(ItemStack stack, boolean fromTexture) {
+		if (!fromTexture) {
+			return DEFAULT_COLOUR;
+		}
 		return COLOURS.computeIfAbsent(stack.getItem(), item -> {
 			float[] estimate = ColourEstimator.estimate(stack);
 			float[] colour = estimate == null ? DEFAULT_COLOUR : estimate;

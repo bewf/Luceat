@@ -1,21 +1,55 @@
 package me.bewf.luceat.client.shadow;
 
-import me.bewf.luceat.client.config.LuceatConfig;
+import java.util.IdentityHashMap;
+import java.util.Map;
 
-import net.minecraft.world.level.block.LeavesBlock;
+import me.bewf.luceat.client.config.LuceatConfig;
+import me.bewf.luceat.client.config.ShadowQuality;
+
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.resources.model.sprite.Material;
+import net.minecraft.core.BlockPos;
+import net.minecraft.world.level.BlockGetter;
+import net.minecraft.world.level.block.RenderShape;
 import net.minecraft.world.level.block.state.BlockState;
 
 public final class Occluders {
+	private static final Map<BlockState, Integer> STATES = new IdentityHashMap<>();
+
 	private Occluders() {
 	}
 
-	public static int opacity(BlockState state) {
+	public static void clear() {
+		STATES.clear();
+	}
+
+	public static int id(BlockState state, BlockGetter level, BlockPos pos) {
+		if (state.isAir()) {
+			return 0;
+		}
+		Integer known = STATES.get(state);
+		if (known != null) {
+			return known;
+		}
+		int id = compute(state, level, pos);
+		STATES.put(state, id);
+		return id;
+	}
+
+	private static int compute(BlockState state, BlockGetter level, BlockPos pos) {
 		if (state.isSolidRender()) {
-			return 255;
+			return PatternAtlas.OPAQUE;
 		}
-		if (state.getBlock() instanceof LeavesBlock) {
-			return Math.round(255.0F * Math.clamp(LuceatConfig.get().leafShadow, 0.0F, 1.0F));
+		if (state.getRenderShape() == RenderShape.INVISIBLE || !state.isCollisionShapeFullBlock(level, pos)) {
+			return 0;
 		}
-		return 0;
+		if (LuceatConfig.get().foliageShadows == ShadowQuality.OFF) {
+			return PatternAtlas.OPAQUE;
+		}
+		Material.Baked material = Minecraft.getInstance().getModelManager().getBlockStateModelSet().getParticleMaterial(state);
+		if (material == null) {
+			return 0;
+		}
+		return PatternAtlas.idFor(material.sprite().contents().name());
 	}
 }

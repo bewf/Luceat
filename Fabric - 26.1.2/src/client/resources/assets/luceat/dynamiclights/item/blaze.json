@@ -1,9 +1,7 @@
 {
 	"match": {
-		"items": [
-			"minecraft:blaze_powder",
-			"minecraft:blaze_rod"
-		]
+		"items": "minecraft:blaze_rod"
 	},
-	"luminance": 10
+	"luminance": 10,
+	"color": "#ffa63a"
 }

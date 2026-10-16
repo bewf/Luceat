@@ -1,0 +1,8 @@
+{
+	"match": {
+		"items": "minecraft:flint_and_steel"
+	},
+	"luminance": 5,
+	"color": "#ff9a3c",
+	"water_sensitive": true
+}

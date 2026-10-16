@@ -15,6 +15,17 @@ repositories {
 			includeGroup 'maven.modrinth'
 		}
 	}
+	exclusiveContent {
+		forRepository {
+			maven {
+				name = 'Polyfrost'
+				url = 'https://repo.polyfrost.org/releases'
+			}
+		}
+		filter {
+			includeGroup 'org.polyfrost.oneconfig'
+		}
+	}
 }
 
 sourceSets {
@@ -51,6 +62,7 @@ dependencies {
 	implementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_api_version}"
 
 	clientImplementation "maven.modrinth:sodium:${project.sodium_version}"
+	clientCompileOnly "org.polyfrost.oneconfig:mod-toggles:${project.oneconfig_toggles_version}"
 }
 
 processResources {

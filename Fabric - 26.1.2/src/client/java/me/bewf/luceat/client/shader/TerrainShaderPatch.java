@@ -2,6 +2,7 @@ package me.bewf.luceat.client.shader;
 
 import me.bewf.luceat.Luceat;
 import me.bewf.luceat.client.light.LightBuffer;
+import me.bewf.luceat.client.shadow.PatternAtlas;
 import me.bewf.luceat.client.shadow.ShadowVolume;
 
 import net.minecraft.resources.Identifier;
@@ -14,54 +15,100 @@ public final class TerrainShaderPatch {
 	private static final String FRAGMENT_LIGHTING = """
 
 			in vec3 v_LuceatPos;
+			in vec4 v_LuceatBase;
 
 			layout(std140) uniform @BLOCK@ {
 			    vec4 u_LuceatState;
+			    vec4 u_LuceatOptions;
+			    vec4 u_LuceatExtra;
 			    ivec4 u_LuceatCamBlock;
 			    vec4 u_LuceatCamFrac;
 			    vec4 u_LuceatPosRadius[@LIGHTS@];
 			    vec4 u_LuceatColor[@LIGHTS@];
 			};
 
-			uniform sampler3D @SAMPLER@;
+			uniform usampler3D @SAMPLER@;
+			uniform sampler2D @PATTERNS@;
 
 			ivec3 luceatWrap(ivec3 cell) {
 			    return cell - @DIM@ * ivec3(floor(vec3(cell) / float(@DIM@)));
 			}
 
-			float luceatVisibility(vec3 pos, vec3 lightPos) {
+			vec3 luceatPattern(uint id, vec3 hit, ivec3 cell, int axis, bool positiveFace) {
+			    vec3 local = clamp(hit - vec3(cell), 0.0, 0.999);
+			    vec2 uv;
+			    if (axis == 0) {
+			        uv = vec2(positiveFace ? 1.0 - local.z : local.z, 1.0 - local.y);
+			    } else if (axis == 1) {
+			        uv = vec2(local.x, positiveFace ? local.z : 1.0 - local.z);
+			    } else {
+			        uv = vec2(positiveFace ? local.x : 1.0 - local.x, 1.0 - local.y);
+			    }
+			    int index = int(id) - 2;
+			    ivec2 tile = ivec2(index & 63, index >> 6) * 16;
+			    return texelFetch(@PATTERNS@, tile + ivec2(uv * 16.0), 0).rgb;
+			}
+
+			vec3 luceatNormal(vec3 pos) {
+			    vec3 n = cross(dFdx(pos), dFdy(pos));
+			    float size = length(n);
+			    if (size < 1.0e-12) {
+			        return vec3(0.0, 1.0, 0.0);
+			    }
+			    n /= size;
+			    return dot(n, pos) > 0.0 ? -n : n;
+			}
+
+			vec3 luceatVisibility(vec3 pos, vec3 normal, vec3 lightPos) {
 			    vec3 delta = lightPos - pos;
 			    float len = length(delta);
-			    if (len < 0.2) {
-			        return 1.0;
+			    if (len < 0.15) {
+			        return vec3(1.0);
 			    }
 			    vec3 dir = delta / len;
-			    vec3 origin = pos + dir * 0.12 + u_LuceatCamFrac.xyz;
+			    vec3 origin = pos + normal * 0.03 + dir * 0.01 + u_LuceatCamFrac.xyz;
 			    vec3 target = lightPos + u_LuceatCamFrac.xyz;
 			    ivec3 cell = ivec3(floor(origin));
+			    ivec3 lightCell = ivec3(floor(target));
 			    vec3 sgn = vec3(dir.x >= 0.0 ? 1.0 : -1.0, dir.y >= 0.0 ? 1.0 : -1.0, dir.z >= 0.0 ? 1.0 : -1.0);
 			    vec3 safe = max(abs(dir), vec3(1.0e-5));
 			    vec3 tDelta = 1.0 / safe;
 			    vec3 tMax = (vec3(cell) + max(sgn, 0.0) - origin) * sgn / safe;
 			    ivec3 stepCell = ivec3(sgn);
-			    float limit = len - 0.12;
-			    float trans = 1.0;
+			    float limit = len;
+			    float tEntry = 0.0;
+			    int entryAxis = 0;
+			    vec3 trans = vec3(1.0);
 			    for (int i = 0; i < 96; i++) {
-			        if (distance(vec3(cell) + 0.5, target) > 0.9) {
-			            float o = texelFetch(@SAMPLER@, luceatWrap(cell + u_LuceatCamBlock.xyz), 0).r;
-			            trans *= 1.0 - o;
-			            if (trans < 0.02) {
-			                return 0.0;
+			        float tExit = min(tMax.x, min(tMax.y, tMax.z));
+			        int exitAxis = tMax.x <= tMax.y && tMax.x <= tMax.z ? 0 : (tMax.y <= tMax.z ? 1 : 2);
+			        if (any(notEqual(cell, lightCell))) {
+			            uint id = texelFetch(@SAMPLER@, luceatWrap(cell + u_LuceatCamBlock.xyz), 0).r;
+			            if (id == 1u) {
+			                return vec3(0.0);
+			            }
+			            if (id > 1u && i > 0) {
+			                bool enterPositive = sgn[entryAxis] < 0.0;
+			                bool exitPositive = sgn[exitAxis] > 0.0;
+			                vec3 through = luceatPattern(id, origin + dir * tEntry, cell, entryAxis, enterPositive);
+			                if (tExit < limit) {
+			                    through = min(through, luceatPattern(id, origin + dir * tExit, cell, exitAxis, exitPositive));
+			                }
+			                trans *= through;
+			                if (max(trans.r, max(trans.g, trans.b)) < 0.02) {
+			                    return vec3(0.0);
+			                }
 			            }
 			        }
-			        float tNext = min(tMax.x, min(tMax.y, tMax.z));
-			        if (tNext >= limit) {
+			        if (tExit >= limit) {
 			            break;
 			        }
-			        if (tMax.x <= tMax.y && tMax.x <= tMax.z) {
+			        tEntry = tExit;
+			        entryAxis = exitAxis;
+			        if (exitAxis == 0) {
 			            cell.x += stepCell.x;
 			            tMax.x += tDelta.x;
-			        } else if (tMax.y <= tMax.z) {
+			        } else if (exitAxis == 1) {
 			            cell.y += stepCell.y;
 			            tMax.y += tDelta.y;
 			        } else {
@@ -78,25 +125,52 @@ public final class TerrainShaderPatch {
 			    return min(x, vec3(knee)) + (cap - knee) * (vec3(1.0) - exp(-over / (cap - knee)));
 			}
 
-			vec3 luceatLight(vec3 pos) {
+			vec3 luceatLight(vec3 pos, vec3 normal, vec4 vertexColor, vec4 baseColor) {
+			    float exposure = max(baseColor.r, max(baseColor.g, baseColor.b));
+			    float fade = 1.0 - u_LuceatOptions.x * smoothstep(0.25, 0.95, exposure);
+			    if (fade <= 0.01) {
+			        return vec3(0.0);
+			    }
+			    bool shadowsOn = u_LuceatState.y > 0.5 && length(pos) < u_LuceatExtra.y;
 			    vec3 total = vec3(0.0);
+			    float placedCover = 0.0;
 			    int count = int(u_LuceatState.x);
 			    for (int i = 0; i < count; i++) {
 			        vec4 light = u_LuceatPosRadius[i];
-			        float level = max(light.w - distance(pos, light.xyz), 0.0) / 15.0;
+			        vec3 toLight = light.xyz - pos;
+			        float dist = length(toLight);
+			        float level = max(light.w - dist, 0.0) / 15.0;
 			        if (level <= 0.0) {
 			            continue;
 			        }
+			        float ndotl = dot(normal, toLight / max(dist, 1.0e-4));
+			        float facing = mix(1.0, smoothstep(-0.35, 0.15, ndotl), u_LuceatOptions.y);
+			        if (facing <= 0.0) {
+			            continue;
+			        }
+			        bool placed = u_LuceatColor[i].w > 0.5;
+			        float lambert = mix(1.0, 0.4 + 0.6 * clamp(ndotl, 0.0, 1.0), u_LuceatOptions.y);
 			        float curved = level / (4.0 - 3.0 * level);
-			        float visible = u_LuceatState.y > 0.5 ? luceatVisibility(pos, light.xyz) : 1.0;
-			        total += u_LuceatColor[i].rgb * (u_LuceatState.z * curved * visible);
+			        float power = curved * lambert * facing * (placed ? u_LuceatExtra.x : 1.0);
+			        vec3 tint = u_LuceatColor[i].rgb;
+			        if (placed) {
+			            placedCover += curved * facing;
+			        }
+			        vec3 visible = vec3(1.0);
+			        if (shadowsOn && power * u_LuceatState.z * fade * max(tint.r, max(tint.g, tint.b)) > 0.01) {
+			            visible = mix(vec3(1.0), luceatVisibility(pos, normal, light.xyz), u_LuceatOptions.z);
+			        }
+			        total += tint * (u_LuceatState.z * power) * visible;
 			    }
-			    return luceatSoft(total, u_LuceatState.w);
+			    vec3 blockPart = max(vertexColor.rgb - baseColor.rgb, vec3(0.0));
+			    float coverage = clamp(placedCover * fade / max(dot(blockPart, vec3(0.299, 0.587, 0.114)), 0.02), 0.0, 1.0);
+			    return luceatSoft(total, u_LuceatState.w) * fade - blockPart * (u_LuceatOptions.w * coverage);
 			}
 			"""
 			.replace("@BLOCK@", LightBuffer.BLOCK_NAME)
 			.replace("@LIGHTS@", Integer.toString(LightBuffer.MAX_LIGHTS))
 			.replace("@SAMPLER@", ShadowVolume.SAMPLER)
+			.replace("@PATTERNS@", PatternAtlas.SAMPLER)
 			.replace("@DIM@", Integer.toString(ShadowVolume.DIMENSION));
 
 	private static boolean vertexPatched;
@@ -120,14 +194,15 @@ public final class TerrainShaderPatch {
 	}
 
 	private static String patchVertex(String source) {
-		String patched = replaceOnce(source, "flat out uint v_Material;", "flat out uint v_Material;\nout vec3 v_LuceatPos;");
-		return replaceOnce(patched, "vec3 position = _vert_position + translation;", "vec3 position = _vert_position + translation;\n    v_LuceatPos = position;");
+		String patched = replaceOnce(source, "flat out uint v_Material;", "flat out uint v_Material;\nout vec3 v_LuceatPos;\nout vec4 v_LuceatBase;");
+		patched = replaceOnce(patched, "vec3 position = _vert_position + translation;", "vec3 position = _vert_position + translation;\n    v_LuceatPos = position;");
+		return replaceOnce(patched, "v_Color = _vert_color * texture(u_LightTex, _vert_tex_light_coord);", "v_Color = _vert_color * texture(u_LightTex, _vert_tex_light_coord);\n    v_LuceatBase = _vert_color * texture(u_LightTex, vec2(0.0, _vert_tex_light_coord.y));");
 	}
 
 	private static String patchFragment(String source) {
 		String patched = replaceOnce(source, "flat in uint v_Material;", "flat in uint v_Material;\n" + FRAGMENT_LIGHTING);
-		patched = replaceOnce(patched, "color *= v_Color;", "vec3 luceatAlbedo = color.rgb;\n    color *= v_Color;");
-		return replaceOnce(patched, "fragColor = _linearFog(", "color.rgb += luceatAlbedo * luceatLight(v_LuceatPos);\n\n    fragColor = _linearFog(");
+		patched = replaceOnce(patched, "color *= v_Color;", "vec3 luceatAlbedo = color.rgb;\n    vec3 luceatFaceNormal = luceatNormal(v_LuceatPos);\n    color *= v_Color;");
+		return replaceOnce(patched, "fragColor = _linearFog(", "color.rgb += luceatAlbedo * luceatLight(v_LuceatPos, luceatFaceNormal, v_Color, v_LuceatBase);\n\n    fragColor = _linearFog(");
 	}
 
 	private static String replaceOnce(String source, String anchor, String replacement) {
