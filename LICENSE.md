@@ -10,7 +10,7 @@ The source code for this software is publicly viewable ("source-available"); how
 
 You are allowed to:
 
-* Include this software in modpacks, provided it is distributed unchanged
+* Include this software in modpacks hosted on modrinth or github, provided it is distributed unchanged
 * Redistribute the original, unmodified JAR file only as part of a free modpack
 * Promote, showcase, or review the software freely
 
