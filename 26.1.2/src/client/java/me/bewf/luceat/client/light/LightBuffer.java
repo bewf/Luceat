@@ -28,7 +28,7 @@ public final class LightBuffer {
 		LuceatConfig config = LuceatConfig.get();
 		this.scratch.putFloat(count).putFloat(config.shadows ? 1.0F : 0.0F).putFloat(config.brightness).putFloat(Math.max(config.maxBrightness, 0.1F));
 		this.scratch.putFloat(config.daylightFade).putFloat(config.directionalShading).putFloat(config.shadowStrength).putFloat(config.vanillaReplace);
-		this.scratch.putFloat(config.placedStrength).putFloat(config.shadowDistance).putFloat(0.0F).putFloat(0.0F);
+		this.scratch.putFloat(config.placedStrength).putFloat(config.shadowDistance).putFloat(config.shadowSoftness * 0.45F).putFloat(0.0F);
 		int blockX = (int) Math.floor(camera.x);
 		int blockY = (int) Math.floor(camera.y);
 		int blockZ = (int) Math.floor(camera.z);
