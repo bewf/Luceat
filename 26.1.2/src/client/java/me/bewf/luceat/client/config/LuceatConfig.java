@@ -30,6 +30,10 @@ public final class LuceatConfig {
 	public boolean mobs = true;
 	public boolean droppedItems = true;
 	public boolean enchantGlow = true;
+	public boolean itemFrames = true;
+	public boolean naturalLights = true;
+	public float flicker = 0.0F;
+	public float heldHeight = 0.7F;
 	public boolean waterPutsOutLights = true;
 	public int maxLights = 16;
 	public int lightRange = 64;
@@ -43,9 +47,15 @@ public final class LuceatConfig {
 	public int shadowDistance = 48;
 	public float shadowStrength = 1.0F;
 	public boolean keepLightOutOfWalls = true;
+	public float shadowSoftness = 0.0F;
+	public boolean thinShadows = true;
+	public boolean plantShadows = true;
 	public ShadowQuality foliageShadows = ShadowQuality.FANCY;
 	public boolean glassTint = true;
 	public float cutoutOpacity = 0.9F;
+
+	public boolean entityShadows = true;
+	public float entityShadowStrength = 0.5F;
 
 	public boolean updateChecker = true;
 
@@ -78,6 +88,43 @@ public final class LuceatConfig {
 		}
 	}
 
+	public static String snapshot() {
+		return GSON.toJson(current);
+	}
+
+	public LuceatConfig copy() {
+		LuceatConfig made = GSON.fromJson(GSON.toJson(this), LuceatConfig.class);
+		made.clamp();
+		return made;
+	}
+
+	public String asJson() {
+		return GSON.toJson(this);
+	}
+
+	public static void restore(String json) {
+		LuceatConfig loaded = GSON.fromJson(json, LuceatConfig.class);
+		if (loaded == null) {
+			return;
+		}
+		loaded.clamp();
+		current.copyFrom(loaded);
+	}
+
+	public void copyFrom(LuceatConfig other) {
+		for (java.lang.reflect.Field field : LuceatConfig.class.getDeclaredFields()) {
+			int modifiers = field.getModifiers();
+			if (java.lang.reflect.Modifier.isStatic(modifiers) || java.lang.reflect.Modifier.isFinal(modifiers)) {
+				continue;
+			}
+			try {
+				field.set(this, field.get(other));
+			} catch (IllegalAccessException e) {
+				Luceat.LOGGER.warn("Could not copy {}", field.getName(), e);
+			}
+		}
+	}
+
 	private static Path path() {
 		return FabricLoader.getInstance().getConfigDir().resolve("luceat.json");
 	}
@@ -95,6 +142,10 @@ public final class LuceatConfig {
 		vanillaReplace = Math.max(0.0F, Math.min(vanillaReplace, 1.0F));
 		placedMinLevel = Math.max(1, Math.min(placedMinLevel, 15));
 		shadowDistance = Math.max(8, Math.min(shadowDistance, 128));
+		shadowSoftness = Math.max(0.0F, Math.min(shadowSoftness, 1.0F));
+		flicker = Math.max(0.0F, Math.min(flicker, 1.0F));
+		heldHeight = Math.max(0.3F, Math.min(heldHeight, 1.0F));
+		entityShadowStrength = Math.max(0.0F, Math.min(entityShadowStrength, 1.0F));
 		if (foliageShadows == null) {
 			foliageShadows = ShadowQuality.FANCY;
 		}
