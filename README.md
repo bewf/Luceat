@@ -2,11 +2,18 @@
 
 Client-side dynamic lighting for Minecraft Java on Fabric. Lights are shaded on the GPU, so moving a light never rebuilds chunks.
 
-Target: Minecraft 26.1.2, Fabric, with Sodium as an optional companion.
+Sodium is an optional companion. Status: early development.
 
-Status: early development.
+## Versions
+
+Every Minecraft version has its own folder with its own build.
+
+| Folder | Minecraft | Status |
+| --- | --- | --- |
+| [26.1.2](26.1.2) | 26.1.2 | In development |
+
+To build one, open its folder and run `./gradlew build`. The jar ends up in `build/libs`.
 
 ## License
 
-
-##### Code licensed under [ARR](https://github.com/bewf/luceat/blob/main/LICENSE.md). Unmodified redistribution **in free modpacks** is permitted with credit. See the [full license](https://github.com/bewf/mint/blob/main/LICENSE.md) on GitHub for details.
+##### Code licensed under [ARR](https://github.com/bewf/luceat/blob/main/LICENSE.md). Unmodified redistribution **in free modpacks** is permitted with credit. See the [full license](https://github.com/bewf/luceat/blob/main/LICENSE.md) on GitHub for details.

@@ -1,7 +1,5 @@
-# Automatically build the project and run any configured tests for every push
-# and submitted pull request. This can help catch issues that only occur on
-# certain platforms or Java versions, and provides a first line of defence
-# against bad commits.
+# Builds every version folder on each push and pull request.
+# To add a new Minecraft version, add its folder name to the list below.
 
 name: build
 on: [pull_request, push]
@@ -9,6 +7,13 @@ on: [pull_request, push]
 jobs:
   build:
     runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        version: ['26.1.2']
+    defaults:
+      run:
+        working-directory: ${{ matrix.version }}
     steps:
       - name: checkout repository
         uses: actions/checkout@v6
@@ -26,5 +31,5 @@ jobs:
       - name: capture build artifacts
         uses: actions/upload-artifact@v7
         with:
-          name: Artifacts
-          path: build/libs/
+          name: Luceat-${{ matrix.version }}
+          path: ${{ matrix.version }}/build/libs/

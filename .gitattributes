@@ -1,9 +1,15 @@
 #
 # https://help.github.com/articles/dealing-with-line-endings/
 #
+# Every text file uses lf on every computer, so patches always apply
+* text=auto eol=lf
+
 # Linux start script should use lf
-/gradlew        text eol=lf
+gradlew         text eol=lf
 
 # These are Windows script files and should use crlf
 *.bat           text eol=crlf
 
+# Never touch these
+*.png           binary
+*.jar           binary
