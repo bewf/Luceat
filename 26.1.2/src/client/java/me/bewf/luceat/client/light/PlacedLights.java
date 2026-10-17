@@ -6,6 +6,7 @@ import java.util.List;
 import java.util.Map;
 
 import me.bewf.luceat.client.config.LuceatConfig;
+import me.bewf.luceat.client.light.block.BlockRules;
 
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.core.BlockPos;
@@ -81,7 +82,7 @@ public final class PlacedLights {
 		slot[count * 3] = (float) px;
 		slot[count * 3 + 1] = (float) py;
 		slot[count * 3 + 2] = (float) pz;
-		levels[cell][count] = (byte) state.getLightEmission();
+		levels[cell][count] = (byte) BlockRules.emission(state);
 		states[cell][count] = state;
 		counts[cell] = count + 1;
 	}
@@ -139,7 +140,7 @@ public final class PlacedLights {
 			acceptedZ[accepted] = z;
 			accepted++;
 			float[] colour = colourOf(states[cell][slotIndex]);
-			out.add(new LightSource(x, y, z, colour[0], colour[1], colour[2], levels[cell][slotIndex], true));
+			out.add(new LightSource(x, y, z, colour[0], colour[1], colour[2], levels[cell][slotIndex], true, LightSource.warm(colour[0], colour[2], levels[cell][slotIndex]), 0L));
 		}
 	}
 
@@ -156,6 +157,10 @@ public final class PlacedLights {
 	}
 
 	private static float[] colourOf(BlockState state) {
+		float[] forced = BlockRules.colour(state);
+		if (forced != null) {
+			return forced;
+		}
 		if (!LuceatConfig.get().textureColours) {
 			return DEFAULT_COLOUR;
 		}

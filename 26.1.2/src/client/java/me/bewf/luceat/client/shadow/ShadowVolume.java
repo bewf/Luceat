@@ -18,6 +18,7 @@ import org.lwjgl.opengl.GL30;
 
 import me.bewf.luceat.client.config.LuceatConfig;
 import me.bewf.luceat.client.light.PlacedLights;
+import me.bewf.luceat.client.light.block.BlockRules;
 
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.core.BlockPos;
@@ -220,7 +221,7 @@ public final class ShadowVolume {
 					pos.set(originX + x, originY + y, originZ + z);
 					BlockState state = level.getBlockState(pos);
 					cellData.putShort((short) Occluders.id(state, level, pos));
-					if (state.getLightEmission() >= minLevel) {
+					if (BlockRules.emission(state) >= minLevel) {
 						PlacedLights.offer(level, slot, originX + x, originY + y, originZ + z, state);
 					}
 				}

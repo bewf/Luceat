@@ -6,6 +6,8 @@ import java.util.Map;
 
 import me.bewf.luceat.Luceat;
 import me.bewf.luceat.client.config.LuceatConfig;
+import me.bewf.luceat.client.light.block.BlockRule;
+import me.bewf.luceat.client.light.block.BlockRules;
 import me.bewf.luceat.client.light.item.ItemLightRule;
 import me.bewf.luceat.client.light.item.ItemLightRules;
 
@@ -31,6 +33,10 @@ public final class LightSpecs {
 			return NONE;
 		}
 		LuceatConfig config = LuceatConfig.get();
+		BlockRule custom = BlockRules.forItem(stack.getItem());
+		if (custom != null && !custom.enabled) {
+			return NONE;
+		}
 		boolean submerged = wet && config.waterPutsOutLights;
 		List<ItemLightRule> rules = ItemLightRules.matching(stack);
 		int level = 0;
@@ -48,13 +54,16 @@ public final class LightSpecs {
 		if (rules.isEmpty() && stack.getItem() instanceof BlockItem blockItem) {
 			level = ItemLightRule.emission(blockItem.getBlock());
 		}
+		if (custom != null && custom.level >= 0) {
+			level = custom.level;
+		}
 		if (level <= 0) {
 			if (config.enchantGlow && rules.isEmpty() && stack.hasFoil()) {
 				return ENCHANT_GLOW;
 			}
 			return NONE;
 		}
-		float[] colour = best != null && best.colour() != null ? best.colour() : colourOf(stack, config.textureColours);
+		float[] colour = custom != null && custom.colour >= 0 ? custom.rgb() : best != null && best.colour() != null ? best.colour() : colourOf(stack, config.textureColours);
 		return new LightSpec(level, colour[0], colour[1], colour[2]);
 	}
 
