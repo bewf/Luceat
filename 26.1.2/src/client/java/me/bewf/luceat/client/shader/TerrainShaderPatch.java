@@ -3,6 +3,7 @@ package me.bewf.luceat.client.shader;
 import me.bewf.luceat.Luceat;
 import me.bewf.luceat.client.light.LightBuffer;
 import me.bewf.luceat.client.shadow.PatternAtlas;
+import me.bewf.luceat.client.shadow.ShapeMasks;
 import me.bewf.luceat.client.shadow.ShadowVolume;
 
 import net.minecraft.resources.Identifier;
@@ -29,6 +30,7 @@ public final class TerrainShaderPatch {
 
 			uniform usampler3D @SAMPLER@;
 			uniform sampler2D @PATTERNS@;
+			uniform sampler2D @SHAPES@;
 
 			ivec3 luceatWrap(ivec3 cell) {
 			    return cell - @DIM@ * ivec3(floor(vec3(cell) / float(@DIM@)));
@@ -46,7 +48,7 @@ public final class TerrainShaderPatch {
 			    }
 			    int index = int(id) - 2;
 			    ivec2 tile = ivec2(index & 63, index >> 6) * 16;
-			    return texelFetch(@PATTERNS@, tile + ivec2(uv * 16.0), 0).rgb;
+			    return texelFetch(@PATTERNS@, tile + min(ivec2(uv * 16.0), ivec2(15)), 0).rgb;
 			}
 
 			vec3 luceatNormal(vec3 pos) {
@@ -57,6 +59,49 @@ public final class TerrainShaderPatch {
 			    }
 			    n /= size;
 			    return dot(n, pos) > 0.0 ? -n : n;
+			}
+
+			vec3 luceatShape(uint tile, vec3 origin, vec3 dir, ivec3 cell, float t0, float t1, vec3 sgn, vec3 safe) {
+			    vec3 local = (origin + dir * t0 - vec3(cell)) * 8.0 + dir * 0.01;
+			    local = clamp(local, vec3(0.0), vec3(7.999));
+			    ivec3 v = ivec3(floor(local));
+			    vec3 tDelta = 1.0 / (safe * 8.0);
+			    vec3 tMax = vec3(t0) + (vec3(v) + max(sgn, 0.0) - local) * sgn / (safe * 8.0);
+			    ivec3 stepCell = ivec3(sgn);
+			    ivec2 base = ivec2(int(tile & 15u) * 64, int(tile >> 4u) * 8);
+			    vec3 trans = vec3(1.0);
+			    float t = t0;
+			    for (int k = 0; k < 24; k++) {
+			        float tNext = min(tMax.x, min(tMax.y, tMax.z));
+			        float tEnd = min(tNext, t1);
+			        if (tEnd > 0.07) {
+			            vec3 vt = texelFetch(@SHAPES@, base + ivec2(v.z * 8 + v.x, v.y), 0).rgb;
+			            if (vt.r < 0.999 || vt.g < 0.999 || vt.b < 0.999) {
+			                if (max(vt.r, max(vt.g, vt.b)) < 0.03) {
+			                    return vec3(0.0);
+			                }
+			                trans *= pow(max(vt, vec3(0.03)), vec3(max(tEnd - max(t, 0.07), 0.0) * 8.0));
+			            }
+			        }
+			        if (tNext >= t1) {
+			            break;
+			        }
+			        t = tNext;
+			        if (tMax.x <= tMax.y && tMax.x <= tMax.z) {
+			            v.x += stepCell.x;
+			            tMax.x += tDelta.x;
+			        } else if (tMax.y <= tMax.z) {
+			            v.y += stepCell.y;
+			            tMax.y += tDelta.y;
+			        } else {
+			            v.z += stepCell.z;
+			            tMax.z += tDelta.z;
+			        }
+			        if (any(lessThan(v, ivec3(0))) || any(greaterThan(v, ivec3(7)))) {
+			            break;
+			        }
+			    }
+			    return trans;
 			}
 
 			vec3 luceatVisibility(vec3 pos, vec3 normal, vec3 lightPos) {
@@ -87,14 +132,18 @@ public final class TerrainShaderPatch {
 			            if (id == 1u) {
 			                return vec3(0.0);
 			            }
-			            if (id > 1u && i > 0) {
-			                bool enterPositive = sgn[entryAxis] < 0.0;
-			                bool exitPositive = sgn[exitAxis] > 0.0;
-			                vec3 through = luceatPattern(id, origin + dir * tEntry, cell, entryAxis, enterPositive);
-			                if (tExit < limit) {
-			                    through = min(through, luceatPattern(id, origin + dir * tExit, cell, exitAxis, exitPositive));
+			            if (id > 1u) {
+			                if ((id & 32768u) != 0u) {
+			                    trans *= luceatShape(id & 32767u, origin, dir, cell, tEntry, min(tExit, limit), sgn, safe);
+			                } else if (i > 0) {
+			                    bool enterPositive = sgn[entryAxis] < 0.0;
+			                    bool exitPositive = sgn[exitAxis] > 0.0;
+			                    vec3 through = luceatPattern(id, origin + dir * tEntry, cell, entryAxis, enterPositive);
+			                    if (tExit < limit) {
+			                        through *= luceatPattern(id, origin + dir * tExit, cell, exitAxis, exitPositive);
+			                    }
+			                    trans *= through;
 			                }
-			                trans *= through;
 			                if (max(trans.r, max(trans.g, trans.b)) < 0.02) {
 			                    return vec3(0.0);
 			                }
@@ -117,6 +166,28 @@ public final class TerrainShaderPatch {
 			        }
 			    }
 			    return trans;
+			}
+
+			vec3 luceatShadow(vec3 pos, vec3 normal, vec3 lightPos) {
+			    vec3 centre = luceatVisibility(pos, normal, lightPos);
+			    float radius = u_LuceatExtra.z;
+			    if (radius <= 0.0 || max(centre.r, max(centre.g, centre.b)) > 0.98) {
+			        return centre;
+			    }
+			    vec3 dir = normalize(lightPos - pos);
+			    vec3 side = normalize(cross(dir, abs(dir.y) > 0.9 ? vec3(1.0, 0.0, 0.0) : vec3(0.0, 1.0, 0.0)));
+			    vec3 up = cross(dir, side);
+			    ivec3 home = ivec3(floor(lightPos + u_LuceatCamFrac.xyz));
+			    vec3 total = centre;
+			    for (int k = 0; k < 3; k++) {
+			        float angle = 2.0943951 * float(k) + 0.5;
+			        vec3 spot = lightPos + (side * cos(angle) + up * sin(angle)) * radius;
+			        if (ivec3(floor(spot + u_LuceatCamFrac.xyz)) != home) {
+			            spot = lightPos;
+			        }
+			        total += luceatVisibility(pos, normal, spot);
+			    }
+			    return total * 0.25;
 			}
 
 			vec3 luceatSoft(vec3 x, float cap) {
@@ -158,7 +229,7 @@ public final class TerrainShaderPatch {
 			        }
 			        vec3 visible = vec3(1.0);
 			        if (shadowsOn && power * u_LuceatState.z * fade * max(tint.r, max(tint.g, tint.b)) > 0.01) {
-			            visible = mix(vec3(1.0), luceatVisibility(pos, normal, light.xyz), u_LuceatOptions.z);
+			            visible = mix(vec3(1.0), luceatShadow(pos, normal, light.xyz), u_LuceatOptions.z);
 			        }
 			        total += tint * (u_LuceatState.z * power) * visible;
 			    }
@@ -171,6 +242,7 @@ public final class TerrainShaderPatch {
 			.replace("@LIGHTS@", Integer.toString(LightBuffer.MAX_LIGHTS))
 			.replace("@SAMPLER@", ShadowVolume.SAMPLER)
 			.replace("@PATTERNS@", PatternAtlas.SAMPLER)
+			.replace("@SHAPES@", ShapeMasks.SAMPLER)
 			.replace("@DIM@", Integer.toString(ShadowVolume.DIMENSION));
 
 	private static boolean vertexPatched;

@@ -89,7 +89,24 @@ public final class PatternAtlas {
 	}
 
 	private static void fill(NativeImage image) {
-		LuceatConfig config = LuceatConfig.get();
+		float[] data = compute(image, LuceatConfig.get());
+		TILE_DATA.clear();
+		for (int i = 0; i < TILE * TILE; i++) {
+			for (int c = 0; c < 3; c++) {
+				TILE_DATA.put((byte) Math.round(Math.clamp(data[i * 3 + c], 0.0F, 1.0F) * 255.0F));
+			}
+			TILE_DATA.put((byte) -1);
+		}
+		TILE_DATA.flip();
+	}
+
+	public static float[] cpuTile(Identifier sprite, LuceatConfig config) {
+		try (NativeImage image = TextureFiles.read(sprite)) {
+			return image == null ? null : compute(image, config);
+		}
+	}
+
+	private static float[] compute(NativeImage image, LuceatConfig config) {
 		int width = image.getWidth();
 		int height = Math.min(image.getHeight(), width);
 		float opaqueBlock = 1.0F - Math.clamp(config.cutoutOpacity, 0.0F, 1.0F);
@@ -117,18 +134,43 @@ public final class PatternAtlas {
 			}
 		}
 		boolean uniform = config.foliageShadows == ShadowQuality.FAST;
-		TILE_DATA.clear();
+		if (!uniform) {
+			soften(tile);
+		}
+		float[] data = new float[TILE * TILE * 3];
 		for (int i = 0; i < TILE * TILE; i++) {
 			for (int c = 0; c < 3; c++) {
-				float value = uniform ? sum[c] / (TILE * TILE) : tile[i][c];
-				TILE_DATA.put((byte) Math.round(Math.clamp(value, 0.0F, 1.0F) * 255.0F));
+				data[i * 3 + c] = uniform ? sum[c] / (TILE * TILE) : tile[i][c];
 			}
-			TILE_DATA.put((byte) -1);
 		}
-		TILE_DATA.flip();
+		return data;
 	}
 
-	private static void pixel(int argb, float opaqueBlock, boolean tint, float[] out) {
+	private static void soften(float[][] tile) {
+		float[][] source = new float[tile.length][];
+		for (int i = 0; i < tile.length; i++) {
+			source[i] = tile[i].clone();
+		}
+		for (int y = 0; y < TILE; y++) {
+			for (int x = 0; x < TILE; x++) {
+				float[] out = tile[x + y * TILE];
+				for (int c = 0; c < 3; c++) {
+					float total = 0.0F;
+					for (int dy = -1; dy <= 1; dy++) {
+						for (int dx = -1; dx <= 1; dx++) {
+							int sx = Math.min(TILE - 1, Math.max(0, x + dx));
+							int sy = Math.min(TILE - 1, Math.max(0, y + dy));
+							float weight = (dx == 0 ? 2.0F : 1.0F) * (dy == 0 ? 2.0F : 1.0F);
+							total += source[sx + sy * TILE][c] * weight;
+						}
+					}
+					out[c] = total / 16.0F;
+				}
+			}
+		}
+	}
+
+	static void pixel(int argb, float opaqueBlock, boolean tint, float[] out) {
 		float alpha = ARGB.alpha(argb) / 255.0F;
 		if (alpha <= 0.0F) {
 			out[0] += 1.0F;
