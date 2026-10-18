@@ -18,6 +18,7 @@ public final class LuceatLook {
 	public static final int MUTED = 0xFF6C6C7C;
 	public static final int GOOD = 0xFF5BE38A;
 	public static final int WARN = 0xFFFFC857;
+	public static final int ORANGE = 0xFFFF9A4D;
 	public static final int BAD = 0xFFFF6B6B;
 	public static final int TRACK = 0xFF3A3A47;
 

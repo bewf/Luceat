@@ -3,10 +3,11 @@ package me.bewf.luceat.client.gui.setting;
 import me.bewf.luceat.client.gui.LuceatLook;
 
 public enum Cost {
-	NONE("None", LuceatLook.GOOD),
+	NONE("None", LuceatLook.MUTED),
 	LOW("Low", LuceatLook.GOOD),
 	MEDIUM("Medium", LuceatLook.WARN),
-	HIGH("High", LuceatLook.BAD);
+	HIGH("High", LuceatLook.ORANGE),
+	VERY_HIGH("Very high", LuceatLook.BAD);
 
 	private final String label;
 	private final int colour;
@@ -24,13 +25,16 @@ public enum Cost {
 		return colour;
 	}
 
-	public static Cost fromMillis(float millis) {
-		if (millis < 0.15F) {
+	public static Cost fromShare(float percent) {
+		if (percent < 0.5F) {
 			return NONE;
 		}
-		if (millis < 0.6F) {
+		if (percent < 2.5F) {
 			return LOW;
 		}
-		return millis < 1.5F ? MEDIUM : HIGH;
+		if (percent < 7.0F) {
+			return MEDIUM;
+		}
+		return percent < 15.0F ? HIGH : VERY_HIGH;
 	}
 }

@@ -1,6 +1,7 @@
 package me.bewf.luceat.client.gui;
 
 import java.util.HashMap;
+import java.util.Locale;
 import java.util.Map;
 
 import me.bewf.luceat.client.gui.setting.Cost;
@@ -10,20 +11,34 @@ import me.bewf.luceat.client.shadow.ShadowVolume;
 import net.minecraft.client.Minecraft;
 
 public final class PerfTest {
-	private static final int WARM_FRAMES = 20;
-	private static final int SAMPLE_FRAMES = 90;
+	private static final int ROUNDS = 3;
+	private static final int WARM_FRAMES = 12;
+	private static final int SAMPLE_FRAMES = 40;
+	private static final int STEPS = ROUNDS * 2;
 
-	private enum Phase {
-		IDLE, WARM_FIRST, SAMPLE_FIRST, WARM_SECOND, SAMPLE_SECOND
+	public record Result(float millis, float percent) {
+		public Cost cost() {
+			return Cost.fromShare(percent);
+		}
+
+		public String text() {
+			return String.format(Locale.ROOT, "%.2f ms, %.1f%% of a frame, %s", millis, percent, cost().label().toLowerCase(Locale.ROOT));
+		}
 	}
 
-	private final Map<Setting, Float> results = new HashMap<>();
+	private enum Phase {
+		IDLE, WARM, SAMPLE
+	}
+
+	private final Map<Setting, Result> results = new HashMap<>();
 	private Setting target;
 	private Object snapshot;
 	private Phase phase = Phase.IDLE;
+	private int step;
 	private int frames;
-	private double first;
-	private double second;
+	private double sum;
+	private double totalA;
+	private double totalB;
 	private long last;
 	private String note = "";
 
@@ -39,8 +54,12 @@ public final class PerfTest {
 		return note;
 	}
 
-	public Float result(Setting setting) {
+	public Result result(Setting setting) {
 		return results.get(setting);
+	}
+
+	public void forget() {
+		results.clear();
 	}
 
 	public void start(Setting setting) {
@@ -59,10 +78,14 @@ public final class PerfTest {
 		note = "";
 		target = setting;
 		snapshot = setting.snapshot();
-		phase = Phase.WARM_FIRST;
+		setting.useTestState(false);
+		applied(setting);
+		phase = Phase.WARM;
+		step = 0;
 		frames = 0;
-		first = 0.0;
-		second = 0.0;
+		sum = 0.0;
+		totalA = 0.0;
+		totalB = 0.0;
 		last = 0L;
 	}
 
@@ -86,61 +109,49 @@ public final class PerfTest {
 		double millis = (now - last) / 1.0E6;
 		last = now;
 		frames++;
-		switch (phase) {
-			case WARM_FIRST -> {
-				if (frames >= WARM_FRAMES) {
-					phase = Phase.SAMPLE_FIRST;
-					frames = 0;
-				}
+		if (phase == Phase.WARM) {
+			if (frames >= WARM_FRAMES) {
+				phase = Phase.SAMPLE;
+				frames = 0;
+				sum = 0.0;
 			}
-			case SAMPLE_FIRST -> {
-				first += millis;
-				if (frames >= SAMPLE_FRAMES) {
-					target.useOtherState();
-					applied(target);
-					phase = Phase.WARM_SECOND;
-					frames = 0;
-				}
-			}
-			case WARM_SECOND -> {
-				if (frames >= WARM_FRAMES) {
-					phase = Phase.SAMPLE_SECOND;
-					frames = 0;
-				}
-			}
-			case SAMPLE_SECOND -> {
-				second += millis;
-				if (frames >= SAMPLE_FRAMES) {
-					target.restore(snapshot);
-					applied(target);
-					float difference = (float) Math.abs(first - second) / SAMPLE_FRAMES;
-					results.put(target, difference);
-					note = "";
-					phase = Phase.IDLE;
-				}
-			}
-			default -> {
-			}
+			return;
 		}
+		sum += millis;
+		if (frames < SAMPLE_FRAMES) {
+			return;
+		}
+		if (step % 2 == 0) {
+			totalA += sum / SAMPLE_FRAMES;
+		} else {
+			totalB += sum / SAMPLE_FRAMES;
+		}
+		step++;
+		frames = 0;
+		if (step >= STEPS) {
+			target.restore(snapshot);
+			applied(target);
+			double a = totalA / ROUNDS;
+			double b = totalB / ROUNDS;
+			float difference = (float) Math.abs(a - b);
+			float percent = (float) (difference / Math.max(Math.max(a, b), 0.001) * 100.0);
+			results.put(target, new Result(difference, percent));
+			note = "";
+			phase = Phase.IDLE;
+			return;
+		}
+		target.useTestState(step % 2 == 1);
+		applied(target);
+		phase = Phase.WARM;
 	}
 
 	public int progress() {
 		if (!running()) {
 			return 0;
 		}
-		int total = (WARM_FRAMES + SAMPLE_FRAMES) * 2;
-		int done = switch (phase) {
-			case WARM_FIRST -> frames;
-			case SAMPLE_FIRST -> WARM_FRAMES + frames;
-			case WARM_SECOND -> WARM_FRAMES + SAMPLE_FRAMES + frames;
-			case SAMPLE_SECOND -> 2 * WARM_FRAMES + SAMPLE_FRAMES + frames;
-			default -> 0;
-		};
-		return Math.min(100, done * 100 / total);
-	}
-
-	public static String describe(float millis) {
-		return String.format(java.util.Locale.ROOT, "%.2f ms, %s", millis, Cost.fromMillis(millis).label().toLowerCase());
+		int unit = WARM_FRAMES + SAMPLE_FRAMES;
+		int done = step * unit + (phase == Phase.WARM ? frames : WARM_FRAMES + frames);
+		return Math.min(100, done * 100 / (STEPS * unit));
 	}
 
 	private static void applied(Setting setting) {

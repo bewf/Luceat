@@ -53,8 +53,8 @@ public final class ChoiceSetting<E extends Enum<E>> extends Setting {
 	}
 
 	@Override
-	public void useOtherState() {
-		choose(index() == 0 ? values.length - 1 : 0);
+	public void useTestState(boolean high) {
+		choose(high ? values.length - 1 : 0);
 	}
 
 	@Override

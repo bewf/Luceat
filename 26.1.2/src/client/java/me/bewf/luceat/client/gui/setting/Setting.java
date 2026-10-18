@@ -50,7 +50,14 @@ public abstract class Setting {
 		return null;
 	}
 
-	public void useOtherState() {
+	public static boolean same(Object a, Object b) {
+		if (a instanceof Float x && b instanceof Float y) {
+			return Math.abs(x - y) < 0.0005F;
+		}
+		return java.util.Objects.equals(a, b);
+	}
+
+	public void useTestState(boolean high) {
 	}
 
 	public void restore(Object snapshot) {

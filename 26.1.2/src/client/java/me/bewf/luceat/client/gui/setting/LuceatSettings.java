@@ -23,7 +23,10 @@ public final class LuceatSettings {
 	}
 
 	public static List<Setting> create() {
-		LuceatConfig c = LuceatConfig.get();
+		return create(LuceatConfig.get());
+	}
+
+	public static List<Setting> create(LuceatConfig c) {
 		List<Setting> all = new ArrayList<>();
 
 		all.add(new ToggleSetting(LIGHTING, "Luceat",
@@ -63,6 +66,15 @@ public final class LuceatSettings {
 		all.add(new ToggleSetting(SHADOWS, "Keep lights out of walls",
 			"If a held light would end up inside a wall, it is moved back out so the wall does not go dark.",
 			Cost.LOW, false, () -> c.keepLightOutOfWalls, value -> c.keepLightOutOfWalls = value));
+		all.add(new SliderSetting(SHADOWS, "Soft edges",
+			"Blurs the edge of shadows. Zero is sharp and fastest. Higher is softer and costs more.",
+			Cost.MEDIUM, false, 0.0F, 1.0F, 0.05F, "", () -> c.shadowSoftness, value -> c.shadowSoftness = value));
+		all.add(new ToggleSetting(SHADOWS, "Fences, panes, slabs and more",
+			"Blocks that are not full cubes, like fences, bars, doors, stairs and slabs, cast their real shape as a shadow.",
+			Cost.MEDIUM, true, () -> c.thinShadows, value -> c.thinShadows = value));
+		all.add(new ToggleSetting(SHADOWS, "Grass and flowers",
+			"Plants cast a soft shadow too.",
+			Cost.LOW, true, () -> c.plantShadows, value -> c.plantShadows = value));
 		all.add(new ChoiceSetting<>(SHADOWS, "Leaves and holes",
 			"Off: leaves, grates and similar blocks work like solid blocks. Fast: they dim the light by how much of the block is see through. Fancy: they cast the real shape of the leaves or holes.",
 			Cost.MEDIUM, true, ShadowQuality.values(), new String[]{"Off", "Fast", "Fancy"}, () -> c.foliageShadows, value -> c.foliageShadows = value));
@@ -104,6 +116,18 @@ public final class LuceatSettings {
 		all.add(new ToggleSetting(SOURCES, "Dropped items",
 			"Items lying on the ground give off light.",
 			Cost.LOW, false, () -> c.droppedItems, value -> c.droppedItems = value));
+		all.add(new ToggleSetting(SOURCES, "Items in item frames",
+			"Items in item frames give off their light.",
+			Cost.LOW, false, () -> c.itemFrames, value -> c.itemFrames = value));
+		all.add(new ToggleSetting(SOURCES, "Fire, glowing mobs and more",
+			"Blazes, burning mobs, allays, glow squid, magma cubes, fireballs, end crystals and other glowing things give off light.",
+			Cost.LOW, false, () -> c.naturalLights, value -> c.naturalLights = value));
+		all.add(new SliderSetting(SOURCES, "Held light height",
+			"How high your held light sits on your body. Higher feels more like a lantern held up, lower feels like it is at your hip.",
+			Cost.NONE, false, 0.3F, 1.0F, 0.02F, "", () -> c.heldHeight, value -> c.heldHeight = value));
+		all.add(new SliderSetting(SOURCES, "Fire flicker",
+			"Warm lights like torches and campfires shimmer a little. Zero keeps them steady.",
+			Cost.NONE, false, 0.0F, 1.0F, 0.05F, "", () -> c.flicker, value -> c.flicker = value));
 		all.add(new ToggleSetting(SOURCES, "Water puts out lights",
 			"Torches, campfires and similar items go dark under water.",
 			Cost.NONE, false, () -> c.waterPutsOutLights, value -> c.waterPutsOutLights = value));

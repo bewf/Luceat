@@ -37,8 +37,8 @@ public final class ToggleSetting extends Setting {
 	}
 
 	@Override
-	public void useOtherState() {
-		set(!value());
+	public void useTestState(boolean high) {
+		set(high);
 	}
 
 	@Override

@@ -3,6 +3,7 @@ package me.bewf.luceat.client;
 import me.bewf.luceat.Luceat;
 import me.bewf.luceat.client.config.LuceatConfig;
 import me.bewf.luceat.client.gui.LuceatMenu;
+import me.bewf.luceat.client.light.block.BlockRules;
 import me.bewf.luceat.client.light.item.ItemLightRules;
 import me.bewf.luceat.client.shadow.ShadowReload;
 import me.bewf.luceat.client.update.UpdateChecker;
@@ -17,6 +18,7 @@ public class LuceatClient implements ClientModInitializer {
 	@Override
 	public void onInitializeClient() {
 		LuceatConfig.load();
+		BlockRules.load();
 		ResourceLoader.get(PackType.CLIENT_RESOURCES).registerReloadListener(ItemLightRules.ID, new ItemLightRules());
 		ResourceLoader.get(PackType.CLIENT_RESOURCES).registerReloadListener(ShadowReload.ID, new ShadowReload());
 		LuceatMenu.init();

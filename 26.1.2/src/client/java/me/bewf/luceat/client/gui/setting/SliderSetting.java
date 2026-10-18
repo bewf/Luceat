@@ -45,6 +45,16 @@ public final class SliderSetting extends Setting {
 	}
 
 	@Override
+	public Object snapshot() {
+		return value();
+	}
+
+	@Override
+	public void restore(Object snapshot) {
+		setter.accept((Float) snapshot);
+	}
+
+	@Override
 	public String valueText() {
 		float value = value();
 		if (step >= 1.0F) {
