@@ -24,6 +24,7 @@ public final class TerrainShaderPatch {
 			    vec4 u_LuceatExtra;
 			    ivec4 u_LuceatCamBlock;
 			    vec4 u_LuceatCamFrac;
+			    ivec4 u_LuceatVol;
 			    vec4 u_LuceatPosRadius[@LIGHTS@];
 			    vec4 u_LuceatColor[@LIGHTS@];
 			};
@@ -33,7 +34,8 @@ public final class TerrainShaderPatch {
 			uniform sampler2D @SHAPES@;
 
 			ivec3 luceatWrap(ivec3 cell) {
-			    return cell - @DIM@ * ivec3(floor(vec3(cell) / float(@DIM@)));
+			    ivec3 m = cell % @DIM@;
+			    return m + @DIM@ * ivec3(lessThan(m, ivec3(0)));
 			}
 
 			vec3 luceatPattern(uint id, vec3 hit, ivec3 cell, int axis, bool positiveFace) {
@@ -58,29 +60,35 @@ public final class TerrainShaderPatch {
 			        return vec3(0.0, 1.0, 0.0);
 			    }
 			    n /= size;
-			    return dot(n, pos) > 0.0 ? -n : n;
+			    n = dot(n, pos) > 0.0 ? -n : n;
+			    vec3 a = abs(n);
+			    float m = max(a.x, max(a.y, a.z));
+			    if (m > 0.93) {
+			        n = vec3(a.x == m ? sign(n.x) : 0.0, a.y == m ? sign(n.y) : 0.0, a.z == m ? sign(n.z) : 0.0);
+			    }
+			    return n;
 			}
 
 			vec3 luceatShape(uint tile, vec3 origin, vec3 dir, ivec3 cell, float t0, float t1, vec3 sgn, vec3 safe) {
-			    vec3 local = (origin + dir * t0 - vec3(cell)) * 8.0 + dir * 0.01;
-			    local = clamp(local, vec3(0.0), vec3(7.999));
+			    vec3 local = (origin + dir * t0 - vec3(cell)) * @RES@.0 + dir * 0.01;
+			    local = clamp(local, vec3(0.0), vec3(@RES@.0 - 0.001));
 			    ivec3 v = ivec3(floor(local));
-			    vec3 tDelta = 1.0 / (safe * 8.0);
-			    vec3 tMax = vec3(t0) + (vec3(v) + max(sgn, 0.0) - local) * sgn / (safe * 8.0);
+			    vec3 tDelta = 1.0 / (safe * @RES@.0);
+			    vec3 tMax = vec3(t0) + (vec3(v) + max(sgn, 0.0) - local) * sgn / (safe * @RES@.0);
 			    ivec3 stepCell = ivec3(sgn);
-			    ivec2 base = ivec2(int(tile & 15u) * 64, int(tile >> 4u) * 8);
+			    ivec2 base = ivec2(int(tile % @PER_ROW@u) * @TILE_W@, int(tile / @PER_ROW@u) * @RES@);
 			    vec3 trans = vec3(1.0);
 			    float t = t0;
-			    for (int k = 0; k < 24; k++) {
+			    for (int k = 0; k < @STEPS@; k++) {
 			        float tNext = min(tMax.x, min(tMax.y, tMax.z));
 			        float tEnd = min(tNext, t1);
-			        if (tEnd > 0.07) {
-			            vec3 vt = texelFetch(@SHAPES@, base + ivec2(v.z * 8 + v.x, v.y), 0).rgb;
+			        if (tEnd > 0.02) {
+			            vec3 vt = texelFetch(@SHAPES@, base + ivec2(v.z * @RES@ + v.x, v.y), 0).rgb;
 			            if (vt.r < 0.999 || vt.g < 0.999 || vt.b < 0.999) {
 			                if (max(vt.r, max(vt.g, vt.b)) < 0.03) {
 			                    return vec3(0.0);
 			                }
-			                trans *= pow(max(vt, vec3(0.03)), vec3(max(tEnd - max(t, 0.07), 0.0) * 8.0));
+			                trans *= pow(max(vt, vec3(0.03)), vec3(max(tEnd - max(t, 0.02), 0.0) * @RES@.0));
 			            }
 			        }
 			        if (tNext >= t1) {
@@ -97,7 +105,7 @@ public final class TerrainShaderPatch {
 			            v.z += stepCell.z;
 			            tMax.z += tDelta.z;
 			        }
-			        if (any(lessThan(v, ivec3(0))) || any(greaterThan(v, ivec3(7)))) {
+			        if (any(lessThan(v, ivec3(0))) || any(greaterThan(v, ivec3(@RES@ - 1)))) {
 			            break;
 			        }
 			    }
@@ -111,7 +119,7 @@ public final class TerrainShaderPatch {
 			        return vec3(1.0);
 			    }
 			    vec3 dir = delta / len;
-			    vec3 origin = pos + normal * 0.03 + dir * 0.01 + u_LuceatCamFrac.xyz;
+			    vec3 origin = pos + normal * 0.02 + dir * 0.01 + u_LuceatCamFrac.xyz;
 			    vec3 target = lightPos + u_LuceatCamFrac.xyz;
 			    ivec3 cell = ivec3(floor(origin));
 			    ivec3 lightCell = ivec3(floor(target));
@@ -128,13 +136,19 @@ public final class TerrainShaderPatch {
 			        float tExit = min(tMax.x, min(tMax.y, tMax.z));
 			        int exitAxis = tMax.x <= tMax.y && tMax.x <= tMax.z ? 0 : (tMax.y <= tMax.z ? 1 : 2);
 			        if (any(notEqual(cell, lightCell))) {
-			            uint id = texelFetch(@SAMPLER@, luceatWrap(cell + u_LuceatCamBlock.xyz), 0).r;
+			            ivec3 world = cell + u_LuceatCamBlock.xyz;
+			            ivec3 offset = (world >> 4) - u_LuceatVol.xyz;
+			            bool inside = all(lessThanEqual(abs(offset), ivec3(u_LuceatVol.w)));
+			            uint id = inside ? texelFetch(@SAMPLER@, luceatWrap(world), 0).r : 0u;
 			            if (id == 1u) {
 			                return vec3(0.0);
 			            }
 			            if (id > 1u) {
 			                if ((id & 32768u) != 0u) {
-			                    trans *= luceatShape(id & 32767u, origin, dir, cell, tEntry, min(tExit, limit), sgn, safe);
+			                    ivec3 gap = abs(cell - lightCell);
+			                    if (max(gap.x, max(gap.y, gap.z)) > 1) {
+			                        trans *= luceatShape(id & 32767u, origin, dir, cell, tEntry, min(tExit, limit), sgn, safe);
+			                    }
 			                } else if (i > 0) {
 			                    bool enterPositive = sgn[entryAxis] < 0.0;
 			                    bool exitPositive = sgn[exitAxis] > 0.0;
@@ -202,7 +216,8 @@ public final class TerrainShaderPatch {
 			    if (fade <= 0.01) {
 			        return vec3(0.0);
 			    }
-			    bool shadowsOn = u_LuceatState.y > 0.5 && length(pos) < u_LuceatExtra.y;
+			    float shadowFade = u_LuceatState.y > 0.5 ? 1.0 - smoothstep(0.6 * u_LuceatExtra.y, u_LuceatExtra.y, length(pos)) : 0.0;
+			    bool shadowsOn = shadowFade > 0.01;
 			    vec3 total = vec3(0.0);
 			    float placedCover = 0.0;
 			    int count = int(u_LuceatState.x);
@@ -229,7 +244,7 @@ public final class TerrainShaderPatch {
 			        }
 			        vec3 visible = vec3(1.0);
 			        if (shadowsOn && power * u_LuceatState.z * fade * max(tint.r, max(tint.g, tint.b)) > 0.01) {
-			            visible = mix(vec3(1.0), luceatShadow(pos, normal, light.xyz), u_LuceatOptions.z);
+			            visible = mix(vec3(1.0), luceatShadow(pos, normal, light.xyz), u_LuceatOptions.z * shadowFade);
 			        }
 			        total += tint * (u_LuceatState.z * power) * visible;
 			    }
@@ -243,7 +258,11 @@ public final class TerrainShaderPatch {
 			.replace("@SAMPLER@", ShadowVolume.SAMPLER)
 			.replace("@PATTERNS@", PatternAtlas.SAMPLER)
 			.replace("@SHAPES@", ShapeMasks.SAMPLER)
-			.replace("@DIM@", Integer.toString(ShadowVolume.DIMENSION));
+			.replace("@DIM@", Integer.toString(ShadowVolume.DIMENSION))
+			.replace("@RES@", Integer.toString(ShapeMasks.RES))
+			.replace("@PER_ROW@", Integer.toString(ShapeMasks.PER_ROW))
+			.replace("@TILE_W@", Integer.toString(ShapeMasks.TILE_WIDTH))
+			.replace("@STEPS@", Integer.toString(ShapeMasks.RES * 3));
 
 	private static boolean vertexPatched;
 

@@ -29,6 +29,8 @@ public final class ShadowVolume {
 	public static final int CELLS = 5;
 	public static final int CELL_SIZE = 16;
 	public static final int DIMENSION = CELLS * CELL_SIZE;
+	public static final int HALF = CELLS / 2;
+	public static final int RELIABLE = HALF * CELL_SIZE;
 	public static final String SAMPLER = "u_LuceatVoxels";
 
 	private static final int UNIT = 14;
@@ -52,8 +54,23 @@ public final class ShadowVolume {
 	private static int texture;
 	private static int frame;
 	private static int refreshCursor;
+	private static int centreX;
+	private static int centreY;
+	private static int centreZ;
 
 	private ShadowVolume() {
+	}
+
+	public static int centreX() {
+		return centreX;
+	}
+
+	public static int centreY() {
+		return centreY;
+	}
+
+	public static int centreZ() {
+		return centreZ;
 	}
 
 	public static long bytes() {
@@ -81,9 +98,9 @@ public final class ShadowVolume {
 			reset();
 		}
 		ensureTexture();
-		int centreX = Math.floorDiv((int) Math.floor(camera.x), CELL_SIZE);
-		int centreY = Math.floorDiv((int) Math.floor(camera.y), CELL_SIZE);
-		int centreZ = Math.floorDiv((int) Math.floor(camera.z), CELL_SIZE);
+		centreX = Math.floorDiv((int) Math.floor(camera.x), CELL_SIZE);
+		centreY = Math.floorDiv((int) Math.floor(camera.y), CELL_SIZE);
+		centreZ = Math.floorDiv((int) Math.floor(camera.z), CELL_SIZE);
 		bindForUpload(() -> {
 			fillMissing(centreX, centreY, centreZ);
 			refreshDirty();
@@ -141,9 +158,9 @@ public final class ShadowVolume {
 
 	private static void fillMissing(int centreX, int centreY, int centreZ) {
 		List<int[]> missing = null;
-		for (int dx = -2; dx <= 2; dx++) {
-			for (int dy = -2; dy <= 2; dy++) {
-				for (int dz = -2; dz <= 2; dz++) {
+		for (int dx = -HALF; dx <= HALF; dx++) {
+			for (int dy = -HALF; dy <= HALF; dy++) {
+				for (int dz = -HALF; dz <= HALF; dz++) {
 					int x = centreX + dx;
 					int y = centreY + dy;
 					int z = centreZ + dz;

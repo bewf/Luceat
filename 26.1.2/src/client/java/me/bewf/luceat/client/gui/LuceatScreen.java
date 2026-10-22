@@ -561,12 +561,10 @@ public final class LuceatScreen extends Screen {
 		graphics.text(this.font, "Made by bëwf", x + 60, y + 22, LuceatLook.SOFT, false);
 		y += 62;
 		String[] paragraphs = {
-			"Luceat lights the world from your hands, dropped items, other players and the blocks you place. It adds coloured light and shadows without rebuilding any chunks.",
-			"It only changes how your game looks on your screen. It never changes the world or the server, so it is safe to use anywhere. Water and bubble columns do not block light, so bubble elevators and farms are not touched.",
+			"Luceat adds dynamic lights to held items, dropped items, other player, placed blocks, and more.",
+			"You can customise light colours, brightness, and shadows to create a look you like. You can add lights to any block you want.",
+			"You can hover a setting to see it in the live preview.",
 			"Open this menu any time with /luceat or the K key.",
-			"Hover a setting to see it in the live preview. Hover a preset to try it before you pick it.",
-			"Press Test next to a setting to measure what it costs on your computer. Turn VSync off first or the test cannot see small changes.",
-			"The Blocks tab lists every block and item. You can turn a light off, change its level or colour, or add your own."
 		};
 		for (String paragraph : paragraphs) {
 			y = drawWrappedText(graphics, paragraph, x, y, listRight - x, LuceatLook.SOFT) + 6;

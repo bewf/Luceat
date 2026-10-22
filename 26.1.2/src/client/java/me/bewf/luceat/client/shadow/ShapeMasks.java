@@ -31,12 +31,12 @@ import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.shapes.VoxelShape;
 
 public final class ShapeMasks {
-	public static final int RES = 8;
+	public static final int RES = 16;
 	public static final int VOXELS = RES * RES * RES;
 	public static final int TILE_WIDTH = RES * RES;
 	public static final int TILE_HEIGHT = RES;
-	public static final int PER_ROW = 16;
-	public static final int ROWS = 64;
+	public static final int PER_ROW = 8;
+	public static final int ROWS = 128;
 	public static final int ATLAS_WIDTH = PER_ROW * TILE_WIDTH;
 	public static final int ATLAS_HEIGHT = ROWS * TILE_HEIGHT;
 	public static final int CAPACITY = PER_ROW * ROWS;
@@ -47,7 +47,8 @@ public final class ShapeMasks {
 	public static final int SOLID = 1;
 
 	private static final int UNIT = 13;
-	private static final int MAX_STEPS = 96;
+	private static final int MAX_STEPS = 160;
+	private static final float INSET = 0.3F;
 	private static final Direction[] SIDES = Direction.values();
 
 	private static final Map<Integer, List<Integer>> BUCKETS = new HashMap<>();
@@ -108,26 +109,93 @@ public final class ShapeMasks {
 		BlockStateModel model = Minecraft.getInstance().getModelManager().getBlockStateModelSet().get(state);
 		List<BlockStateModelPart> parts = new ArrayList<>();
 		model.collectParts(RandomSource.create(42L), parts);
-		float opaque = 1.0F - Math.clamp(config.cutoutOpacity, 0.0F, 1.0F);
-		boolean drawn = false;
+		List<BakedQuad> quads = new ArrayList<>();
 		for (BlockStateModelPart part : parts) {
-			drawn |= rasterQuads(part.getQuads(null), mask, opaque, config.glassTint);
+			quads.addAll(part.getQuads(null));
 			for (Direction side : SIDES) {
-				drawn |= rasterQuads(part.getQuads(side), mask, opaque, config.glassTint);
+				quads.addAll(part.getQuads(side));
 			}
 		}
-		return drawn;
-	}
-
-	private static boolean rasterQuads(List<BakedQuad> quads, float[] mask, float opaque, boolean tint) {
+		if (quads.isEmpty()) {
+			return false;
+		}
+		float inward = inwardSign(quads);
+		float opaque = 1.0F - Math.clamp(config.cutoutOpacity, 0.0F, 1.0F);
 		boolean drawn = false;
 		for (BakedQuad quad : quads) {
-			drawn |= rasterQuad(quad, mask, opaque, tint);
+			drawn |= rasterQuad(quad, mask, opaque, config.glassTint, inward);
 		}
 		return drawn;
 	}
 
-	private static boolean rasterQuad(BakedQuad quad, float[] mask, float opaque, boolean tint) {
+	// which way the winding points compared to the model middle so faces can be pushed inside
+	private static float inwardSign(List<BakedQuad> quads) {
+		float minX = Float.MAX_VALUE;
+		float minY = Float.MAX_VALUE;
+		float minZ = Float.MAX_VALUE;
+		float maxX = -Float.MAX_VALUE;
+		float maxY = -Float.MAX_VALUE;
+		float maxZ = -Float.MAX_VALUE;
+		for (BakedQuad quad : quads) {
+			for (int k = 0; k < 4; k++) {
+				Vector3fc v = quad.position(k);
+				minX = Math.min(minX, v.x());
+				minY = Math.min(minY, v.y());
+				minZ = Math.min(minZ, v.z());
+				maxX = Math.max(maxX, v.x());
+				maxY = Math.max(maxY, v.y());
+				maxZ = Math.max(maxZ, v.z());
+			}
+		}
+		float cx = (minX + maxX) * 0.5F;
+		float cy = (minY + maxY) * 0.5F;
+		float cz = (minZ + maxZ) * 0.5F;
+		float total = 0.0F;
+		float[] n = new float[3];
+		for (BakedQuad quad : quads) {
+			normal(quad, n);
+			float mx = 0.0F;
+			float my = 0.0F;
+			float mz = 0.0F;
+			for (int k = 0; k < 4; k++) {
+				Vector3fc v = quad.position(k);
+				mx += v.x() * 0.25F;
+				my += v.y() * 0.25F;
+				mz += v.z() * 0.25F;
+			}
+			total += n[0] * (mx - cx) + n[1] * (my - cy) + n[2] * (mz - cz);
+		}
+		return total < 0.0F ? -1.0F : 1.0F;
+	}
+
+	// unit normal from the winding or zero when flat
+	private static void normal(BakedQuad quad, float[] out) {
+		Vector3fc a = quad.position(0);
+		Vector3fc b = quad.position(1);
+		Vector3fc c = quad.position(2);
+		Vector3fc d = quad.position(3);
+		float d1x = c.x() - a.x();
+		float d1y = c.y() - a.y();
+		float d1z = c.z() - a.z();
+		float d2x = d.x() - b.x();
+		float d2y = d.y() - b.y();
+		float d2z = d.z() - b.z();
+		float nx = d1y * d2z - d1z * d2y;
+		float ny = d1z * d2x - d1x * d2z;
+		float nz = d1x * d2y - d1y * d2x;
+		float length = (float) Math.sqrt(nx * nx + ny * ny + nz * nz);
+		if (length < 1.0E-6F) {
+			out[0] = 0.0F;
+			out[1] = 0.0F;
+			out[2] = 0.0F;
+			return;
+		}
+		out[0] = nx / length;
+		out[1] = ny / length;
+		out[2] = nz / length;
+	}
+
+	private static boolean rasterQuad(BakedQuad quad, float[] mask, float opaque, boolean tint, float inward) {
 		TextureAtlasSprite atlas = quad.materialInfo().sprite();
 		SpriteData sprite = SpriteData.of(atlas.contents().name());
 		float u0 = atlas.getU0();
@@ -136,6 +204,12 @@ public final class ShapeMasks {
 		float v1 = atlas.getV1();
 		float[] p = new float[12];
 		float[] t = new float[8];
+		float[] push = new float[3];
+		normal(quad, push);
+		float shift = -inward * INSET / RES;
+		push[0] *= shift;
+		push[1] *= shift;
+		push[2] *= shift;
 		for (int k = 0; k < 4; k++) {
 			Vector3fc position = quad.position(k);
 			p[k * 3] = position.x();
@@ -162,9 +236,9 @@ public final class ShapeMasks {
 				if (x < -0.001F || x > 1.001F || y < -0.001F || y > 1.001F || z < -0.001F || z > 1.001F) {
 					continue;
 				}
-				int vx = Math.min(RES - 1, Math.max(0, (int) Math.floor(x * RES)));
-				int vy = Math.min(RES - 1, Math.max(0, (int) Math.floor(y * RES)));
-				int vz = Math.min(RES - 1, Math.max(0, (int) Math.floor(z * RES)));
+				int vx = Math.min(RES - 1, Math.max(0, (int) Math.floor((x + push[0]) * RES)));
+				int vy = Math.min(RES - 1, Math.max(0, (int) Math.floor((y + push[1]) * RES)));
+				int vz = Math.min(RES - 1, Math.max(0, (int) Math.floor((z + push[2]) * RES)));
 				float tu = bilinear(t, 2, 0, u, v);
 				float tv = bilinear(t, 2, 1, u, v);
 				int pixel = sprite.sample(Math.min(Math.max(tu, 0.0F), 0.9999F), Math.min(Math.max(tv, 0.0F), 0.9999F));

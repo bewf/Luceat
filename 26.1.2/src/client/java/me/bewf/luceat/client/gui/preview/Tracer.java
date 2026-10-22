@@ -2,9 +2,11 @@ package me.bewf.luceat.client.gui.preview;
 
 import java.util.stream.IntStream;
 
+import me.bewf.luceat.client.shadow.ShapeMasks;
+
 public final class Tracer {
 	public static final int VOX = 16;
-	private static final int SHAPE_RES = 8;
+	private static final int SHAPE_RES = ShapeMasks.RES;
 
 	private final int width;
 	private final int height;
@@ -392,9 +394,9 @@ public final class Tracer {
 		}
 		double[] dir = {dx / len, dy / len, dz / len};
 		double[] origin = {
-			px + n[0] * 0.03 + dir[0] * 0.01,
-			py + n[1] * 0.03 + dir[1] * 0.01,
-			pz + n[2] * 0.03 + dir[2] * 0.01
+			px + n[0] * 0.02 + dir[0] * 0.01,
+			py + n[1] * 0.02 + dir[1] * 0.01,
+			pz + n[2] * 0.02 + dir[2] * 0.01
 		};
 		int[] cell = {(int) Math.floor(origin[0]), (int) Math.floor(origin[1]), (int) Math.floor(origin[2])};
 		int[] lightCell = {(int) Math.floor(lx), (int) Math.floor(ly), (int) Math.floor(lz)};
@@ -419,7 +421,10 @@ public final class Tracer {
 					return new float[3];
 				}
 				if (occ.kind == Occ.SHAPE) {
-					shape(occ.data, origin, dir, cell, tEntry, Math.min(tExit, len), sgn, safe, trans);
+					int gap = Math.max(Math.abs(cell[0] - lightCell[0]), Math.max(Math.abs(cell[1] - lightCell[1]), Math.abs(cell[2] - lightCell[2])));
+					if (gap > 1) {
+						shape(occ.data, origin, dir, cell, tEntry, Math.min(tExit, len), sgn, safe, trans);
+					}
 				} else if (occ.kind == Occ.PATTERN && i > 0) {
 					boolean enterPositive = sgn[entryAxis] < 0.0;
 					boolean exitPositive = sgn[exitAxis] > 0.0;
@@ -477,16 +482,16 @@ public final class Tracer {
 		double[] tMax = new double[3];
 		double[] tDelta = new double[3];
 		for (int a = 0; a < 3; a++) {
-			local[a] = clamp((origin[a] + dir[a] * t0 - cell[a]) * SHAPE_RES + dir[a] * 0.01, 0.0, 7.999);
+			local[a] = clamp((origin[a] + dir[a] * t0 - cell[a]) * SHAPE_RES + dir[a] * 0.01, 0.0, SHAPE_RES - 0.001);
 			v[a] = (int) Math.floor(local[a]);
 			tDelta[a] = 1.0 / (safe[a] * SHAPE_RES);
 			tMax[a] = t0 + (v[a] + Math.max(sgn[a], 0.0) - local[a]) * sgn[a] / (safe[a] * SHAPE_RES);
 		}
 		double t = t0;
-		for (int k = 0; k < 24; k++) {
+		for (int k = 0; k < SHAPE_RES * 3; k++) {
 			double tNext = Math.min(tMax[0], Math.min(tMax[1], tMax[2]));
 			double tEnd = Math.min(tNext, t1);
-			if (tEnd > 0.07) {
+			if (tEnd > 0.02) {
 				int at = (v[0] + SHAPE_RES * (v[1] + SHAPE_RES * v[2])) * 3;
 				float r = mask[at];
 				float g = mask[at + 1];
@@ -498,7 +503,7 @@ public final class Tracer {
 						trans[2] = 0.0F;
 						return;
 					}
-					double span = Math.max(tEnd - Math.max(t, 0.07), 0.0) * SHAPE_RES;
+					double span = Math.max(tEnd - Math.max(t, 0.02), 0.0) * SHAPE_RES;
 					trans[0] *= (float) Math.pow(Math.max(r, 0.03F), span);
 					trans[1] *= (float) Math.pow(Math.max(g, 0.03F), span);
 					trans[2] *= (float) Math.pow(Math.max(b, 0.03F), span);

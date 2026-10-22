@@ -32,26 +32,26 @@ public final class LuceatSettings {
 		List<Setting> all = new ArrayList<>();
 
 		all.add(new ToggleSetting(GENERAL, "Luceat",
-			"Turns all of Luceat on or off. When it is off the game looks the way it did before.",
+			"Turns Luceat on or off. Off is the default minecraft look.",
 			Cost.MEDIUM, false, () -> c.enabled, value -> c.enabled = value));
 
 		all.add(new SliderSetting(LIGHTING, "Light strength",
-			"How bright your lights are. Higher is brighter around the light.",
+			"How bright your lights are. Higher is brighter.",
 			Cost.NONE, false, 0.0F, 3.0F, 0.05F, "x", () -> c.brightness, value -> c.brightness = value));
 		all.add(new SliderSetting(LIGHTING, "Brightness limit",
-			"Stops a lot of lights from adding up to pure white. Lower keeps things softer.",
+			"Stops multiple lights from adding up to pure white.",
 			Cost.NONE, false, 0.3F, 2.0F, 0.05F, "x", () -> c.maxBrightness, value -> c.maxBrightness = value));
 		all.add(new SliderSetting(LIGHTING, "Fade in daylight",
-			"The sun already lights things up, so your lights should matter less in the day. Higher fades them out more.",
+			"Fades out light based during daytime",
 			Cost.NONE, false, 0.0F, 1.0F, 0.05F, "", () -> c.daylightFade, value -> c.daylightFade = value));
 		all.add(new SliderSetting(LIGHTING, "Surface direction",
-			"Surfaces that face the light get more of it and surfaces turned away get less. At zero everything is lit the same.",
+			"Surface facing the light are lit up more than surfaces facing away. At zero everything is lit the same.",
 			Cost.LOW, false, 0.0F, 1.0F, 0.05F, "", () -> c.directionalShading, value -> c.directionalShading = value));
 		all.add(new SliderSetting(LIGHTING, "Light bounce",
-			"Spots in shadow keep a little light, like light bouncing off the walls around them. At zero shadows go fully dark. Higher fills them in more.",
+			"Shadows keep some light to simulate light bouncing off the walls around them. At zero shadows go fully dark.",
 			Cost.LOW, false, 0.0F, 1.0F, 0.05F, "", () -> c.lightBounce, value -> c.lightBounce = value));
 		all.add(new SliderSetting(LIGHTING, "Shiny surfaces",
-			"Metal, polished stone, glass and ice catch a bright shine from your lights. At zero nothing is shiny.",
+			"Shiny stuff being shiny. At zero nothing is shiny.",
 			Cost.LOW, true, 0.0F, 1.0F, 0.05F, "", () -> c.shine, value -> c.shine = value));
 		all.add(new ToggleSetting(LIGHTING, "Colours from textures",
 			"Picks the glow colour from the item's own texture, so a texture pack changes the colours too.",
@@ -64,19 +64,19 @@ public final class LuceatSettings {
 			Cost.LOW, false, () -> c.enchantGlow, value -> c.enchantGlow = value));
 
 		all.add(new ToggleSetting(SHADOWS, "Shadows",
-			"Stops light from going through walls and other blocks. This is the most expensive setting.",
+			"Adds Shadows to lights. Stop light from going through blocks.",
 			Cost.HIGH, false, () -> c.shadows, value -> c.shadows = value));
 		all.add(new SliderSetting(SHADOWS, "Shadow darkness",
 			"How dark a shadow gets. At zero the light ignores walls.",
 			Cost.NONE, false, 0.0F, 1.0F, 0.05F, "", () -> c.shadowStrength, value -> c.shadowStrength = value));
 		all.add(new ToggleSetting(SHADOWS, "Keep lights out of walls",
-			"If a held light would end up inside a wall, it is moved back out so the wall does not go dark.",
+			"If a light is held inside a wall, it is moved back out so the wall does not go dark.",
 			Cost.LOW, false, () -> c.keepLightOutOfWalls, value -> c.keepLightOutOfWalls = value));
 		all.add(new SliderSetting(SHADOWS, "Soft edges",
 			"Blurs the edge of shadows. Zero is sharp and fastest. Higher is softer and costs more.",
 			Cost.MEDIUM, false, 0.0F, 1.0F, 0.05F, "", () -> c.shadowSoftness, value -> c.shadowSoftness = value));
 		all.add(new ToggleSetting(SHADOWS, "Fences, panes, slabs and more",
-			"Blocks that are not full cubes, like fences, bars, doors, stairs and slabs, cast their real shape as a shadow.",
+			"Blocks that aren't full, like fences, bars, doors, stairs and slabs, cast their real shape as a shadow.",
 			Cost.MEDIUM, true, () -> c.thinShadows, value -> c.thinShadows = value));
 		all.add(new ToggleSetting(SHADOWS, "Grass and flowers",
 			"Plants cast a soft shadow too.",
@@ -92,7 +92,7 @@ public final class LuceatSettings {
 			Cost.NONE, true, 0.3F, 1.0F, 0.05F, "", () -> c.cutoutOpacity, value -> c.cutoutOpacity = value));
 
 		all.add(new ToggleSetting(PLACED, "Placed lights",
-			"Torches, lanterns, glowstone, lava and other light blocks you place light up their surroundings with their own colour and cast shadows.",
+			"Light blocks you place light up their surroundings with their own colour and cast shadows.",
 			Cost.HIGH, false, () -> c.placedLights, value -> {
 				c.placedLights = value;
 				ShadowVolume.reset();
@@ -101,7 +101,7 @@ public final class LuceatSettings {
 			"How bright the light from placed blocks is. Higher is brighter.",
 			Cost.NONE, false, 0.0F, 2.0F, 0.05F, "x", () -> c.placedStrength, value -> c.placedStrength = value));
 		all.add(new SliderSetting(PLACED, "Replace normal light",
-			"How much of the normal Minecraft block light is swapped for Luceat's light. At full, shadows are at their darkest. At zero, placed light blocks look the way they always did.",
+			"How much of the normal Minecraft block light is swapped for Luceat's light. At zero, placed light blocks look the way they always did.",
 			Cost.NONE, false, 0.0F, 1.0F, 0.05F, "", () -> c.vanillaReplace, value -> c.vanillaReplace = value));
 		all.add(new SliderSetting(PLACED, "Smallest light",
 			"Light blocks dimmer than this are left alone. Raising it skips candles and small buds.",
@@ -129,16 +129,16 @@ public final class LuceatSettings {
 			"Blazes, burning mobs, allays, glow squid, magma cubes, fireballs, end crystals and other glowing things give off light.",
 			Cost.LOW, false, () -> c.naturalLights, value -> c.naturalLights = value));
 		all.add(new ToggleSetting(SOURCES, "Light on mobs and items",
-			"Players, mobs and dropped items get brighter when one of your lights is close to them, the way the ground does.",
+			"Players, mobs and dropped items get brighter when one of your lights is close to them.",
 			Cost.NONE, false, () -> c.entityLights, value -> c.entityLights = value));
 		all.add(new ToggleSetting(SOURCES, "Light on particles",
 			"Smoke, sparks and other particles get brighter when one of your lights is close to them.",
 			Cost.NONE, false, () -> c.particleLights, value -> c.particleLights = value));
 		all.add(new SliderSetting(SOURCES, "Held light height",
-			"How high your held light sits on your body. Higher feels more like a lantern held up, lower feels like it is at your hip.",
+			"How high your held light sits on your body.",
 			Cost.NONE, false, 0.3F, 1.0F, 0.02F, "", () -> c.heldHeight, value -> c.heldHeight = value));
 		all.add(new SliderSetting(SOURCES, "Fire flicker",
-			"Warm lights like torches and campfires shimmer a little. Zero keeps them steady.",
+			"Warm lights like torches and campfires flicker. Zero removes flicker.",
 			Cost.NONE, false, 0.0F, 1.0F, 0.05F, "", () -> c.flicker, value -> c.flicker = value));
 		all.add(new ToggleSetting(SOURCES, "Water puts out lights",
 			"Torches, campfires and similar items go dark under water.",
@@ -148,13 +148,13 @@ public final class LuceatSettings {
 			"How many lights can be active at once. Each pixel only looks at the lights near it, so a big number costs very little. Far away lights are joined together to save even more.",
 			Cost.LOW, false, 4.0F, 256.0F, 4.0F, "", () -> c.maxLights, value -> c.maxLights = Math.round(value)));
 		all.add(new ToggleSetting(PERFORMANCE, "Join faraway lights",
-			"Lights that are far from you and close to each other are joined into one bigger light. It looks almost the same and saves a lot of work in busy places.",
+			"Lights that are far from you and close to each other are joined into one bigger light.",
 			Cost.NONE, false, () -> c.mergeFarLights, value -> c.mergeFarLights = value));
 		all.add(new SliderSetting(PERFORMANCE, "Light range",
 			"How far away Luceat looks for lights. Lights past this fade out smoothly.",
 			Cost.LOW, false, 16.0F, 128.0F, 8.0F, " blocks", () -> c.lightRange, value -> c.lightRange = Math.round(value)));
 		all.add(new SliderSetting(PERFORMANCE, "Lights with shadows",
-			"Every pixel traces shadows for this many of the strongest lights near it. The other lights still shine, they just do not cast shadows. This is the biggest cost in a busy place, so lower it first if the game is slow.",
+			"Every pixel traces shadows for this many of the strongest lights near it. The other lights still shine, they just do not cast shadows.",
 			Cost.HIGH, false, 0.0F, 8.0F, 1.0F, "", () -> c.shadowedLights, value -> c.shadowedLights = Math.round(value)));
 		all.add(new SliderSetting(PERFORMANCE, "Shadow distance",
 			"Shadows fade out on things farther from you than this. Lower is faster.",
