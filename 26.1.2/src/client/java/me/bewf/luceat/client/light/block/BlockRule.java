@@ -6,6 +6,15 @@ public final class BlockRule {
 	public int level = -1;
 	public int colour = -1;
 	public boolean added;
+	public float radius = 1.0F;
+	public int flicker = -1;
+	public int shadows = -1;
+	public int water = -1;
+	public float shine = -1.0F;
+	public boolean whenPlaced = true;
+	public boolean whenHeld = true;
+	public boolean whenDropped = true;
+	public boolean whenFramed = true;
 
 	public BlockRule() {
 	}
@@ -15,7 +24,11 @@ public final class BlockRule {
 	}
 
 	public boolean edited() {
-		return !enabled || level >= 0 || colour >= 0;
+		return !enabled || level >= 0 || colour >= 0 || extras();
+	}
+
+	public boolean extras() {
+		return Math.abs(radius - 1.0F) > 0.001F || flicker >= 0 || shadows >= 0 || water >= 0 || shine >= 0.0F || !whenPlaced || !whenHeld || !whenDropped || !whenFramed;
 	}
 
 	public boolean keep() {

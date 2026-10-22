@@ -102,6 +102,15 @@ public final class BlockRules {
 			copy.level = rule.level;
 			copy.colour = rule.colour;
 			copy.added = rule.added;
+			copy.radius = rule.radius;
+			copy.flicker = rule.flicker;
+			copy.shadows = rule.shadows;
+			copy.water = rule.water;
+			copy.shine = rule.shine;
+			copy.whenPlaced = rule.whenPlaced;
+			copy.whenHeld = rule.whenHeld;
+			copy.whenDropped = rule.whenDropped;
+			copy.whenFramed = rule.whenFramed;
 			out.add(copy);
 		}
 	}
