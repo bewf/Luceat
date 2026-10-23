@@ -30,8 +30,10 @@ public final class ShadowVolume {
 	public static final int HALF = CELLS / 2;
 	public static final int RELIABLE = HALF * CELL_SIZE;
 	public static final String SAMPLER = "u_LuceatVoxels";
+	public static final String SHINE_SAMPLER = "u_LuceatShine";
 
 	private static final int UNIT = 14;
+	private static final int SHINE_UNIT = 11;
 	private static final int TOTAL = CELLS * CELLS * CELLS;
 	private static final int FILLS_PER_FRAME = 3;
 	private static final int DIRTY_PER_FRAME = 8;
@@ -47,9 +49,11 @@ public final class ShadowVolume {
 	private static final boolean[] valid = new boolean[TOTAL];
 	private static final Set<Long> dirty = new HashSet<>();
 	private static final ByteBuffer cellData = BufferUtils.createByteBuffer(CELL_SIZE * CELL_SIZE * CELL_SIZE * 2).order(ByteOrder.nativeOrder());
+	private static final ByteBuffer shineData = BufferUtils.createByteBuffer(CELL_SIZE * CELL_SIZE * CELL_SIZE);
 
 	private static ClientLevel level;
 	private static int texture;
+	private static int shineTexture;
 	private static int frame;
 	private static int refreshCursor;
 	private static int centreX;
@@ -72,13 +76,14 @@ public final class ShadowVolume {
 	}
 
 	public static long bytes() {
-		return texture == 0 ? 0L : (long) DIMENSION * DIMENSION * DIMENSION * 2L;
+		return texture == 0 ? 0L : (long) DIMENSION * DIMENSION * DIMENSION * 3L;
 	}
 
 	public static void reset() {
 		Arrays.fill(valid, false);
 		dirty.clear();
 		Occluders.clear();
+		Shine.clear();
 		PatternAtlas.clear();
 		PlacedLights.clear();
 	}
@@ -118,6 +123,12 @@ public final class ShadowVolume {
 		int previousUnit = GL11.glGetInteger(GL13.GL_ACTIVE_TEXTURE);
 		GL13.glActiveTexture(GL13.GL_TEXTURE0 + UNIT);
 		GL11.glBindTexture(GL12.GL_TEXTURE_3D, texture);
+		int shineLocation = GL20.glGetUniformLocation(program, SHINE_SAMPLER);
+		if (shineLocation >= 0) {
+			GL20.glUniform1i(shineLocation, SHINE_UNIT);
+			GL13.glActiveTexture(GL13.GL_TEXTURE0 + SHINE_UNIT);
+			GL11.glBindTexture(GL12.GL_TEXTURE_3D, shineTexture);
+		}
 		GL13.glActiveTexture(previousUnit);
 	}
 
@@ -135,6 +146,15 @@ public final class ShadowVolume {
 		GL11.glTexParameteri(GL12.GL_TEXTURE_3D, GL11.GL_TEXTURE_WRAP_T, GL12.GL_CLAMP_TO_EDGE);
 		GL11.glTexParameteri(GL12.GL_TEXTURE_3D, GL12.GL_TEXTURE_WRAP_R, GL12.GL_CLAMP_TO_EDGE);
 		GL12.glTexImage3D(GL12.GL_TEXTURE_3D, 0, GL30.GL_R16UI, DIMENSION, DIMENSION, DIMENSION, 0, GL30.GL_RED_INTEGER, GL11.GL_UNSIGNED_SHORT, (ByteBuffer) null);
+		GL13.glActiveTexture(GL13.GL_TEXTURE0 + SHINE_UNIT);
+		shineTexture = GL11.glGenTextures();
+		GL11.glBindTexture(GL12.GL_TEXTURE_3D, shineTexture);
+		GL11.glTexParameteri(GL12.GL_TEXTURE_3D, GL11.GL_TEXTURE_MIN_FILTER, GL11.GL_NEAREST);
+		GL11.glTexParameteri(GL12.GL_TEXTURE_3D, GL11.GL_TEXTURE_MAG_FILTER, GL11.GL_NEAREST);
+		GL11.glTexParameteri(GL12.GL_TEXTURE_3D, GL11.GL_TEXTURE_WRAP_S, GL12.GL_CLAMP_TO_EDGE);
+		GL11.glTexParameteri(GL12.GL_TEXTURE_3D, GL11.GL_TEXTURE_WRAP_T, GL12.GL_CLAMP_TO_EDGE);
+		GL11.glTexParameteri(GL12.GL_TEXTURE_3D, GL12.GL_TEXTURE_WRAP_R, GL12.GL_CLAMP_TO_EDGE);
+		GL12.glTexImage3D(GL12.GL_TEXTURE_3D, 0, GL30.GL_R8, DIMENSION, DIMENSION, DIMENSION, 0, GL11.GL_RED, GL11.GL_UNSIGNED_BYTE, (ByteBuffer) null);
 		GL13.glActiveTexture(previousUnit);
 	}
 
@@ -227,21 +247,32 @@ public final class ShadowVolume {
 		int originY = cy * CELL_SIZE;
 		int originZ = cz * CELL_SIZE;
 		cellData.clear();
+		shineData.clear();
 		for (int z = 0; z < CELL_SIZE; z++) {
 			for (int y = 0; y < CELL_SIZE; y++) {
 				for (int x = 0; x < CELL_SIZE; x++) {
 					pos.set(originX + x, originY + y, originZ + z);
 					BlockState state = level.getBlockState(pos);
 					cellData.putShort((short) Occluders.id(state, level, pos));
+					shineData.put((byte) Shine.of(state));
 				}
 			}
 		}
 		cellData.flip();
+		shineData.flip();
 		GL12.glTexSubImage3D(
 			GL12.GL_TEXTURE_3D, 0,
 			Math.floorMod(cx, CELLS) * CELL_SIZE, Math.floorMod(cy, CELLS) * CELL_SIZE, Math.floorMod(cz, CELLS) * CELL_SIZE,
 			CELL_SIZE, CELL_SIZE, CELL_SIZE, GL30.GL_RED_INTEGER, GL11.GL_UNSIGNED_SHORT, cellData
 		);
+		GL13.glActiveTexture(GL13.GL_TEXTURE0 + SHINE_UNIT);
+		GL11.glBindTexture(GL12.GL_TEXTURE_3D, shineTexture);
+		GL12.glTexSubImage3D(
+			GL12.GL_TEXTURE_3D, 0,
+			Math.floorMod(cx, CELLS) * CELL_SIZE, Math.floorMod(cy, CELLS) * CELL_SIZE, Math.floorMod(cz, CELLS) * CELL_SIZE,
+			CELL_SIZE, CELL_SIZE, CELL_SIZE, GL11.GL_RED, GL11.GL_UNSIGNED_BYTE, shineData
+		);
+		GL13.glActiveTexture(GL13.GL_TEXTURE0 + UNIT);
 		int index = index(cx, cy, cz);
 		cellX[index] = cx;
 		cellY[index] = cy;

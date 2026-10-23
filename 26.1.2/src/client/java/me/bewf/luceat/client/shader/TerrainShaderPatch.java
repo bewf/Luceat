@@ -34,6 +34,9 @@ public final class TerrainShaderPatch {
 
 			uniform usampler3D @SAMPLER@;
 			uniform usampler3D @GRID@;
+			uniform sampler3D @SHINE@;
+
+			vec3 luceatSpec;
 			uniform sampler2D @PATTERNS@;
 			uniform sampler2D @SHAPES@;
 
@@ -260,6 +263,7 @@ public final class TerrainShaderPatch {
 			vec3 luceatLight(vec3 pos, vec3 normal, vec4 vertexColor, vec4 baseColor) {
 			    float exposure = max(baseColor.r, max(baseColor.g, baseColor.b));
 			    float fade = 1.0 - u_LuceatOptions.x * smoothstep(0.25, 0.95, exposure);
+			    luceatSpec = vec3(0.0);
 			    if (fade <= 0.01 || u_LuceatState.x < 0.5) {
 			        return vec3(0.0);
 			    }
@@ -290,7 +294,18 @@ public final class TerrainShaderPatch {
 			    }
 			    sumPower = max(sumPower, 1.0e-4);
 			    vec3 total = vec3(0.0);
+			    vec3 shiny = vec3(0.0);
 			    float placedCover = 0.0;
+			    float bounce = u_LuceatMore.x;
+			    float gloss = 0.0;
+			    if (u_LuceatMore.y > 0.001) {
+			        ivec3 inner = ivec3(floor(pos + u_LuceatCamFrac.xyz - normal * 0.25)) + u_LuceatCamBlock.xyz;
+			        ivec3 away = (inner >> 4) - u_LuceatVol.xyz;
+			        if (all(lessThanEqual(abs(away), ivec3(u_LuceatVol.w)))) {
+			            gloss = texelFetch(@SHINE@, luceatWrap(inner), 0).r * u_LuceatMore.y;
+			        }
+			    }
+			    vec3 viewDir = normalize(-pos);
 			    for (int g = 0; g < @TEXELS@; g++) {
 			        uvec4 slots = texelFetch(@GRID@, ivec3(gc.x * @TEXELS@ + g, gc.y, gc.z), 0);
 			        for (int c = 0; c < 4; c++) {
@@ -303,42 +318,58 @@ public final class TerrainShaderPatch {
 			            vec3 toLight = light.xyz - pos;
 			            float dist = length(toLight);
 			            float level = clamp((light.w - dist) / 15.0, 0.0, 1.0);
-			            if (level <= 0.0) {
+			            float bounceLevel = bounce > 0.001 ? clamp((light.w * 1.2 - dist) / 18.0, 0.0, 1.0) : 0.0;
+			            if (level <= 0.0 && bounceLevel <= 0.0) {
 			                continue;
 			            }
-			            float ndotl = dot(normal, toLight / max(dist, 1.0e-4));
+			            vec3 dirToLight = toLight / max(dist, 1.0e-4);
+			            float ndotl = dot(normal, dirToLight);
 			            float facing = mix(1.0, smoothstep(-0.35, 0.15, ndotl), u_LuceatOptions.y);
-			            if (facing <= 0.0) {
-			                continue;
-			            }
 			            int flags = int(u_LuceatColor[i].w + 0.5);
 			            bool placed = (flags & 1) != 0;
 			            bool noShadow = (flags & 2) != 0;
-			            float lambert = mix(1.0, 0.4 + 0.6 * clamp(ndotl, 0.0, 1.0), u_LuceatOptions.y);
-			            float curved = level / (4.0 - 3.0 * level);
-			            float power = curved * lambert * facing * (placed ? u_LuceatExtra.x : 1.0);
 			            vec3 tint = u_LuceatColor[i].rgb;
-			            if (placed) {
-			                placedCover += curved * facing;
-			            }
-			            vec3 visible = vec3(1.0);
+			            float strength = placed ? u_LuceatExtra.x : 1.0;
+			            float curved = level / (4.0 - 3.0 * level);
 			            float share = curved * max(tint.r, max(tint.g, tint.b)) / sumPower;
-			            if (shadowFade > 0.01 && budget > 0.5 && !noShadow && power * u_LuceatState.z * fade * max(tint.r, max(tint.g, tint.b)) > 0.01) {
-			                float wFull = smoothstep(0.6 * full, full, share);
-			                float wCheap = smoothstep(0.6 * cheap, cheap, share);
-			                vec3 base = vec3(1.0);
-			                if (wCheap > 0.01 && wFull < 0.99) {
-			                    base = vec3(mix(1.0, luceatCheap(pos, normal, light.xyz), wCheap));
+			            bool shadowOn = shadowFade > 0.01 && budget > 0.5 && !noShadow;
+			            float wFull = shadowOn ? smoothstep(0.6 * full, full, share) : 0.0;
+			            float wCheap = shadowOn ? smoothstep(0.6 * cheap, cheap, share) : 0.0;
+			            if (level > 0.0 && facing > 0.0) {
+			                float lambert = mix(1.0, 0.4 + 0.6 * clamp(ndotl, 0.0, 1.0), u_LuceatOptions.y);
+			                float power = curved * lambert * facing * strength;
+			                if (placed) {
+			                    placedCover += curved * facing;
 			                }
-			                vec3 solved = base;
-			                if (wFull > 0.01) {
-			                    solved = luceatShadow(pos, normal, light.xyz, share > 0.4 && dist < 24.0);
+			                vec3 visible = vec3(1.0);
+			                if (shadowOn && power * u_LuceatState.z * fade * max(tint.r, max(tint.g, tint.b)) > 0.01) {
+			                    vec3 base = vec3(1.0);
+			                    if (wCheap > 0.01 && wFull < 0.99) {
+			                        base = vec3(mix(1.0, luceatCheap(pos, normal, light.xyz), wCheap));
+			                    }
+			                    vec3 solved = base;
+			                    if (wFull > 0.01) {
+			                        solved = luceatShadow(pos, normal, light.xyz, share > 0.4 && dist < 24.0);
+			                    }
+			                    visible = mix(vec3(1.0), mix(base, solved, wFull), u_LuceatOptions.z * shadowFade);
 			                }
-			                visible = mix(vec3(1.0), mix(base, solved, wFull), u_LuceatOptions.z * shadowFade);
+			                total += tint * (u_LuceatState.z * power) * visible;
+			                if (gloss > 0.01 && ndotl > 0.0) {
+			                    float spec = pow(max(dot(normal, normalize(dirToLight + viewDir)), 0.0), 28.0) * 0.8 * gloss * curved * strength;
+			                    shiny += tint * (spec * u_LuceatState.z) * visible;
+			                }
 			            }
-			            total += tint * (u_LuceatState.z * power) * visible;
+			            if (bounceLevel > 0.0 && ndotl < 0.6) {
+			                float curvedBounce = bounceLevel / (4.0 - 3.0 * bounceLevel);
+			                float seen = 1.0;
+			                if (wCheap > 0.01) {
+			                    seen = mix(1.0, luceatCheap(pos + normal * 0.6, normal, light.xyz), wCheap * u_LuceatOptions.z * shadowFade);
+			                }
+			                total += tint * (u_LuceatState.z * bounce * 0.2 * curvedBounce * (1.0 - clamp(ndotl, 0.0, 1.0)) * strength * seen);
+			            }
 			        }
 			    }
+			    luceatSpec = min(shiny, vec3(1.0)) * fade;
 			    vec3 blockPart = max(vertexColor.rgb - baseColor.rgb, vec3(0.0));
 			    float coverage = clamp(placedCover * fade / max(dot(blockPart, vec3(0.299, 0.587, 0.114)), 0.02), 0.0, 1.0);
 			    return luceatSoft(total, u_LuceatState.w) * fade - blockPart * (u_LuceatOptions.w * coverage);
@@ -350,6 +381,7 @@ public final class TerrainShaderPatch {
 			.replace("@PATTERNS@", PatternAtlas.SAMPLER)
 			.replace("@SHAPES@", ShapeMasks.SAMPLER)
 			.replace("@GRID@", LightGrid.SAMPLER)
+			.replace("@SHINE@", ShadowVolume.SHINE_SAMPLER)
 			.replace("@GX@", Integer.toString(LightGrid.GX))
 			.replace("@GY@", Integer.toString(LightGrid.GY))
 			.replace("@GZ@", Integer.toString(LightGrid.GZ))
@@ -389,7 +421,7 @@ public final class TerrainShaderPatch {
 	private static String patchFragment(String source) {
 		String patched = replaceOnce(source, "flat in uint v_Material;", "flat in uint v_Material;\n" + FRAGMENT_LIGHTING);
 		patched = replaceOnce(patched, "color *= v_Color;", "vec3 luceatAlbedo = color.rgb;\n    vec3 luceatFaceNormal = luceatNormal(v_LuceatPos);\n    color *= v_Color;");
-		return replaceOnce(patched, "fragColor = _linearFog(", "color.rgb += luceatAlbedo * luceatLight(v_LuceatPos, luceatFaceNormal, v_Color, v_LuceatBase);\n\n    fragColor = _linearFog(");
+		return replaceOnce(patched, "fragColor = _linearFog(", "color.rgb += luceatAlbedo * luceatLight(v_LuceatPos, luceatFaceNormal, v_Color, v_LuceatBase);\n    color.rgb += luceatSpec;\n\n    fragColor = _linearFog(");
 	}
 
 	private static String replaceOnce(String source, String anchor, String replacement) {
