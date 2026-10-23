@@ -2,6 +2,7 @@ package me.bewf.luceat.client.shader;
 
 import me.bewf.luceat.Luceat;
 import me.bewf.luceat.client.light.LightBuffer;
+import me.bewf.luceat.client.light.LightGrid;
 import me.bewf.luceat.client.shadow.PatternAtlas;
 import me.bewf.luceat.client.shadow.ShapeMasks;
 import me.bewf.luceat.client.shadow.ShadowVolume;
@@ -25,17 +26,29 @@ public final class TerrainShaderPatch {
 			    ivec4 u_LuceatCamBlock;
 			    vec4 u_LuceatCamFrac;
 			    ivec4 u_LuceatVol;
+			    vec4 u_LuceatMore;
+			    ivec4 u_LuceatGrid;
 			    vec4 u_LuceatPosRadius[@LIGHTS@];
 			    vec4 u_LuceatColor[@LIGHTS@];
 			};
 
 			uniform usampler3D @SAMPLER@;
+			uniform usampler3D @GRID@;
 			uniform sampler2D @PATTERNS@;
 			uniform sampler2D @SHAPES@;
 
 			ivec3 luceatWrap(ivec3 cell) {
 			    ivec3 m = cell % @DIM@;
 			    return m + @DIM@ * ivec3(lessThan(m, ivec3(0)));
+			}
+
+			uint luceatId(ivec3 cell) {
+			    ivec3 world = cell + u_LuceatCamBlock.xyz;
+			    ivec3 offset = (world >> 4) - u_LuceatVol.xyz;
+			    if (any(greaterThan(abs(offset), ivec3(u_LuceatVol.w)))) {
+			        return 0u;
+			    }
+			    return texelFetch(@SAMPLER@, luceatWrap(world), 0).r;
 			}
 
 			vec3 luceatPattern(uint id, vec3 hit, ivec3 cell, int axis, bool positiveFace) {
@@ -136,10 +149,7 @@ public final class TerrainShaderPatch {
 			        float tExit = min(tMax.x, min(tMax.y, tMax.z));
 			        int exitAxis = tMax.x <= tMax.y && tMax.x <= tMax.z ? 0 : (tMax.y <= tMax.z ? 1 : 2);
 			        if (any(notEqual(cell, lightCell))) {
-			            ivec3 world = cell + u_LuceatCamBlock.xyz;
-			            ivec3 offset = (world >> 4) - u_LuceatVol.xyz;
-			            bool inside = all(lessThanEqual(abs(offset), ivec3(u_LuceatVol.w)));
-			            uint id = inside ? texelFetch(@SAMPLER@, luceatWrap(world), 0).r : 0u;
+			            uint id = luceatId(cell);
 			            if (id == 1u) {
 			                return vec3(0.0);
 			            }
@@ -182,9 +192,46 @@ public final class TerrainShaderPatch {
 			    return trans;
 			}
 
-			vec3 luceatShadow(vec3 pos, vec3 normal, vec3 lightPos) {
+			float luceatCheap(vec3 pos, vec3 normal, vec3 lightPos) {
+			    vec3 delta = lightPos - pos;
+			    float len = length(delta);
+			    if (len < 0.15) {
+			        return 1.0;
+			    }
+			    vec3 dir = delta / len;
+			    vec3 origin = pos + normal * 0.02 + dir * 0.01 + u_LuceatCamFrac.xyz;
+			    ivec3 cell = ivec3(floor(origin));
+			    ivec3 lightCell = ivec3(floor(lightPos + u_LuceatCamFrac.xyz));
+			    vec3 sgn = vec3(dir.x >= 0.0 ? 1.0 : -1.0, dir.y >= 0.0 ? 1.0 : -1.0, dir.z >= 0.0 ? 1.0 : -1.0);
+			    vec3 safe = max(abs(dir), vec3(1.0e-5));
+			    vec3 tDelta = 1.0 / safe;
+			    vec3 tMax = (vec3(cell) + max(sgn, 0.0) - origin) * sgn / safe;
+			    ivec3 stepCell = ivec3(sgn);
+			    for (int i = 0; i < 40; i++) {
+			        if (any(notEqual(cell, lightCell)) && luceatId(cell) == 1u) {
+			            return 0.0;
+			        }
+			        float tExit = min(tMax.x, min(tMax.y, tMax.z));
+			        if (tExit >= len) {
+			            break;
+			        }
+			        if (tMax.x <= tMax.y && tMax.x <= tMax.z) {
+			            cell.x += stepCell.x;
+			            tMax.x += tDelta.x;
+			        } else if (tMax.y <= tMax.z) {
+			            cell.y += stepCell.y;
+			            tMax.y += tDelta.y;
+			        } else {
+			            cell.z += stepCell.z;
+			            tMax.z += tDelta.z;
+			        }
+			    }
+			    return 1.0;
+			}
+
+			vec3 luceatShadow(vec3 pos, vec3 normal, vec3 lightPos, bool soft) {
 			    vec3 centre = luceatVisibility(pos, normal, lightPos);
-			    float radius = u_LuceatExtra.z;
+			    float radius = soft ? u_LuceatExtra.z : 0.0;
 			    if (radius <= 0.0 || max(centre.r, max(centre.g, centre.b)) > 0.98) {
 			        return centre;
 			    }
@@ -213,40 +260,84 @@ public final class TerrainShaderPatch {
 			vec3 luceatLight(vec3 pos, vec3 normal, vec4 vertexColor, vec4 baseColor) {
 			    float exposure = max(baseColor.r, max(baseColor.g, baseColor.b));
 			    float fade = 1.0 - u_LuceatOptions.x * smoothstep(0.25, 0.95, exposure);
-			    if (fade <= 0.01) {
+			    if (fade <= 0.01 || u_LuceatState.x < 0.5) {
+			        return vec3(0.0);
+			    }
+			    ivec3 gc = ivec3(floor((pos + u_LuceatCamFrac.xyz + vec3(u_LuceatCamBlock.xyz - u_LuceatGrid.xyz)) / 8.0));
+			    if (any(lessThan(gc, ivec3(0))) || any(greaterThanEqual(gc, ivec3(@GX@, @GY@, @GZ@)))) {
 			        return vec3(0.0);
 			    }
 			    float shadowFade = u_LuceatState.y > 0.5 ? 1.0 - smoothstep(0.6 * u_LuceatExtra.y, u_LuceatExtra.y, length(pos)) : 0.0;
-			    bool shadowsOn = shadowFade > 0.01;
+			    float budget = u_LuceatMore.z;
+			    float full = budget > 0.5 ? 0.5 / budget : 2.0;
+			    float cheap = full * 0.25;
+			    float sumPower = 0.0;
+			    for (int g = 0; g < @TEXELS@; g++) {
+			        uvec4 slots = texelFetch(@GRID@, ivec3(gc.x * @TEXELS@ + g, gc.y, gc.z), 0);
+			        for (int c = 0; c < 4; c++) {
+			            uint id = slots[c];
+			            if (id == 0u) {
+			                continue;
+			            }
+			            vec4 light = u_LuceatPosRadius[int(id) - 1];
+			            float level = clamp((light.w - length(light.xyz - pos)) / 15.0, 0.0, 1.0);
+			            if (level <= 0.0) {
+			                continue;
+			            }
+			            vec3 tint = u_LuceatColor[int(id) - 1].rgb;
+			            sumPower += level / (4.0 - 3.0 * level) * max(tint.r, max(tint.g, tint.b));
+			        }
+			    }
+			    sumPower = max(sumPower, 1.0e-4);
 			    vec3 total = vec3(0.0);
 			    float placedCover = 0.0;
-			    int count = int(u_LuceatState.x);
-			    for (int i = 0; i < count; i++) {
-			        vec4 light = u_LuceatPosRadius[i];
-			        vec3 toLight = light.xyz - pos;
-			        float dist = length(toLight);
-			        float level = max(light.w - dist, 0.0) / 15.0;
-			        if (level <= 0.0) {
-			            continue;
+			    for (int g = 0; g < @TEXELS@; g++) {
+			        uvec4 slots = texelFetch(@GRID@, ivec3(gc.x * @TEXELS@ + g, gc.y, gc.z), 0);
+			        for (int c = 0; c < 4; c++) {
+			            uint id = slots[c];
+			            if (id == 0u) {
+			                continue;
+			            }
+			            int i = int(id) - 1;
+			            vec4 light = u_LuceatPosRadius[i];
+			            vec3 toLight = light.xyz - pos;
+			            float dist = length(toLight);
+			            float level = clamp((light.w - dist) / 15.0, 0.0, 1.0);
+			            if (level <= 0.0) {
+			                continue;
+			            }
+			            float ndotl = dot(normal, toLight / max(dist, 1.0e-4));
+			            float facing = mix(1.0, smoothstep(-0.35, 0.15, ndotl), u_LuceatOptions.y);
+			            if (facing <= 0.0) {
+			                continue;
+			            }
+			            int flags = int(u_LuceatColor[i].w + 0.5);
+			            bool placed = (flags & 1) != 0;
+			            bool noShadow = (flags & 2) != 0;
+			            float lambert = mix(1.0, 0.4 + 0.6 * clamp(ndotl, 0.0, 1.0), u_LuceatOptions.y);
+			            float curved = level / (4.0 - 3.0 * level);
+			            float power = curved * lambert * facing * (placed ? u_LuceatExtra.x : 1.0);
+			            vec3 tint = u_LuceatColor[i].rgb;
+			            if (placed) {
+			                placedCover += curved * facing;
+			            }
+			            vec3 visible = vec3(1.0);
+			            float share = curved * max(tint.r, max(tint.g, tint.b)) / sumPower;
+			            if (shadowFade > 0.01 && budget > 0.5 && !noShadow && power * u_LuceatState.z * fade * max(tint.r, max(tint.g, tint.b)) > 0.01) {
+			                float wFull = smoothstep(0.6 * full, full, share);
+			                float wCheap = smoothstep(0.6 * cheap, cheap, share);
+			                vec3 base = vec3(1.0);
+			                if (wCheap > 0.01 && wFull < 0.99) {
+			                    base = vec3(mix(1.0, luceatCheap(pos, normal, light.xyz), wCheap));
+			                }
+			                vec3 solved = base;
+			                if (wFull > 0.01) {
+			                    solved = luceatShadow(pos, normal, light.xyz, share > 0.4 && dist < 24.0);
+			                }
+			                visible = mix(vec3(1.0), mix(base, solved, wFull), u_LuceatOptions.z * shadowFade);
+			            }
+			            total += tint * (u_LuceatState.z * power) * visible;
 			        }
-			        float ndotl = dot(normal, toLight / max(dist, 1.0e-4));
-			        float facing = mix(1.0, smoothstep(-0.35, 0.15, ndotl), u_LuceatOptions.y);
-			        if (facing <= 0.0) {
-			            continue;
-			        }
-			        bool placed = u_LuceatColor[i].w > 0.5;
-			        float lambert = mix(1.0, 0.4 + 0.6 * clamp(ndotl, 0.0, 1.0), u_LuceatOptions.y);
-			        float curved = level / (4.0 - 3.0 * level);
-			        float power = curved * lambert * facing * (placed ? u_LuceatExtra.x : 1.0);
-			        vec3 tint = u_LuceatColor[i].rgb;
-			        if (placed) {
-			            placedCover += curved * facing;
-			        }
-			        vec3 visible = vec3(1.0);
-			        if (shadowsOn && power * u_LuceatState.z * fade * max(tint.r, max(tint.g, tint.b)) > 0.01) {
-			            visible = mix(vec3(1.0), luceatShadow(pos, normal, light.xyz), u_LuceatOptions.z * shadowFade);
-			        }
-			        total += tint * (u_LuceatState.z * power) * visible;
 			    }
 			    vec3 blockPart = max(vertexColor.rgb - baseColor.rgb, vec3(0.0));
 			    float coverage = clamp(placedCover * fade / max(dot(blockPart, vec3(0.299, 0.587, 0.114)), 0.02), 0.0, 1.0);
@@ -258,6 +349,11 @@ public final class TerrainShaderPatch {
 			.replace("@SAMPLER@", ShadowVolume.SAMPLER)
 			.replace("@PATTERNS@", PatternAtlas.SAMPLER)
 			.replace("@SHAPES@", ShapeMasks.SAMPLER)
+			.replace("@GRID@", LightGrid.SAMPLER)
+			.replace("@GX@", Integer.toString(LightGrid.GX))
+			.replace("@GY@", Integer.toString(LightGrid.GY))
+			.replace("@GZ@", Integer.toString(LightGrid.GZ))
+			.replace("@TEXELS@", Integer.toString(LightGrid.SLOTS / 4))
 			.replace("@DIM@", Integer.toString(ShadowVolume.DIMENSION))
 			.replace("@RES@", Integer.toString(ShapeMasks.RES))
 			.replace("@PER_ROW@", Integer.toString(ShapeMasks.PER_ROW))

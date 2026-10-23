@@ -175,6 +175,11 @@ public final class BlockRules {
 		return rule.level;
 	}
 
+	public static BlockRule rule(BlockState state) {
+		Map<Block, BlockRule> map = byBlock;
+		return map.isEmpty() ? null : map.get(state.getBlock());
+	}
+
 	public static float[] colour(BlockState state) {
 		Map<Block, BlockRule> map = byBlock;
 		if (map.isEmpty()) {

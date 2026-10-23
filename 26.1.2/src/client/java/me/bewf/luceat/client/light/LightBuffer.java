@@ -14,11 +14,11 @@ import me.bewf.luceat.client.shadow.ShadowVolume;
 import net.minecraft.world.phys.Vec3;
 
 public final class LightBuffer {
-	public static final int MAX_LIGHTS = 32;
+	public static final int MAX_LIGHTS = 256;
 	public static final int BINDING = 7;
 	public static final String BLOCK_NAME = "LuceatLights";
 
-	private static final int HEADER = 96;
+	private static final int HEADER = 128;
 	private static final int SIZE = HEADER + MAX_LIGHTS * 32;
 
 	private final ByteBuffer scratch = BufferUtils.createByteBuffer(SIZE);
@@ -37,6 +37,8 @@ public final class LightBuffer {
 		this.scratch.putInt(blockX).putInt(blockY).putInt(blockZ).putInt(0);
 		this.scratch.putFloat((float) (camera.x - blockX)).putFloat((float) (camera.y - blockY)).putFloat((float) (camera.z - blockZ)).putFloat(0.0F);
 		this.scratch.putInt(ShadowVolume.centreX()).putInt(ShadowVolume.centreY()).putInt(ShadowVolume.centreZ()).putInt(ShadowVolume.HALF);
+		this.scratch.putFloat(config.lightBounce).putFloat(config.shine).putFloat(config.shadows ? config.shadowedLights : 0).putFloat(0.0F);
+		this.scratch.putInt(LightGrid.originX()).putInt(LightGrid.originY()).putInt(LightGrid.originZ()).putInt(0);
 		for (int i = 0; i < MAX_LIGHTS; i++) {
 			if (i < count) {
 				LightSource light = lights.get(i);
@@ -51,7 +53,7 @@ public final class LightBuffer {
 		for (int i = 0; i < MAX_LIGHTS; i++) {
 			if (i < count) {
 				LightSource light = lights.get(i);
-				this.scratch.putFloat(light.red()).putFloat(light.green()).putFloat(light.blue()).putFloat(light.placed() ? 1.0F : 0.0F);
+				this.scratch.putFloat(light.red()).putFloat(light.green()).putFloat(light.blue()).putFloat((light.placed() ? 1.0F : 0.0F) + (light.noShadow() ? 2.0F : 0.0F));
 			} else {
 				this.scratch.putFloat(0.0F).putFloat(0.0F).putFloat(0.0F).putFloat(0.0F);
 			}

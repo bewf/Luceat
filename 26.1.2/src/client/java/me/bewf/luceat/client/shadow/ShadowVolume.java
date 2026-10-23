@@ -16,9 +16,7 @@ import org.lwjgl.opengl.GL13;
 import org.lwjgl.opengl.GL20;
 import org.lwjgl.opengl.GL30;
 
-import me.bewf.luceat.client.config.LuceatConfig;
 import me.bewf.luceat.client.light.PlacedLights;
-import me.bewf.luceat.client.light.block.BlockRules;
 
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.core.BlockPos;
@@ -26,7 +24,7 @@ import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.Vec3;
 
 public final class ShadowVolume {
-	public static final int CELLS = 5;
+	public static final int CELLS = 9;
 	public static final int CELL_SIZE = 16;
 	public static final int DIMENSION = CELLS * CELL_SIZE;
 	public static final int HALF = CELLS / 2;
@@ -178,7 +176,7 @@ public final class ShadowVolume {
 			return;
 		}
 		missing.sort((a, b) -> Integer.compare(a[3], b[3]));
-		int count = Math.min(FILLS_PER_FRAME, missing.size());
+		int count = Math.min(missing.size() > 30 ? FILLS_PER_FRAME * 2 : FILLS_PER_FRAME, missing.size());
 		for (int i = 0; i < count; i++) {
 			int[] cell = missing.get(i);
 			scan(cell[0], cell[1], cell[2]);
@@ -229,18 +227,12 @@ public final class ShadowVolume {
 		int originY = cy * CELL_SIZE;
 		int originZ = cz * CELL_SIZE;
 		cellData.clear();
-		int slot = index(cx, cy, cz);
-		PlacedLights.forget(slot);
-		int minLevel = LuceatConfig.get().placedMinLevel;
 		for (int z = 0; z < CELL_SIZE; z++) {
 			for (int y = 0; y < CELL_SIZE; y++) {
 				for (int x = 0; x < CELL_SIZE; x++) {
 					pos.set(originX + x, originY + y, originZ + z);
 					BlockState state = level.getBlockState(pos);
 					cellData.putShort((short) Occluders.id(state, level, pos));
-					if (BlockRules.emission(state) >= minLevel) {
-						PlacedLights.offer(level, slot, originX + x, originY + y, originZ + z, state);
-					}
 				}
 			}
 		}

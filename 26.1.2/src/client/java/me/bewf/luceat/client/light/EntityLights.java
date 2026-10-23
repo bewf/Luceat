@@ -39,8 +39,11 @@ public final class EntityLights {
 			if (entity instanceof LivingEntity living) {
 				HeldLights.collect(level, living, partialTick, lights);
 			}
-			if (config.naturalLights) {
+			if (config.naturalLights && config.entityLights) {
 				addNatural(lights, level, entity, partialTick);
+			}
+			if (!config.entityLights) {
+				continue;
 			}
 			if (entity instanceof ItemEntity item) {
 				if (config.droppedItems) {
@@ -57,7 +60,7 @@ public final class EntityLights {
 		if (dropped != null) {
 			merge(dropped, counts, lights);
 		}
-		int limit = Math.min(config.maxLights, LightBuffer.MAX_LIGHTS);
+		int limit = Math.max(4, Math.min(config.maxLights, LightBuffer.MAX_LIGHTS) / 2);
 		if (lights.size() > limit) {
 			lights.sort(Comparator.comparingDouble(light -> distanceSquared(light, camera)));
 			return new ArrayList<>(lights.subList(0, limit));

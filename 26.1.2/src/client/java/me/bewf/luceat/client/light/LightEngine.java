@@ -58,17 +58,22 @@ public final class LightEngine {
 				LightSmoother.clear();
 			}
 		}
+		LightGrid.update(lights, camera);
 		BUFFER.update(lights, camera);
 		BUFFER.bind(program);
+		LightGrid.bind(program);
 		ShadowVolume.bind(program);
 		PatternAtlas.bind(program);
 		ShapeMasks.bind(program);
 	}
 
 	private static List<LightSource> gather(Minecraft minecraft, Vec3 camera, float partialTick, LuceatConfig config) {
+		LightCull.setup(minecraft, camera, partialTick);
 		List<LightSource> found = new ArrayList<>(EntityLights.collect(minecraft, camera, partialTick));
+		found.removeIf(light -> !LightCull.sees(light.x(), light.y(), light.z(), light.radius()));
 		ShadowVolume.update(minecraft.level, camera);
 		if (config.placedLights) {
+			PlacedLights.update(minecraft.level, camera);
 			PlacedLights.collect(camera, Math.min(config.maxLights, LightBuffer.MAX_LIGHTS) - found.size(), found);
 		}
 		return LightSmoother.apply(found);

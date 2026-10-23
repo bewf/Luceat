@@ -1,5 +1,6 @@
 package me.bewf.luceat.client.mixin;
 
+import me.bewf.luceat.client.light.PlacedLights;
 import me.bewf.luceat.client.shadow.ShadowVolume;
 
 import net.minecraft.client.multiplayer.ClientLevel;
@@ -16,5 +17,6 @@ public abstract class ClientLevelMixin {
 	@Inject(method = "setBlocksDirty", at = @At("HEAD"))
 	private void luceat$markShadowsDirty(BlockPos pos, BlockState oldState, BlockState newState, CallbackInfo ci) {
 		ShadowVolume.markDirty(pos);
+		PlacedLights.markDirty(pos);
 	}
 }

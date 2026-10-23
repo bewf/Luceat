@@ -201,7 +201,6 @@ public final class Presets {
 		return null;
 	}
 
-	// what reset section goes back to: the chosen preset on top of plain defaults
 	public static LuceatConfig baseline(LuceatConfig live) {
 		LuceatConfig base = new LuceatConfig();
 		Preset chosen = byName(live == null ? null : live.preset);
