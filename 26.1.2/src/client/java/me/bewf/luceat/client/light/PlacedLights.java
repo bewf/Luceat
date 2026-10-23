@@ -78,7 +78,9 @@ public final class PlacedLights {
 	private static final List<long[]> queue = new ArrayList<>();
 	private static final Map<BlockState, float[]> colours = new IdentityHashMap<>();
 	private static final BlockPos.MutableBlockPos probe = new BlockPos.MutableBlockPos();
+	private static int minLevel = 1;
 	private static final Predicate<BlockState> EMITTER = state -> BlockRules.emission(state) >= minLevel;
+
 
 	private static final float[] cx = new float[MAX_CANDIDATES];
 	private static final float[] cy = new float[MAX_CANDIDATES];
@@ -107,7 +109,6 @@ public final class PlacedLights {
 	private static final boolean[] flame = new boolean[TABLE];
 	private static final int[] touched = new int[TABLE];
 
-	private static int minLevel = 1;
 	private static int frame;
 	private static int sweepCellX = Integer.MIN_VALUE;
 	private static int sweepCellY;
