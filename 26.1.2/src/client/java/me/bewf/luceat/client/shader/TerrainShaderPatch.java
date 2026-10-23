@@ -27,7 +27,7 @@ public final class TerrainShaderPatch {
 			    vec4 u_LuceatCamFrac;
 			    ivec4 u_LuceatVol;
 			    vec4 u_LuceatMore;
-			    ivec4 u_LuceatGrid;
+			    ivec4 u_LuceatGridOrigin;
 			    vec4 u_LuceatPosRadius[@LIGHTS@];
 			    vec4 u_LuceatColor[@LIGHTS@];
 			};
@@ -267,7 +267,7 @@ public final class TerrainShaderPatch {
 			    if (fade <= 0.01 || u_LuceatState.x < 0.5) {
 			        return vec3(0.0);
 			    }
-			    ivec3 gc = ivec3(floor((pos + u_LuceatCamFrac.xyz + vec3(u_LuceatCamBlock.xyz - u_LuceatGrid.xyz)) / 8.0));
+			    ivec3 gc = ivec3(floor((pos + u_LuceatCamFrac.xyz + vec3(u_LuceatCamBlock.xyz - u_LuceatGridOrigin.xyz)) / 8.0));
 			    if (any(lessThan(gc, ivec3(0))) || any(greaterThanEqual(gc, ivec3(@GX@, @GY@, @GZ@)))) {
 			        return vec3(0.0);
 			    }

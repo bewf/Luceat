@@ -69,13 +69,13 @@ public final class EntityLights {
 	}
 
 	public static int brighten(Entity entity, int lightCoords) {
+		int own = lightCoords;
 		if (entity instanceof LivingEntity living) {
-			return HeldLights.brighten(living, lightCoords);
+			own = HeldLights.brighten(living, lightCoords);
+		} else if (entity instanceof ItemEntity item && LuceatConfig.get().droppedItems) {
+			own = HeldLights.brighten(LightSpecs.of(item.getItem(), item.isInWater()).level(), lightCoords);
 		}
-		if (entity instanceof ItemEntity item && LuceatConfig.get().droppedItems) {
-			return HeldLights.brighten(LightSpecs.of(item.getItem(), item.isInWater()).level(), lightCoords);
-		}
-		return lightCoords;
+		return LightSampler.entity(entity.getX(), entity.getY() + entity.getBbHeight() * 0.5, entity.getZ(), own);
 	}
 
 	private static void addNatural(List<LightSource> out, ClientLevel level, Entity entity, float partialTick) {

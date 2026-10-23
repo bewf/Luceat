@@ -46,6 +46,7 @@ public final class LightGrid {
 	private static int originZ;
 	private static long signature = Long.MIN_VALUE;
 	private static int cellsUsed;
+	private static List<LightSource> current = List.of();
 
 	private LightGrid() {
 	}
@@ -76,6 +77,7 @@ public final class LightGrid {
 
 	public static void update(List<LightSource> lights, Vec3 camera) {
 		ensureTexture();
+		current = lights;
 		originX = (Math.floorDiv((int) Math.floor(camera.x), CELL) - GX / 2) * CELL;
 		originY = (Math.floorDiv((int) Math.floor(camera.y), CELL) - GY / 2) * CELL;
 		originZ = (Math.floorDiv((int) Math.floor(camera.z), CELL) - GZ / 2) * CELL;
@@ -172,6 +174,32 @@ public final class LightGrid {
 			return low - point;
 		}
 		return point > low + CELL ? point - low - CELL : 0.0F;
+	}
+
+	// strongest light level reaching a point, same lights the shader sees
+	public static float levelAt(double x, double y, double z) {
+		int cx = (int) Math.floor((x - originX) / CELL);
+		int cy = (int) Math.floor((y - originY) / CELL);
+		int cz = (int) Math.floor((z - originZ) / CELL);
+		if (cx < 0 || cy < 0 || cz < 0 || cx >= GX || cy >= GY || cz >= GZ) {
+			return 0.0F;
+		}
+		int cell = (cz * GY + cy) * GX + cx;
+		int base = cell * SLOTS;
+		int n = counts[cell];
+		float best = 0.0F;
+		for (int k = 0; k < n; k++) {
+			int index = ids[base + k] - 1;
+			if (index < 0 || index >= current.size()) {
+				continue;
+			}
+			LightSource light = current.get(index);
+			double dx = light.x() - x;
+			double dy = light.y() - y;
+			double dz = light.z() - z;
+			best = Math.max(best, light.radius() - (float) Math.sqrt(dx * dx + dy * dy + dz * dz));
+		}
+		return best;
 	}
 
 	public static void bind(int program) {

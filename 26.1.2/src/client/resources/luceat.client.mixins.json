@@ -7,6 +7,7 @@
     "ClientLevelMixin",
     "EntityRendererMixin",
     "ItemInHandRendererMixin",
+    "ParticleMixin",
     "sodium.SodiumChunkRendererMixin",
     "sodium.SodiumShaderLoaderMixin"
   ],
