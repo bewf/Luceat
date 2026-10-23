@@ -28,7 +28,15 @@ public final class LightSpecs {
 		COLOURS.clear();
 	}
 
+	public enum Where {
+		HELD, DROPPED, FRAMED
+	}
+
 	public static LightSpec of(ItemStack stack, boolean wet) {
+		return of(stack, wet, Where.HELD);
+	}
+
+	public static LightSpec of(ItemStack stack, boolean wet, Where where) {
 		if (stack.isEmpty()) {
 			return NONE;
 		}
@@ -37,7 +45,10 @@ public final class LightSpecs {
 		if (custom != null && !custom.enabled) {
 			return NONE;
 		}
-		boolean submerged = wet && config.waterPutsOutLights;
+		if (custom != null && !(where == Where.HELD ? custom.whenHeld : where == Where.DROPPED ? custom.whenDropped : custom.whenFramed)) {
+			return NONE;
+		}
+		boolean submerged = wet && (custom != null && custom.water >= 0 ? custom.water == 1 : config.waterPutsOutLights);
 		List<ItemLightRule> rules = ItemLightRules.matching(stack);
 		int level = 0;
 		ItemLightRule best = null;
@@ -62,6 +73,9 @@ public final class LightSpecs {
 				return ENCHANT_GLOW;
 			}
 			return NONE;
+		}
+		if (custom != null && Math.abs(custom.radius - 1.0F) > 0.001F) {
+			level = Math.max(1, Math.min(24, Math.round(level * custom.radius)));
 		}
 		float[] colour = custom != null && custom.colour >= 0 ? custom.rgb() : best != null && best.colour() != null ? best.colour() : colourOf(stack, config.textureColours);
 		return new LightSpec(level, colour[0], colour[1], colour[2]);

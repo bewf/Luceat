@@ -73,7 +73,7 @@ public final class EntityLights {
 		if (entity instanceof LivingEntity living) {
 			own = HeldLights.brighten(living, lightCoords);
 		} else if (entity instanceof ItemEntity item && LuceatConfig.get().droppedItems) {
-			own = HeldLights.brighten(LightSpecs.of(item.getItem(), item.isInWater()).level(), lightCoords);
+			own = HeldLights.brighten(LightSpecs.of(item.getItem(), item.isInWater(), LightSpecs.Where.DROPPED).level(), lightCoords);
 		}
 		return LightSampler.entity(entity.getX(), entity.getY() + entity.getBbHeight() * 0.5, entity.getZ(), own);
 	}
@@ -90,7 +90,7 @@ public final class EntityLights {
 	}
 
 	private static void addFrame(List<LightSource> out, ItemFrame frame) {
-		LightSpec spec = LightSpecs.of(frame.getItem(), false);
+		LightSpec spec = LightSpecs.of(frame.getItem(), false, LightSpecs.Where.FRAMED);
 		if (spec.level() <= 0) {
 			return;
 		}
@@ -105,7 +105,7 @@ public final class EntityLights {
 	}
 
 	private static void addDropped(List<LightSource> out, List<Integer> counts, ItemEntity entity, float partialTick) {
-		LightSpec spec = LightSpecs.of(entity.getItem(), entity.isInWater());
+		LightSpec spec = LightSpecs.of(entity.getItem(), entity.isInWater(), LightSpecs.Where.DROPPED);
 		if (spec.level() > 0) {
 			counts.add(Math.max(1, entity.getItem().getCount()));
 			Vec3 position = entity.getPosition(partialTick);
