@@ -561,7 +561,7 @@ public final class LuceatScreen extends Screen {
 		graphics.text(this.font, "Made by bëwf", x + 60, y + 22, LuceatLook.SOFT, false);
 		y += 62;
 		String[] paragraphs = {
-			"Luceat adds dynamic lights to held items, dropped items, other player, placed blocks, and more.",
+			"Luceat adds dynamic lights to held items, dropped items, other players, placed blocks, and more.",
 			"You can customise light colours, brightness, and shadows to create a look you like. You can add lights to any block you want.",
 			"You can hover a setting to see it in the live preview.",
 			"Open this menu any time with /luceat or the K key.",
