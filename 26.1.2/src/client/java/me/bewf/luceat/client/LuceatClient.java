@@ -1,6 +1,7 @@
 package me.bewf.luceat.client;
 
 import me.bewf.luceat.Luceat;
+import me.bewf.luceat.client.compat.IrisCompat;
 import me.bewf.luceat.client.config.LuceatConfig;
 import me.bewf.luceat.client.gui.LuceatMenu;
 import me.bewf.luceat.client.light.block.BlockRules;
@@ -25,6 +26,7 @@ public class LuceatClient implements ClientModInitializer {
 		ClientCommandRegistrationCallback.EVENT.register((dispatcher, context) -> LuceatMenu.register(dispatcher));
 		ClientTickEvents.END_CLIENT_TICK.register(client -> {
 			LuceatMenu.tick(client);
+			IrisCompat.tick(client);
 			UpdateChecker.tick(client);
 		});
 		UpdateChecker.check();
