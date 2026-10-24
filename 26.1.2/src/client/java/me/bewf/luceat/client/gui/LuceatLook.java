@@ -44,6 +44,36 @@ public final class LuceatLook {
 		return a << 24 | r << 16 | g << 8 | b;
 	}
 
+	private static final String[] RESET_ICON = {
+		"..####.#.",
+		".#....###",
+		"#......#.",
+		"#........",
+		"#.......#",
+		".#.....#.",
+		"..#####.."
+	};
+
+	public static final int ICON_W = 9;
+	public static final int ICON_H = 7;
+
+	public static void resetIcon(GuiGraphicsExtractor graphics, int x, int y, int colour) {
+		for (int row = 0; row < RESET_ICON.length; row++) {
+			String line = RESET_ICON[row];
+			for (int col = 0; col < line.length(); col++) {
+				if (line.charAt(col) == '#') {
+					graphics.fill(x + col, y + row, x + col + 1, y + row + 1, colour);
+				}
+			}
+		}
+	}
+
+	public static void drawSwitch(GuiGraphicsExtractor graphics, int x, int y, boolean on) {
+		round(graphics, x, y, x + 30, y + 14, on ? ACCENT : TRACK);
+		int knob = on ? x + 17 : x + 3;
+		round(graphics, knob, y + 2, knob + 10, y + 12, 0xFFFFFFFF);
+	}
+
 	public static boolean inside(double x, double y, int x0, int y0, int x1, int y1) {
 		return x >= x0 && x < x1 && y >= y0 && y < y1;
 	}

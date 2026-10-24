@@ -18,13 +18,17 @@ import net.minecraft.network.chat.Style;
 public final class LuceatMenu {
 	private static final KeyMapping OPEN = KeyMappingHelper.registerKeyMapping(new KeyMapping(
 		"key.luceat.open",
-		GLFW.GLFW_KEY_K,
+		GLFW.GLFW_KEY_J,
 		KeyMapping.Category.register(Identifier.fromNamespaceAndPath("luceat", "main"))
 	));
 
 	private static boolean requested;
 
 	private LuceatMenu() {
+	}
+
+	public static String keyLabel() {
+		return OPEN.getTranslatedKeyMessage().getString();
 	}
 
 	public static void init() {
@@ -42,6 +46,12 @@ public final class LuceatMenu {
 				config.enabled = !config.enabled;
 				LuceatConfig.save();
 				context.getSource().sendFeedback(prefix().append(Component.literal(config.enabled ? "Luceat is on." : "Luceat is off.")));
+				return 1;
+			}))
+			.then(ClientCommands.literal("perf").executes(context -> {
+				for (String line : SpeedTestPage.chatReport()) {
+					context.getSource().sendFeedback(prefix().append(Component.literal(line)));
+				}
 				return 1;
 			})));
 	}

@@ -8,6 +8,7 @@ public final class ChoiceSetting<E extends Enum<E>> extends Setting {
 	private final String[] names;
 	private final Supplier<E> getter;
 	private final Consumer<E> setter;
+	private String[] notes = new String[0];
 
 	public ChoiceSetting(String section, String label, String help, Cost cost, boolean rebuildsShadows, E[] values, String[] names, Supplier<E> getter, Consumer<E> setter) {
 		super(section, label, help, cost, rebuildsShadows);
@@ -15,6 +16,15 @@ public final class ChoiceSetting<E extends Enum<E>> extends Setting {
 		this.names = names;
 		this.getter = getter;
 		this.setter = setter;
+	}
+
+	public ChoiceSetting<E> withNotes(String... values) {
+		this.notes = values;
+		return this;
+	}
+
+	public String note(int index) {
+		return index >= 0 && index < notes.length ? notes[index] : "";
 	}
 
 	public int count() {

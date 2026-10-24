@@ -82,8 +82,9 @@ public final class LuceatSettings {
 			"Plants cast a soft shadow too.",
 			Cost.LOW, true, () -> c.plantShadows, value -> c.plantShadows = value));
 		all.add(new ChoiceSetting<>(SHADOWS, "Leaves and holes",
-			"Off: leaves, grates and similar blocks work like solid blocks. Fast: they dim the light by how much of the block is see through. Fancy: they cast the real shape of the leaves or holes.",
-			Cost.MEDIUM, true, ShadowQuality.values(), new String[]{"Off", "Fast", "Fancy"}, () -> c.foliageShadows, value -> c.foliageShadows = value));
+			"How leaves, grates and other blocks with holes shade the light. Click to change.",
+			Cost.MEDIUM, true, ShadowQuality.values(), new String[]{"Off", "Fast", "Fancy"}, () -> c.foliageShadows, value -> c.foliageShadows = value)
+			.withNotes("Leaves and grates act like solid blocks.", "They dim the light by how see through the block is.", "They cast the real shape of the leaves or holes."));
 		all.add(new ToggleSetting(SHADOWS, "Coloured glass",
 			"Stained glass tints the light that comes through it to the colour of the glass.",
 			Cost.LOW, true, () -> c.glassTint, value -> c.glassTint = value));
@@ -161,8 +162,9 @@ public final class LuceatSettings {
 			Cost.MEDIUM, false, 8.0F, 128.0F, 8.0F, " blocks", () -> c.shadowDistance, value -> c.shadowDistance = Math.round(value)));
 
 		all.add(new ChoiceSetting<>(GENERAL, "Shader packs",
-			"A shader pack draws the world its own way, so Luceat's light does not show while one is on. Leave them: Luceat does nothing. Turn off: Luceat switches the pack off for you while Luceat is on. This needs Iris.",
-			Cost.NONE, false, ShaderPackMode.values(), new String[]{"Leave them", "Turn off"}, () -> c.shaderPacks, value -> c.shaderPacks = value));
+			"A shader pack draws the world its own way, so Luceat's light does not show while one is on. This needs Iris. Click to change.",
+			Cost.NONE, false, ShaderPackMode.values(), new String[]{"Leave them", "Turn off"}, () -> c.shaderPacks, value -> c.shaderPacks = value)
+			.withNotes("Luceat does nothing about shader packs.", "Luceat switches the pack off for you while Luceat is on."));
 		all.add(new ToggleSetting(GENERAL, "Update notices",
 			"Checks Modrinth when the game starts and tells you in chat if a new version is out.",
 			Cost.NONE, false, () -> c.updateChecker, value -> c.updateChecker = value));
