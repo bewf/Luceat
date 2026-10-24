@@ -7,7 +7,6 @@ import java.util.Objects;
 import me.bewf.luceat.Luceat;
 import me.bewf.luceat.client.config.LuceatConfig;
 import me.bewf.luceat.client.gui.LuceatLook;
-import me.bewf.luceat.client.gui.preview.Light.Source;
 
 import com.mojang.blaze3d.platform.NativeImage;
 
@@ -21,7 +20,6 @@ import net.minecraft.resources.Identifier;
 import net.minecraft.util.FormattedCharSequence;
 
 public final class PreviewPanel {
-	private static final float[] DEFAULT_COLOUR = {1.0F, 0.7F, 0.35F};
 	private static final float NIGHT = 0.04F;
 
 	private static final class Target {
@@ -55,7 +53,9 @@ public final class PreviewPanel {
 	private double lightX = Double.NaN;
 	private double lightY = Double.NaN;
 	private double lightZ = Double.NaN;
-	private long lastHash;
+	private int lastHash;
+	private int lastBase;
+	private long lastChange;
 	private Target shown;
 	private Tracer lastTracer;
 	private PreviewOccluders leftOccluders;
@@ -118,7 +118,7 @@ public final class PreviewPanel {
 		imageX = x + 10;
 		imageY = y + 24;
 		imageW = w - 20;
-		imageH = Math.min(h - 130, Math.round(imageW * 0.64F));
+		imageH = Math.min(h - 130, Math.round(imageW * 0.95F));
 		if (imageH < 60) {
 			return;
 		}
@@ -216,9 +216,11 @@ public final class PreviewPanel {
 	}
 
 	private void render(Scene scene, LuceatConfig live) {
-		float scale = interactive || draggingLight || draggingTime ? 0.5F : 1.0F;
-		int tw = Math.max(32, Math.round(imageW * scale));
-		int th = Math.max(24, Math.round(imageH * scale));
+		boolean moving = draggingLight || draggingTime;
+		int gs = guiScale();
+		int ow = Math.max(64, Math.min(1200, imageW * gs));
+		int oh = Math.max(48, Math.round(ow * (float) imageH / imageW));
+		int finalWidth = Math.min(ow, imageW * 2);
 		LuceatConfig left = null;
 		if (spec.compares()) {
 			left = live.copy();
@@ -226,12 +228,22 @@ public final class PreviewPanel {
 		}
 		boolean flicker = live.flicker > 0.0F;
 		long bucket = flicker ? System.nanoTime() / 70_000_000L : 0L;
-		int hash = Objects.hash(live.asJson(), left == null ? "" : left.asJson(), scene.id, spec.caption(), time, lightX, lightY, lightZ, tw, th, bucket);
-		if (hash == lastHash && shown != null && shown.width == tw && shown.height == th) {
+		int base = Objects.hash(live.asJson(), left == null ? "" : left.asJson(), scene.id, spec.caption(), time, lightX, lightY, lightZ, ow, oh, bucket);
+		long now = System.nanoTime();
+		if (base != lastBase) {
+			lastBase = base;
+			lastChange = now;
+		}
+		int tier = moving ? 0 : (now - lastChange > 250_000_000L ? 2 : 1);
+		int hash = base * 31 + tier;
+		if (hash == lastHash && shown != null && shown.width == ow && shown.height == oh) {
 			return;
 		}
+		float quality = tier == 0 ? 0.42F : tier == 1 ? 0.7F : 1.0F;
+		int tw = Math.max(48, Math.round(finalWidth * quality));
+		int th = Math.max(36, Math.round(tw * (float) oh / ow));
 		long start = System.nanoTime();
-		Target target = target(tw, th);
+		Target target = target(ow, oh);
 		int rightKeyNow = PreviewOccluders.key(live);
 		if (rightOccluders == null || rightKey != rightKeyNow) {
 			rightOccluders = new PreviewOccluders(live);
@@ -253,16 +265,62 @@ public final class PreviewPanel {
 			rightTracer.render(pixels, tw, th);
 		}
 		NativeImage image = target.texture.getPixels();
-		for (int row = 0; row < th; row++) {
-			for (int column = 0; column < tw; column++) {
-				image.setPixel(column, row, pixels[column + row * tw]);
+		if (tw == ow && th == oh) {
+			for (int row = 0; row < oh; row++) {
+				for (int column = 0; column < ow; column++) {
+					image.setPixel(column, row, pixels[column + row * ow]);
+				}
 			}
+		} else {
+			smoothUpscale(pixels, tw, th, image, ow, oh);
 		}
 		target.texture.upload();
 		shown = target;
 		lastTracer = rightTracer;
 		lastHash = hash;
 		lastRenderMillis = (System.nanoTime() - start) / 1_000_000L;
+	}
+
+	private static int guiScale() {
+		try {
+			return Math.max(1, Math.min(3, (int) Math.round(Minecraft.getInstance().getWindow().getGuiScale())));
+		} catch (RuntimeException error) {
+			return 2;
+		}
+	}
+
+	// bilinear so the picture stays soft instead of showing blocky pixels
+	private static void smoothUpscale(int[] src, int sw, int sh, NativeImage dst, int dw, int dh) {
+		int[] columns = new int[dw];
+		int[] columnsNext = new int[dw];
+		float[] columnWeight = new float[dw];
+		for (int x = 0; x < dw; x++) {
+			float fx = Math.max(0.0F, Math.min(sw - 1.0F, (x + 0.5F) * sw / dw - 0.5F));
+			int x0 = (int) fx;
+			columns[x] = x0;
+			columnsNext[x] = Math.min(sw - 1, x0 + 1);
+			columnWeight[x] = fx - x0;
+		}
+		for (int y = 0; y < dh; y++) {
+			float fy = Math.max(0.0F, Math.min(sh - 1.0F, (y + 0.5F) * sh / dh - 0.5F));
+			int y0 = (int) fy;
+			int y1 = Math.min(sh - 1, y0 + 1);
+			float wy = fy - y0;
+			for (int x = 0; x < dw; x++) {
+				float wx = columnWeight[x];
+				int a = src[columns[x] + y0 * sw];
+				int b = src[columnsNext[x] + y0 * sw];
+				int c = src[columns[x] + y1 * sw];
+				int d = src[columnsNext[x] + y1 * sw];
+				int out = 0xFF000000;
+				for (int shift = 0; shift <= 16; shift += 8) {
+					float top = ((a >> shift) & 255) * (1.0F - wx) + ((b >> shift) & 255) * wx;
+					float bottom = ((c >> shift) & 255) * (1.0F - wx) + ((d >> shift) & 255) * wx;
+					out |= Math.round(top * (1.0F - wy) + bottom * wy) << shift;
+				}
+				dst.setPixel(x, y, out);
+			}
+		}
 	}
 
 	public long lastRenderMillis() {
@@ -274,85 +332,11 @@ public final class PreviewPanel {
 		for (int i = 0; i < occ.length; i++) {
 			occ[i] = scene.cells[i] == null ? Occ.EMPTY : occluders.of(scene.cells[i]);
 		}
-		List<Light> lights = lights(scene, config);
-		float shadowDistance = scene.shadowScale == 1.0F ? config.shadowDistance : config.shadowDistance * scene.shadowScale;
-		Params params = new Params(config.shadows, config.brightness, config.maxBrightness, config.daylightFade, config.directionalShading, config.shadowStrength, config.vanillaReplace, config.placedStrength, config.shadowSoftness * 0.45F, time, scene.vanilla, shadowDistance);
-		return new Tracer(scene.width, scene.height, scene.depth, scene.voxels(), occ, lights.toArray(new Light[0]), params, scene.eye, scene.target, scene.fov);
-	}
-
-	private List<Light> lights(Scene scene, LuceatConfig config) {
-		List<Light> result = new ArrayList<>();
-		if (!config.enabled) {
-			return result;
-		}
 		double seconds = (System.nanoTime() / 1_000_000L % 1_000_000L) / 1000.0;
-		double maxDistance = scene.rangeScale > 0.0F ? config.lightRange * scene.rangeScale : Double.MAX_VALUE;
-		int index = 0;
-		for (Light light : scene.lights) {
-			Light l = light;
-			if (index == 0 && scene.movable) {
-				if (!Double.isNaN(lightX)) {
-					l = l.at(lightX, Double.isNaN(lightY) ? l.y() : lightY, lightZ);
-				}
-				if (scene.keepAway) {
-					double cx = Math.floor(l.x()) + 0.5;
-					double x = config.keepLightOutOfWalls ? Math.max(cx - 0.2, Math.min(cx + 0.2, l.x())) : Math.max(cx - 0.47, Math.min(cx + 0.47, l.x()));
-					l = l.at(x, l.y(), l.z());
-				}
-			}
-			index++;
-			if (!allowed(l, config)) {
-				continue;
-			}
-			if (l.source() == Source.HELD && scene.id.equals("held")) {
-				l = l.at(l.x(), 1.0 + 1.8 * config.heldHeight - 0.8, l.z());
-			}
-			if (l.textured() && !config.textureColours) {
-				l = l.withColour(DEFAULT_COLOUR[0], DEFAULT_COLOUR[1], DEFAULT_COLOUR[2]);
-			}
-			if (l.fire() && config.flicker > 0.0F) {
-				double seed = (index * 37.31) % 100.0;
-				double noise = 0.55 * Math.sin(seconds * 9.0 + seed) + 0.3 * Math.sin(seconds * 17.3 + seed * 1.7) + 0.15 * Math.sin(seconds * 31.0 + seed * 2.3);
-				l = l.withRadius((float) Math.max(0.0, l.radius() + config.flicker * 1.3 * noise));
-			}
-			double dx = l.x() - scene.eye[0];
-			double dy = l.y() - scene.eye[1];
-			double dz = l.z() - scene.eye[2];
-			if (Math.sqrt(dx * dx + dy * dy + dz * dz) > maxDistance) {
-				continue;
-			}
-			result.add(l);
-		}
-		if (scene.capLights && result.size() > config.maxLights) {
-			double[] eye = scene.eye;
-			result.sort((a, b) -> Double.compare(distance(a, eye), distance(b, eye)));
-			return new ArrayList<>(result.subList(0, Math.max(0, config.maxLights)));
-		}
-		return result;
-	}
-
-	private static double distance(Light light, double[] eye) {
-		double dx = light.x() - eye[0];
-		double dy = light.y() - eye[1];
-		double dz = light.z() - eye[2];
-		return dx * dx + dy * dy + dz * dz;
-	}
-
-	private static boolean allowed(Light light, LuceatConfig config) {
-		if (light.wet() && config.waterPutsOutLights) {
-			return false;
-		}
-		return switch (light.source()) {
-			case HELD -> config.heldLights;
-			case PLAYER -> config.otherPlayers;
-			case MOB -> config.mobs;
-			case DROPPED -> config.droppedItems;
-			case FRAME -> config.itemFrames;
-			case NATURAL -> config.naturalLights;
-			case ENCHANT -> config.enchantGlow;
-			case PLACED -> config.placedLights && light.radius() >= config.placedMinLevel;
-			case ALWAYS -> true;
-		};
+		List<Light> lights = PreviewLights.build(scene, config, seconds, lightX, lightY, lightZ);
+		float shadowDistance = scene.shadowScale == 1.0F ? config.shadowDistance : config.shadowDistance * scene.shadowScale;
+		Params params = new Params(config.shadows, config.brightness, config.maxBrightness, config.daylightFade, config.directionalShading, config.shadowStrength, config.vanillaReplace, config.placedStrength, config.shadowSoftness * 0.45F, time, scene.vanilla, shadowDistance, config.lightBounce, config.shine);
+		return new Tracer(scene.width, scene.height, scene.depth, scene.voxels(), occ, scene.shine(), lights.toArray(new Light[0]), params, scene.eye, scene.target, scene.fov);
 	}
 
 	public void setInteractive(boolean value) {

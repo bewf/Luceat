@@ -7,6 +7,7 @@ import me.bewf.luceat.client.shadow.ShapeMasks;
 public final class Tracer {
 	public static final int VOX = 16;
 	private static final int SHAPE_RES = ShapeMasks.RES;
+	private static final double DESIGN_ASPECT = 1.5;
 
 	private final int width;
 	private final int height;
@@ -15,6 +16,7 @@ public final class Tracer {
 	private final Occ[] occluders;
 	private final Light[] lights;
 	private final Params params;
+	private final float[] shineCells;
 	private final double[] eye;
 	private final double[] forward = new double[3];
 	private final double[] right = new double[3];
@@ -30,6 +32,11 @@ public final class Tracer {
 	}
 
 	public Tracer(int width, int height, int depth, int[][] voxels, Occ[] occluders, Light[] lights, Params params, double[] eye, double[] target, double fovDegrees) {
+		this(width, height, depth, voxels, occluders, null, lights, params, eye, target, fovDegrees);
+	}
+
+	public Tracer(int width, int height, int depth, int[][] voxels, Occ[] occluders, float[] shineCells, Light[] lights, Params params, double[] eye, double[] target, double fovDegrees) {
+		this.shineCells = shineCells;
 		this.width = width;
 		this.height = height;
 		this.depth = depth;
@@ -55,6 +62,7 @@ public final class Tracer {
 
 	public void render(int[] out, int pixelsWide, int pixelsHigh, int fromColumn, int toColumn) {
 		double aspect = (double) pixelsWide / pixelsHigh;
+		double tanHalf = reach(aspect);
 		IntStream.range(0, pixelsHigh).parallel().forEach(row -> {
 			double[] dir = new double[3];
 			for (int column = fromColumn; column < toColumn; column++) {
@@ -69,7 +77,12 @@ public final class Tracer {
 		});
 	}
 
+	private double reach(double aspect) {
+		return tanHalf * Math.max(1.0, DESIGN_ASPECT / aspect);
+	}
+
 	public double[] rayDirection(double fractionX, double fractionY, double aspect) {
+		double tanHalf = reach(aspect);
 		double[] dir = new double[3];
 		double u = (fractionX * 2.0 - 1.0) * tanHalf * aspect;
 		double v = (1.0 - fractionY * 2.0) * tanHalf;
@@ -85,6 +98,7 @@ public final class Tracer {
 	}
 
 	public double[] project(double x, double y, double z, double aspect) {
+		double tanHalf = reach(aspect);
 		double rx = x - eye[0];
 		double ry = y - eye[1];
 		double rz = z - eye[2];
@@ -228,7 +242,7 @@ public final class Tracer {
 				float albedoRed = (argb >> 16 & 255) / 255.0F;
 				float albedoGreen = (argb >> 8 & 255) / 255.0F;
 				float albedoBlue = (argb & 255) / 255.0F;
-				shade(px, py, pz, normal, albedoRed, albedoGreen, albedoBlue, out);
+				shade(px, py, pz, normal, albedoRed, albedoGreen, albedoBlue, out, shineAt(cell));
 				float a = alpha / 255.0F;
 				ray.red += ray.transmit * a * out[0];
 				ray.green += ray.transmit * a * out[1];
@@ -252,7 +266,11 @@ public final class Tracer {
 		return false;
 	}
 
-	private void shade(double px, double py, double pz, double[] n, float red, float green, float blue, float[] out) {
+	private float shineAt(int[] cell) {
+		return shineCells == null ? 0.0F : shineCells[cell[0] + width * (cell[1] + height * cell[2])];
+	}
+
+	private void shade(double px, double py, double pz, double[] n, float red, float green, float blue, float[] out, float gloss) {
 		float faceShade = n[1] > 0.5 ? 1.0F : n[1] < -0.5 ? 0.5F : Math.abs(n[2]) > 0.5 ? 0.8F : 0.6F;
 		float[] ambient = ambient();
 		float[] base = {ambient[0] * faceShade, ambient[1] * faceShade, ambient[2] * faceShade};
@@ -272,56 +290,91 @@ public final class Tracer {
 				vertex[2] = Math.max(vertex[2], base[2] + value * 0.66F);
 			}
 		}
-		float[] extra = lighting(px, py, pz, n, vertex, base);
-		out[0] = red * (vertex[0] + extra[0]);
-		out[1] = green * (vertex[1] + extra[1]);
-		out[2] = blue * (vertex[2] + extra[2]);
+		float[] extra = lighting(px, py, pz, n, vertex, base, gloss * params.shine());
+		out[0] = red * (vertex[0] + extra[0]) + extra[3];
+		out[1] = green * (vertex[1] + extra[1]) + extra[4];
+		out[2] = blue * (vertex[2] + extra[2]) + extra[5];
 	}
 
-	private float[] lighting(double px, double py, double pz, double[] n, float[] vertex, float[] base) {
+	private float[] lighting(double px, double py, double pz, double[] n, float[] vertex, float[] base, float gloss) {
 		float exposure = Math.max(base[0], Math.max(base[1], base[2]));
 		float fade = 1.0F - params.daylightFade() * smoothstep(0.25F, 0.95F, exposure);
 		float[] total = new float[3];
+		float[] shiny = new float[3];
+		float[] result = new float[6];
 		if (fade <= 0.01F) {
-			return total;
+			return result;
 		}
 		float placedCover = 0.0F;
+		float bounce = params.bounce();
+		double vx = eye[0] - px;
+		double vy = eye[1] - py;
+		double vz = eye[2] - pz;
+		double viewLength = Math.max(Math.sqrt(vx * vx + vy * vy + vz * vz), 1.0E-6);
+		vx /= viewLength;
+		vy /= viewLength;
+		vz /= viewLength;
+		double ex = px - eye[0];
+		double ey = py - eye[1];
+		double ez = pz - eye[2];
+		boolean near = ex * ex + ey * ey + ez * ez < (double) params.shadowDistance() * params.shadowDistance();
 		for (Light light : lights) {
 			double tx = light.x() - px;
 			double ty = light.y() - py;
 			double tz = light.z() - pz;
 			double dist = Math.sqrt(tx * tx + ty * ty + tz * tz);
-			float level = (float) Math.max(light.radius() - dist, 0.0) / 15.0F;
-			if (level <= 0.0F) {
+			float level = Math.min(1.0F, (float) Math.max(light.radius() - dist, 0.0) / 15.0F);
+			float bounceLevel = bounce > 0.001F ? Math.min(1.0F, Math.max(0.0F, (float) (light.radius() * 1.2 - dist) / 18.0F)) : 0.0F;
+			if (level <= 0.0F && bounceLevel <= 0.0F) {
 				continue;
 			}
 			float ndotl = (float) ((n[0] * tx + n[1] * ty + n[2] * tz) / Math.max(dist, 1.0E-4));
 			float facing = mix(1.0F, smoothstep(-0.35F, 0.15F, ndotl), params.directional());
-			if (facing <= 0.0F) {
-				continue;
-			}
-			float lambert = mix(1.0F, 0.4F + 0.6F * Math.min(1.0F, Math.max(0.0F, ndotl)), params.directional());
-			float curved = level / (4.0F - 3.0F * level);
-			float power = curved * lambert * facing * (light.placed() ? params.placedStrength() : 1.0F);
-			if (light.placed()) {
-				placedCover += curved * facing;
-			}
-			float[] visible = {1.0F, 1.0F, 1.0F};
+			float strength = light.placed() ? params.placedStrength() : 1.0F;
 			float strongest = Math.max(light.red(), Math.max(light.green(), light.blue()));
-			double ex = px - eye[0];
-			double ey = py - eye[1];
-			double ez = pz - eye[2];
-			boolean near = ex * ex + ey * ey + ez * ez < (double) params.shadowDistance() * params.shadowDistance();
-			if (params.shadows() && near && power * params.brightness() * fade * strongest > 0.01F) {
-				float[] through = shadow(px, py, pz, n, light);
-				for (int c = 0; c < 3; c++) {
-					visible[c] = mix(1.0F, through[c], params.shadowStrength());
+			if (level > 0.0F && facing > 0.0F) {
+				float lambert = mix(1.0F, 0.4F + 0.6F * Math.min(1.0F, Math.max(0.0F, ndotl)), params.directional());
+				float curved = level / (4.0F - 3.0F * level);
+				float power = curved * lambert * facing * strength;
+				if (light.placed()) {
+					placedCover += curved * facing;
+				}
+				float[] visible = {1.0F, 1.0F, 1.0F};
+				if (params.shadows() && near && power * params.brightness() * fade * strongest > 0.01F) {
+					float[] through = shadow(px, py, pz, n, light);
+					for (int c = 0; c < 3; c++) {
+						visible[c] = mix(1.0F, through[c], params.shadowStrength());
+					}
+				}
+				float scale = params.brightness() * power;
+				total[0] += light.red() * scale * visible[0];
+				total[1] += light.green() * scale * visible[1];
+				total[2] += light.blue() * scale * visible[2];
+				if (gloss > 0.01F && ndotl > 0.0F) {
+					double lx = tx / Math.max(dist, 1.0E-6) + vx;
+					double ly = ty / Math.max(dist, 1.0E-6) + vy;
+					double lz = tz / Math.max(dist, 1.0E-6) + vz;
+					double hl = Math.max(Math.sqrt(lx * lx + ly * ly + lz * lz), 1.0E-6);
+					double nh = Math.max(0.0, (n[0] * lx + n[1] * ly + n[2] * lz) / hl);
+					float spec = (float) (Math.pow(nh, 28.0) * 0.8) * gloss * curved * strength * params.brightness();
+					shiny[0] += light.red() * spec * visible[0];
+					shiny[1] += light.green() * spec * visible[1];
+					shiny[2] += light.blue() * spec * visible[2];
 				}
 			}
-			float scale = params.brightness() * power;
-			total[0] += light.red() * scale * visible[0];
-			total[1] += light.green() * scale * visible[1];
-			total[2] += light.blue() * scale * visible[2];
+			if (bounceLevel > 0.0F && ndotl < 0.6F) {
+				float curvedBounce = bounceLevel / (4.0F - 3.0F * bounceLevel);
+				float seen = 1.0F;
+				if (params.shadows() && near) {
+					double[] lifted = {px + n[0] * 0.6, py + n[1] * 0.6, pz + n[2] * 0.6};
+					float[] through = visibility(lifted[0], lifted[1], lifted[2], n, light.x(), light.y(), light.z());
+					seen = mix(1.0F, (through[0] + through[1] + through[2]) / 3.0F, params.shadowStrength());
+				}
+				float amount = params.brightness() * bounce * 0.2F * curvedBounce * (1.0F - Math.min(1.0F, Math.max(0.0F, ndotl))) * strength * seen;
+				total[0] += light.red() * amount;
+				total[1] += light.green() * amount;
+				total[2] += light.blue() * amount;
+			}
 		}
 		float blockRed = Math.max(vertex[0] - base[0], 0.0F);
 		float blockGreen = Math.max(vertex[1] - base[1], 0.0F);
@@ -329,10 +382,10 @@ public final class Tracer {
 		float luma = 0.299F * blockRed + 0.587F * blockGreen + 0.114F * blockBlue;
 		float coverage = Math.min(1.0F, Math.max(0.0F, placedCover * fade / Math.max(luma, 0.02F)));
 		float cap = params.maxBrightness();
-		float[] result = new float[3];
 		float[] block = {blockRed, blockGreen, blockBlue};
 		for (int c = 0; c < 3; c++) {
 			result[c] = soft(total[c], cap) * fade - block[c] * (params.vanillaReplace() * coverage);
+			result[3 + c] = Math.min(1.0F, shiny[c]) * fade;
 		}
 		return result;
 	}

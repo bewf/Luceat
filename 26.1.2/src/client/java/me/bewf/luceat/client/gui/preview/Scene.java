@@ -1,6 +1,10 @@
 package me.bewf.luceat.client.gui.preview;
 
 import java.util.List;
+
+import me.bewf.luceat.client.shadow.Shine;
+
+import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.world.level.block.state.BlockState;
 
 public final class Scene {
@@ -23,6 +27,7 @@ public final class Scene {
 	public final float rangeScale;
 
 	private int[][] voxels;
+	private float[] shine;
 
 	Scene(Builder b) {
 		this.id = b.id;
@@ -58,6 +63,18 @@ public final class Scene {
 			}
 		}
 		return voxels;
+	}
+
+	public float[] shine() {
+		if (shine == null) {
+			shine = new float[cells.length];
+			for (int i = 0; i < cells.length; i++) {
+				if (cells[i] != null) {
+					shine[i] = Shine.material(BuiltInRegistries.BLOCK.getKey(cells[i].getBlock()).getPath());
+				}
+			}
+		}
+		return shine;
 	}
 
 	public boolean solidAt(int x, int y, int z) {

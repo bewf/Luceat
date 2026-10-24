@@ -12,6 +12,8 @@ public record Params(
 	float softRadius,
 	float time,
 	boolean vanilla,
-	float shadowDistance
+	float shadowDistance,
+	float bounce,
+	float shine
 ) {
 }

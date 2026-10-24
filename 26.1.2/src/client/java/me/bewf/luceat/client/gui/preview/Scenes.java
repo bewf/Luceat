@@ -48,6 +48,8 @@ public final class Scenes {
 		MAKERS.put("colours", Scenes::colours);
 		MAKERS.put("day", Scenes::room);
 		MAKERS.put("showcase", Scenes::showcase);
+		MAKERS.put("bounce", Scenes::bounce);
+		MAKERS.put("shiny", Scenes::shiny);
 	}
 
 	private Scenes() {
@@ -135,6 +137,10 @@ public final class Scenes {
 				}
 			});
 			case "Water puts out lights" -> pair("water", "A light under water goes out.", c -> c.waterPutsOutLights = false);
+			case "Light bounce" -> pair("bounce", "Light bounces off surfaces and softly fills places the light cannot reach directly.", c -> c.lightBounce = 0.0F);
+			case "Shiny surfaces" -> pair("shiny", "Metal, ice, glass and polished blocks catch a bright highlight.", c -> c.shine = 0.0F);
+			case "Lights with shadows" -> pair("many", "Only the lights that matter most at each spot cast shadows. More costs more.", c -> c.shadowedLights = 0);
+			case "Join faraway lights" -> pair("many", "Lights far away join into one so big builds stay smooth.", c -> c.mergeFarLights = false);
 			case "Most lights at once" -> pair("many", "Only the closest lights are used. More lights costs more.", c -> c.maxLights = 4);
 			case "Light range" -> pair("hall", "Lights further away than the range are skipped.", c -> c.lightRange = 8);
 			default -> fallback();
@@ -161,10 +167,8 @@ public final class Scenes {
 
 	private static Scene.Builder stage(String id, String title, int w, int h, int d) {
 		Scene.Builder s = new Scene.Builder(id, title, w, h, d);
-		s.fill(0, 0, 0, w - 1, 0, d - 1, b(Blocks.STONE_BRICKS));
-		s.fill(0, 1, d - 1, w - 1, h - 1, d - 1, b(Blocks.STONE_BRICKS));
-		s.fill(0, 1, 0, 0, h - 1, d - 1, b(Blocks.STONE_BRICKS));
-		s.fill(w - 1, 1, 0, w - 1, h - 1, d - 1, b(Blocks.STONE_BRICKS));
+		s.fill(0, 0, 0, w - 1, 0, d - 1, b(Blocks.LIGHT_GRAY_CONCRETE));
+		s.fill(0, 1, d - 1, w - 1, h - 1, d - 1, b(Blocks.QUARTZ_BLOCK));
 		return s;
 	}
 
@@ -179,23 +183,55 @@ public final class Scenes {
 	private static Scene showcase() {
 		Scene.Builder s = stage("showcase", "Showcase", 13, 5, 9);
 		BlockState fence = b(Blocks.OAK_FENCE);
-		s.set(2, 1, 4, fence).set(3, 1, 4, with(with(fence, "east", "true"), "west", "true")).set(4, 1, 4, with(fence, "west", "true"));
-		s.fill(6, 1, 5, 6, 3, 5, b(Blocks.STONE_BRICKS));
+		s.set(2, 1, 4, with(fence, "east", "true"));
+		s.set(3, 1, 4, with(with(fence, "east", "true"), "west", "true"));
+		s.set(4, 1, 4, with(fence, "west", "true"));
+		s.fill(6, 1, 5, 6, 3, 5, b(Blocks.QUARTZ_PILLAR));
+		s.set(7, 1, 5, b(Blocks.GOLD_BLOCK));
 		BlockState leaves = with(b(Blocks.OAK_LEAVES), "persistent", "true");
-		s.fill(8, 1, 4, 9, 2, 5, leaves);
-		s.fill(11, 1, 3, 11, 2, 3, b(Blocks.RED_STAINED_GLASS));
+		s.fill(8, 1, 4, 9, 2, 4, leaves);
+		s.set(5, 1, 3, b(Blocks.GREEN_CARPET));
+		s.set(9, 1, 6, b(Blocks.GREEN_CARPET));
+		s.set(10, 1, 3, b(Blocks.RED_STAINED_GLASS));
+		s.set(11, 1, 3, b(Blocks.BLUE_STAINED_GLASS));
+		s.set(10, 1, 5, b(Blocks.LIME_STAINED_GLASS));
+		s.set(11, 1, 5, b(Blocks.YELLOW_STAINED_GLASS));
 		s.set(1, 1, 6, b(Blocks.SHORT_GRASS)).set(2, 1, 6, b(Blocks.POPPY)).set(3, 1, 6, b(Blocks.FERN));
 		s.light(lamp(Source.ALWAYS, 5.5, 2.4, 2.0, 14, WARM).asFire());
-		s.light(lamp(Source.PLACED, 10.5, 1.6, 6.5, 12, SOUL));
-		s.eye = new double[]{6.5, 3.4, -3.4};
-		s.target = new double[]{6.5, 0.9, 4.5};
+		s.light(lamp(Source.PLACED, 11.5, 1.6, 7.0, 12, SOUL));
+		s.eye = new double[]{6.5, 3.6, -3.6};
+		s.target = new double[]{6.5, 1.0, 4.5};
 		return s.caption("").movable().build();
+	}
+
+	private static Scene bounce() {
+		Scene.Builder s = stage("bounce", "Light bounce", 11, 5, 9);
+		s.fill(0, 1, 0, 0, 4, 8, b(Blocks.QUARTZ_BLOCK));
+		s.fill(4, 1, 3, 5, 3, 3, b(Blocks.QUARTZ_BLOCK));
+		s.light(lamp(Source.ALWAYS, 4.5, 2.2, 1.8, 14, WARM).asFire());
+		s.eye = new double[]{6.0, 3.4, -3.2};
+		s.target = new double[]{4.5, 1.2, 4.5};
+		return s.caption("Light bounces off the wall and softly fills the dark side.").movable().build();
+	}
+
+	private static Scene shiny() {
+		Scene.Builder s = stage("shiny", "Shiny surfaces", 11, 4, 8);
+		s.set(1, 1, 4, b(Blocks.GOLD_BLOCK));
+		s.set(3, 1, 4, b(Blocks.IRON_BLOCK));
+		s.set(5, 1, 4, b(Blocks.QUARTZ_BLOCK));
+		s.set(7, 1, 4, b(Blocks.ICE));
+		s.set(9, 1, 4, b(Blocks.BLUE_STAINED_GLASS));
+		s.set(5, 1, 6, b(Blocks.WHITE_CONCRETE));
+		s.light(lamp(Source.ALWAYS, 5.5, 2.0, 1.6, 14, WARM));
+		s.eye = new double[]{5.5, 2.8, -2.4};
+		s.target = new double[]{5.5, 1.0, 4.5};
+		return s.caption("Metal, ice and glass catch a bright highlight.").movable().build();
 	}
 
 	private static Scene room() {
 		Scene.Builder s = stage("room", "Room", 9, 5, 9);
 		s.fill(5, 1, 3, 6, 2, 4, b(Blocks.OAK_PLANKS));
-		s.fill(1, 1, 5, 2, 1, 6, b(Blocks.WHITE_WOOL));
+		s.fill(1, 1, 5, 2, 1, 6, b(Blocks.GOLD_BLOCK));
 		s.fill(3, 1, 7, 3, 3, 7, b(Blocks.COBBLESTONE));
 		s.light(lamp(Source.ALWAYS, 4.5, 2.2, 4.5, 14, WARM));
 		return s.caption("Drag the light around.").movable().build();
@@ -203,7 +239,7 @@ public final class Scenes {
 
 	private static Scene shadows() {
 		Scene.Builder s = stage("shadows", "Shadows", 11, 5, 9);
-		s.fill(5, 1, 4, 5, 3, 4, b(Blocks.STONE_BRICKS));
+		s.fill(5, 1, 4, 5, 3, 4, b(Blocks.QUARTZ_BLOCK));
 		s.fill(3, 1, 6, 4, 2, 7, b(Blocks.OAK_PLANKS));
 		s.fill(7, 1, 6, 8, 1, 7, b(Blocks.COBBLESTONE));
 		s.light(lamp(Source.ALWAYS, 5.5, 2.2, 2.2, 14, WARM));
@@ -243,7 +279,7 @@ public final class Scenes {
 
 	private static Scene soft() {
 		Scene.Builder s = stage("soft", "Soft edges", 9, 4, 8);
-		s.fill(4, 1, 3, 4, 2, 3, b(Blocks.STONE_BRICKS));
+		s.fill(4, 1, 3, 4, 2, 3, b(Blocks.QUARTZ_BLOCK));
 		s.eye = new double[]{4.5, 3.0, -2.0};
 		s.target = new double[]{4.5, 0.6, 4.5};
 		s.light(lamp(Source.ALWAYS, 4.5, 2.8, 1.4, 13, WARM));
@@ -291,7 +327,8 @@ public final class Scenes {
 	private static Scene thin() {
 		Scene.Builder s = stage("thin", "Thin blocks", 11, 4, 8);
 		BlockState fence = b(Blocks.OAK_FENCE);
-		s.set(1, 1, 3, fence).set(2, 1, 3, with(with(fence, "east", "true"), "west", "true")).set(3, 1, 3, with(fence, "west", "true"));
+		s.set(1, 1, 3, with(fence, "east", "true")).set(2, 1, 3, with(with(fence, "east", "true"), "west", "true")).set(3, 1, 3, with(fence, "west", "true"));
+		s.set(1, 1, 5, b(Blocks.GREEN_CARPET)).set(2, 1, 5, b(Blocks.GREEN_CARPET));
 		BlockState bars = b(Blocks.IRON_BARS);
 		s.set(5, 1, 3, bars).set(5, 2, 3, bars);
 		BlockState pane = b(Blocks.GLASS_PANE);
@@ -306,7 +343,7 @@ public final class Scenes {
 	private static Scene plants() {
 		Scene.Builder s = new Scene.Builder("plants", "Plants", 9, 4, 8);
 		s.fill(0, 0, 0, 8, 0, 7, b(Blocks.GRASS_BLOCK));
-		s.fill(0, 1, 7, 8, 3, 7, b(Blocks.STONE_BRICKS));
+		s.fill(0, 1, 7, 8, 3, 7, b(Blocks.QUARTZ_BLOCK));
 		BlockState[] list = {b(Blocks.SHORT_GRASS), b(Blocks.POPPY), b(Blocks.DANDELION), b(Blocks.FERN)};
 		for (int x = 1; x < 8; x++) {
 			for (int z = 3; z < 6; z++) {
@@ -397,7 +434,7 @@ public final class Scenes {
 	private static Scene water() {
 		Scene.Builder s = stage("water", "Water", 9, 4, 8);
 		s.fill(2, 1, 2, 6, 1, 5, b(Blocks.LIGHT_BLUE_STAINED_GLASS));
-		s.set(4, 1, 4, b(Blocks.STONE_BRICKS));
+		s.set(4, 1, 4, b(Blocks.QUARTZ_BLOCK));
 		s.eye = new double[]{4.5, 3.2, -1.5};
 		s.target = new double[]{4.5, 0.8, 4.0};
 		s.light(lamp(Source.HELD, 3.5, 1.0, 3.5, 13, WARM).asWet().named("Torch under water"));
