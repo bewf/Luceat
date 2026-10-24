@@ -58,7 +58,7 @@ public final class Presets {
 				c.directionalShading = 0.4F;
 			}),
 		new Preset("Light",
-			"Quick shadows from solid blocks only.",
+			"Quick, quiet and still pretty.",
 			"Light",
 			c -> {
 				c.shadows = true;
@@ -120,7 +120,7 @@ public final class Presets {
 				c.directionalShading = 0.7F;
 			}),
 		new Preset("Phenomenal",
-			"Softer shadow edges, longer shadows and a little fire flicker.",
+			"Every torch thinks it’s the main character.",
 			"Heavy",
 			c -> {
 				c.shadows = true;

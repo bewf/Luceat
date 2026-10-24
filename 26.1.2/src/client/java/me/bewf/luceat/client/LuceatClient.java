@@ -28,6 +28,7 @@ public class LuceatClient implements ClientModInitializer {
 			LuceatMenu.tick(client);
 			IrisCompat.tick(client);
 			UpdateChecker.tick(client);
+			me.bewf.luceat.client.gui.presets.PresetFilmstrips.warmUp();
 		});
 		UpdateChecker.check();
 		Luceat.LOGGER.info("Luceat client loaded");
