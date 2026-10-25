@@ -23,6 +23,9 @@ public final class LightEngine {
 	private static double lastY;
 	private static double lastZ;
 	private static ClientLevel lastLevel;
+	private static LuceatConfig lastConfig;
+	private static int lastRevision = -1;
+	private static boolean built;
 
 	private LightEngine() {
 	}
@@ -45,8 +48,11 @@ public final class LightEngine {
 		LuceatConfig config = LuceatConfig.get();
 		ClientLevel level = minecraft.level;
 		long time = level == null ? Long.MIN_VALUE : level.getGameTime();
-		boolean fresh = level != lastLevel || time != lastTime || partialTick != lastPartial || camera.x != lastX || camera.y != lastY || camera.z != lastZ;
+		boolean fresh = config != lastConfig || LuceatConfig.revision() != lastRevision || level != lastLevel || time != lastTime || partialTick != lastPartial || camera.x != lastX || camera.y != lastY || camera.z != lastZ;
 		if (fresh) {
+			built = false;
+			lastConfig = config;
+			lastRevision = LuceatConfig.revision();
 			lastLevel = level;
 			lastTime = time;
 			lastPartial = partialTick;
@@ -58,8 +64,11 @@ public final class LightEngine {
 				LightSmoother.clear();
 			}
 		}
-		LightGrid.update(lights, camera);
-		BUFFER.update(lights, camera);
+		if (!built) {
+			LightGrid.update(lights, camera);
+			BUFFER.update(lights, camera);
+			built = true;
+		}
 		BUFFER.bind(program);
 		LightGrid.bind(program);
 		ShadowVolume.bind(program);

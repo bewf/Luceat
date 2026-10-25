@@ -70,8 +70,14 @@ public final class LuceatConfig {
 	public ShaderPackMode shaderPacks = ShaderPackMode.LEAVE;
 	public boolean fancyNames = true;
 
+	private static int revision;
+
 	public static LuceatConfig get() {
 		return current;
+	}
+
+	public static int revision() {
+		return revision;
 	}
 
 	public static void load() {
@@ -92,6 +98,7 @@ public final class LuceatConfig {
 
 	public static void save() {
 		current.clamp();
+		revision++;
 		try (Writer writer = Files.newBufferedWriter(path())) {
 			GSON.toJson(current, writer);
 		} catch (IOException e) {
