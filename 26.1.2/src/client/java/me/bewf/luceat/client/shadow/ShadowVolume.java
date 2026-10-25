@@ -21,6 +21,8 @@ import me.bewf.luceat.client.light.PlacedLights;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.chunk.LevelChunk;
+import net.minecraft.world.level.chunk.LevelChunkSection;
 import net.minecraft.world.phys.Vec3;
 
 public final class ShadowVolume {
@@ -37,7 +39,7 @@ public final class ShadowVolume {
 	private static final int TOTAL = CELLS * CELLS * CELLS;
 	private static final int FILLS_PER_FRAME = 3;
 	private static final int DIRTY_PER_FRAME = 8;
-	private static final int REFRESH_INTERVAL = 4;
+	private static final int REFRESH_INTERVAL = 20;
 	private static final int[] UNPACK = {
 		GL11.GL_UNPACK_ALIGNMENT, GL11.GL_UNPACK_ROW_LENGTH, GL11.GL_UNPACK_SKIP_ROWS,
 		GL11.GL_UNPACK_SKIP_PIXELS, GL12.GL_UNPACK_IMAGE_HEIGHT, GL12.GL_UNPACK_SKIP_IMAGES
@@ -50,6 +52,8 @@ public final class ShadowVolume {
 	private static final Set<Long> dirty = new HashSet<>();
 	private static final ByteBuffer cellData = BufferUtils.createByteBuffer(CELL_SIZE * CELL_SIZE * CELL_SIZE * 2).order(ByteOrder.nativeOrder());
 	private static final ByteBuffer shineData = BufferUtils.createByteBuffer(CELL_SIZE * CELL_SIZE * CELL_SIZE);
+	private static final ByteBuffer emptyIds = BufferUtils.createByteBuffer(CELL_SIZE * CELL_SIZE * CELL_SIZE * 2);
+	private static final ByteBuffer emptyShine = BufferUtils.createByteBuffer(CELL_SIZE * CELL_SIZE * CELL_SIZE);
 
 	private static ClientLevel level;
 	private static int texture;
@@ -59,6 +63,10 @@ public final class ShadowVolume {
 	private static int centreX;
 	private static int centreY;
 	private static int centreZ;
+	private static int filledX = Integer.MIN_VALUE;
+	private static int filledY;
+	private static int filledZ;
+	private static boolean complete;
 
 	private ShadowVolume() {
 	}
@@ -81,6 +89,7 @@ public final class ShadowVolume {
 
 	public static void reset() {
 		Arrays.fill(valid, false);
+		complete = false;
 		dirty.clear();
 		Occluders.clear();
 		Shine.clear();
@@ -175,6 +184,9 @@ public final class ShadowVolume {
 	}
 
 	private static void fillMissing(int centreX, int centreY, int centreZ) {
+		if (complete && centreX == filledX && centreY == filledY && centreZ == filledZ) {
+			return;
+		}
 		List<int[]> missing = null;
 		for (int dx = -HALF; dx <= HALF; dx++) {
 			for (int dy = -HALF; dy <= HALF; dy++) {
@@ -193,13 +205,21 @@ public final class ShadowVolume {
 			}
 		}
 		if (missing == null) {
+			complete = true;
+			filledX = centreX;
+			filledY = centreY;
+			filledZ = centreZ;
 			return;
 		}
+		complete = false;
 		missing.sort((a, b) -> Integer.compare(a[3], b[3]));
-		int count = Math.min(missing.size() > 30 ? FILLS_PER_FRAME * 2 : FILLS_PER_FRAME, missing.size());
-		for (int i = 0; i < count; i++) {
+		int want = missing.size() > 30 ? FILLS_PER_FRAME * 2 : FILLS_PER_FRAME;
+		int done = 0;
+		for (int i = 0; i < missing.size() && done < want; i++) {
 			int[] cell = missing.get(i);
-			scan(cell[0], cell[1], cell[2]);
+			if (scan(cell[0], cell[1], cell[2])) {
+				done++;
+			}
 		}
 	}
 
@@ -224,7 +244,7 @@ public final class ShadowVolume {
 
 	private static void refreshRotating() {
 		frame++;
-		if (frame % REFRESH_INTERVAL != 0) {
+		if (frame % REFRESH_INTERVAL != 0 || !complete) {
 			return;
 		}
 		for (int tries = 0; tries < TOTAL; tries++) {
@@ -241,36 +261,53 @@ public final class ShadowVolume {
 		return valid[index] && cellX[index] == x && cellY[index] == y && cellZ[index] == z;
 	}
 
-	private static void scan(int cx, int cy, int cz) {
-		BlockPos.MutableBlockPos pos = new BlockPos.MutableBlockPos();
-		int originX = cx * CELL_SIZE;
-		int originY = cy * CELL_SIZE;
-		int originZ = cz * CELL_SIZE;
-		cellData.clear();
-		shineData.clear();
-		for (int z = 0; z < CELL_SIZE; z++) {
-			for (int y = 0; y < CELL_SIZE; y++) {
-				for (int x = 0; x < CELL_SIZE; x++) {
-					pos.set(originX + x, originY + y, originZ + z);
-					BlockState state = level.getBlockState(pos);
-					cellData.putShort((short) Occluders.id(state, level, pos));
-					shineData.put((byte) Shine.of(state));
+	private static boolean scan(int cx, int cy, int cz) {
+		LevelChunk chunk = level.getChunkSource().getChunkNow(cx, cz);
+		if (chunk == null) {
+			return false;
+		}
+		int sectionIndex = chunk.getSectionIndexFromSectionY(cy);
+		LevelChunkSection section = sectionIndex >= 0 && sectionIndex < chunk.getSections().length ? chunk.getSection(sectionIndex) : null;
+		ByteBuffer ids = emptyIds;
+		ByteBuffer shine = emptyShine;
+		if (section != null && !section.hasOnlyAir()) {
+			BlockPos.MutableBlockPos pos = new BlockPos.MutableBlockPos();
+			int originX = cx * CELL_SIZE;
+			int originY = cy * CELL_SIZE;
+			int originZ = cz * CELL_SIZE;
+			cellData.clear();
+			shineData.clear();
+			for (int z = 0; z < CELL_SIZE; z++) {
+				for (int y = 0; y < CELL_SIZE; y++) {
+					for (int x = 0; x < CELL_SIZE; x++) {
+						BlockState state = section.getBlockState(x, y, z);
+						if (state.isAir()) {
+							cellData.putShort((short) 0);
+							shineData.put((byte) 0);
+							continue;
+						}
+						pos.set(originX + x, originY + y, originZ + z);
+						cellData.putShort((short) Occluders.id(state, level, pos));
+						shineData.put((byte) Shine.of(state));
+					}
 				}
 			}
+			cellData.flip();
+			shineData.flip();
+			ids = cellData;
+			shine = shineData;
 		}
-		cellData.flip();
-		shineData.flip();
 		GL12.glTexSubImage3D(
 			GL12.GL_TEXTURE_3D, 0,
 			Math.floorMod(cx, CELLS) * CELL_SIZE, Math.floorMod(cy, CELLS) * CELL_SIZE, Math.floorMod(cz, CELLS) * CELL_SIZE,
-			CELL_SIZE, CELL_SIZE, CELL_SIZE, GL30.GL_RED_INTEGER, GL11.GL_UNSIGNED_SHORT, cellData
+			CELL_SIZE, CELL_SIZE, CELL_SIZE, GL30.GL_RED_INTEGER, GL11.GL_UNSIGNED_SHORT, ids
 		);
 		GL13.glActiveTexture(GL13.GL_TEXTURE0 + SHINE_UNIT);
 		GL11.glBindTexture(GL12.GL_TEXTURE_3D, shineTexture);
 		GL12.glTexSubImage3D(
 			GL12.GL_TEXTURE_3D, 0,
 			Math.floorMod(cx, CELLS) * CELL_SIZE, Math.floorMod(cy, CELLS) * CELL_SIZE, Math.floorMod(cz, CELLS) * CELL_SIZE,
-			CELL_SIZE, CELL_SIZE, CELL_SIZE, GL11.GL_RED, GL11.GL_UNSIGNED_BYTE, shineData
+			CELL_SIZE, CELL_SIZE, CELL_SIZE, GL11.GL_RED, GL11.GL_UNSIGNED_BYTE, shine
 		);
 		GL13.glActiveTexture(GL13.GL_TEXTURE0 + UNIT);
 		int index = index(cx, cy, cz);
@@ -278,6 +315,7 @@ public final class ShadowVolume {
 		cellY[index] = cy;
 		cellZ[index] = cz;
 		valid[index] = true;
+		return true;
 	}
 
 	private static int index(int x, int y, int z) {
