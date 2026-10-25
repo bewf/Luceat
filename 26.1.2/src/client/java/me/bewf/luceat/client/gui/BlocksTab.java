@@ -41,6 +41,16 @@ public final class BlocksTab {
 		}
 	}
 
+	private enum Sort {
+		NAME("Name"), LEVEL("Light level"), BUILT_IN("Built in first"), EDITED("Edited first"), COLOUR("Colour");
+
+		final String label;
+
+		Sort(String label) {
+			this.label = label;
+		}
+	}
+
 	private static final class Entry {
 		Identifier id;
 		String key;
@@ -66,6 +76,16 @@ public final class BlocksTab {
 	private Filter lastMode;
 	private int lastRules = -1;
 	private int slider;
+	private Sort sort = Sort.NAME;
+	private Sort lastSort;
+	private final ColourPicker picker = new ColourPicker();
+	private final java.util.Set<String> collapsed = new java.util.HashSet<>();
+	private final List<Hit> hits = new ArrayList<>();
+	private Slide activeSlide;
+	private float editorScroll;
+	private int editorHeight;
+	private int edTop;
+	private int edBottom;
 
 	private int listX0;
 	private int listY0;
@@ -73,11 +93,6 @@ public final class BlocksTab {
 	private int listY1;
 	private int edX0;
 	private int edX1;
-	private int yToggle;
-	private int yLevel;
-	private int yColour;
-	private int yRed;
-	private int yButtons;
 
 	public BlocksTab(Font font) {
 		this.font = font;
@@ -155,11 +170,12 @@ public final class BlocksTab {
 		}
 		String query = filterInput.text().toLowerCase(Locale.ROOT).trim();
 		int rules = BlockRules.all().size() * 31 + (int) BlockRules.all().stream().filter(BlockRule::edited).count();
-		if (query.equals(lastQuery) && mode == lastMode && rules == lastRules) {
+		if (query.equals(lastQuery) && mode == lastMode && sort == lastSort && rules == lastRules) {
 			return;
 		}
 		lastQuery = query;
 		lastMode = mode;
+		lastSort = sort;
 		lastRules = rules;
 		shown.clear();
 		for (Entry entry : all) {
@@ -179,6 +195,35 @@ public final class BlocksTab {
 				shown.add(entry);
 			}
 		}
+		shown.sort(comparator());
+	}
+
+	private String sortLabel() {
+		return "Sort: " + sort.label;
+	}
+
+	private java.util.Comparator<Entry> comparator() {
+		java.util.Comparator<Entry> byName = (a, b) -> a.name.compareToIgnoreCase(b.name);
+		return switch (sort) {
+			case NAME -> byName;
+			case LEVEL -> ((java.util.Comparator<Entry>) (a, b) -> Integer.compare(effectiveLevel(b), effectiveLevel(a))).thenComparing(byName);
+			case BUILT_IN -> ((java.util.Comparator<Entry>) (a, b) -> Boolean.compare(builtIn(b), builtIn(a))).thenComparing(byName);
+			case EDITED -> ((java.util.Comparator<Entry>) (a, b) -> Integer.compare(editRank(b), editRank(a))).thenComparing(byName);
+			case COLOUR -> ((java.util.Comparator<Entry>) (a, b) -> Float.compare(hueKey(a), hueKey(b))).thenComparing(byName);
+		};
+	}
+
+	private int editRank(Entry entry) {
+		BlockRule rule = BlockRules.get(entry.key);
+		return rule == null ? 0 : rule.added ? 2 : rule.edited() ? 3 : 0;
+	}
+
+	// unlit entries sink to the end, lit ones go round the colour wheel
+	private float hueKey(Entry entry) {
+		if (effectiveLevel(entry) <= 0) {
+			return 10.0F;
+		}
+		return ColourPicker.toHsv(pack(colour(entry)))[0];
 	}
 
 	private int effectiveLevel(Entry entry) {
@@ -243,9 +288,14 @@ public final class BlocksTab {
 			graphics.text(font, filter.label, cx + 7, y0 + 29, on ? 0xFFFFFFFF : LuceatLook.SOFT, false);
 			cx += width + 4;
 		}
+		String sortText = sortLabel();
+		int sortW = font.width(sortText) + 14;
+		boolean sortOver = LuceatLook.inside(mx, my, x1 - sortW, y0 + 24, x1, y0 + 42);
+		LuceatLook.roundOutlined(graphics, x1 - sortW, y0 + 24, x1, y0 + 42, sortOver ? LuceatLook.CARD_HOVER : LuceatLook.CARD, LuceatLook.BORDER);
+		graphics.text(font, sortText, x1 - sortW + 7, y0 + 29, LuceatLook.SOFT, false);
 		String count = shown.size() + (shown.size() == 1 ? " entry" : " entries");
-		if (cx + font.width(count) + 8 < x1) {
-			graphics.text(font, count, x1 - font.width(count), y0 + 29, LuceatLook.MUTED, false);
+		if (cx + font.width(count) + sortW + 16 < x1) {
+			graphics.text(font, count, x1 - sortW - 8 - font.width(count), y0 + 29, LuceatLook.MUTED, false);
 		}
 		int top = y0 + listTopOffset();
 		if (adding) {
@@ -260,7 +310,7 @@ public final class BlocksTab {
 				BlockRule rule = BlockRules.get(entry.key);
 				boolean over = LuceatLook.inside(mx, my, x0, y, x1, y + ROW) && my >= top;
 				boolean isSelected = entry == selected;
-				LuceatLook.roundOutlined(graphics, x0, y, x1, y + ROW, isSelected ? LuceatLook.ACCENT_SOFT : over ? LuceatLook.CARD_HOVER : LuceatLook.CARD, isSelected ? LuceatLook.ACCENT_DIM : over ? LuceatLook.CARD_HOVER : LuceatLook.CARD);
+				LuceatLook.roundOutlined(graphics, x0, y, x1, y + ROW, isSelected ? 0xFF3A2160 : over ? LuceatLook.CARD_HOVER : LuceatLook.CARD, isSelected ? LuceatLook.ACCENT : over ? LuceatLook.CARD_HOVER : LuceatLook.CARD);
 				if (!entry.stack.isEmpty()) {
 					graphics.fakeItem(entry.stack, x0 + 6, y + 6);
 				}
@@ -272,7 +322,7 @@ public final class BlocksTab {
 				int level = effectiveLevel(entry);
 				boolean added = rule != null && rule.added;
 				String status = level > 0 ? "Level " + level : rule != null && !rule.enabled ? "Off" : "No light";
-				int statusColour = level > 0 ? LuceatLook.TEXT : rule != null && !rule.enabled ? LuceatLook.BAD : LuceatLook.MUTED;
+				int statusColour = level > 0 ? isSelected ? 0xFFFFFFFF : LuceatLook.TEXT : rule != null && !rule.enabled ? LuceatLook.BAD : isSelected ? 0xFFDCCBF5 : 0xFF8E8EA0;
 				rx -= font.width(status);
 				graphics.text(font, status, rx, y + 10, statusColour, false);
 				if (level > 0) {
@@ -286,7 +336,7 @@ public final class BlocksTab {
 					rx -= bw + 6;
 					int colourBadge = added ? LuceatLook.ACCENT : BUILT_IN;
 					LuceatLook.roundOutlined(graphics, rx, y + 7, rx + bw, y + 21, 0xFF16161B, colourBadge);
-					graphics.text(font, badge, rx + 5, y + 11, colourBadge, false);
+					graphics.text(font, badge, rx + 5, y + 11, isSelected && !added ? 0xFFB9D4FF : colourBadge, false);
 					if (LuceatLook.inside(mx, my, rx, y + 7, rx + bw, y + 21) && my >= top) {
 						String text = added ? "A rule you made. You can delete it." : "Comes with Minecraft or Luceat. You can turn it off or change it, but you cannot delete it.";
 						tip = font.split(Component.literal(text).withStyle(Style.EMPTY.withColor(0xDDDDE6)), 200);
@@ -314,9 +364,89 @@ public final class BlocksTab {
 		}
 	}
 
+	private record Hit(int x0, int y0, int x1, int y1, Runnable click, Slide slide) {
+	}
+
+	private record Slide(int id, int x0, int x1, java.util.function.DoubleConsumer set) {
+	}
+
+	private void hit(int x0, int y0, int x1, int y1, Runnable click) {
+		if (y1 > edTop && y0 < edBottom) {
+			hits.add(new Hit(x0, Math.max(y0, edTop), x1, Math.min(y1, edBottom), click, null));
+		}
+	}
+
+	private void slideHit(int id, int x0, int y0, int x1, int y1, java.util.function.DoubleConsumer set) {
+		if (y1 > edTop && y0 < edBottom) {
+			hits.add(new Hit(x0, Math.max(y0, edTop), x1, Math.min(y1, edBottom), null, new Slide(id, x0, x1, set)));
+		}
+	}
+
+	private int header(GuiGraphicsExtractor graphics, String name, int y, int mx, int my) {
+		boolean closed = collapsed.contains(name);
+		boolean over = LuceatLook.inside(mx, my, edX0, y, edX1, y + 16) && my >= edTop && my < edBottom;
+		LuceatLook.round(graphics, edX0, y, edX1, y + 16, over ? LuceatLook.CARD_HOVER : LuceatLook.CARD);
+		graphics.text(font, closed ? ">" : "v", edX0 + 6, y + 4, LuceatLook.ACCENT, false);
+		graphics.text(font, name, edX0 + 18, y + 4, LuceatLook.TEXT, false);
+		hit(edX0, y, edX1, y + 16, () -> {
+			if (!collapsed.remove(name)) {
+				collapsed.add(name);
+			}
+		});
+		return y + 20;
+	}
+
+	private int toggleRow(GuiGraphicsExtractor graphics, String label, boolean on, int y, Runnable flip) {
+		graphics.text(font, label, edX0, y + 5, LuceatLook.TEXT, false);
+		int tx = edX1 - 30;
+		LuceatLook.round(graphics, tx, y + 2, tx + 30, y + 16, on ? LuceatLook.ACCENT : LuceatLook.TRACK);
+		int knob = on ? tx + 17 : tx + 3;
+		LuceatLook.round(graphics, knob, y + 4, knob + 10, y + 14, 0xFFFFFFFF);
+		hit(edX0, y, edX1, y + 18, flip);
+		return y + 22;
+	}
+
+	private int cycleRow(GuiGraphicsExtractor graphics, String label, String value, boolean custom, int y, int mx, int my, Runnable next) {
+		graphics.text(font, label, edX0, y + 5, LuceatLook.TEXT, false);
+		int w = font.width(value) + 14;
+		int bx0 = edX1 - w;
+		boolean over = LuceatLook.inside(mx, my, bx0, y, edX1, y + 18) && my >= edTop && my < edBottom;
+		LuceatLook.roundOutlined(graphics, bx0, y, edX1, y + 18, over ? LuceatLook.CARD_HOVER : LuceatLook.CARD, custom ? LuceatLook.WARN : LuceatLook.BORDER);
+		graphics.text(font, value, bx0 + 7, y + 5, custom ? LuceatLook.WARN : LuceatLook.SOFT, false);
+		hit(bx0, y, edX1, y + 18, next);
+		return y + 24;
+	}
+
+	private int sliderRow(GuiGraphicsExtractor graphics, String label, String value, boolean custom, float fraction, int y, int id, Runnable reset, java.util.function.DoubleConsumer set) {
+		graphics.text(font, label, edX0, y, LuceatLook.TEXT, false);
+		graphics.text(font, value, edX1 - font.width(value), y, custom ? LuceatLook.WARN : LuceatLook.SOFT, false);
+		if (reset != null) {
+			hit(edX0, y - 2, edX0 + font.width(label) + 4, y + 10, reset);
+		}
+		slider(graphics, edX0, edX1, y + 16, fraction, slider == id);
+		slideHit(id, edX0, y + 10, edX1, y + 28, set);
+		return y + 34;
+	}
+
+	private static String tri(int value, String on, String off) {
+		return value < 0 ? "Automatic" : value > 0 ? on : off;
+	}
+
+	private static int next(int value) {
+		return value < 0 ? 1 : value > 0 ? 0 : -1;
+	}
+
+	private void setRule(java.util.function.Consumer<BlockRule> change) {
+		change.accept(BlockRules.edit(selected.key));
+		commit();
+	}
+
 	public void drawEditor(GuiGraphicsExtractor graphics, int x0, int y0, int x1, int y1, int mx, int my) {
 		edX0 = x0 + 10;
-		edX1 = x1 - 10;
+		edX1 = x1 - 14;
+		edTop = y0 + 24;
+		edBottom = y1 - 4;
+		hits.clear();
 		LuceatLook.round(graphics, x0, y0, x1, y1, LuceatLook.SIDEBAR);
 		graphics.text(font, "Block settings", x0 + 10, y0 + 8, LuceatLook.TEXT, false);
 		Entry entry = selected;
@@ -327,12 +457,15 @@ public final class BlocksTab {
 		BlockRule rule = BlockRules.get(entry.key);
 		boolean added = rule != null && rule.added;
 		boolean lit = entry.defaultLevel > 0 || added;
-		int y = y0 + 26;
+		editorScroll = Math.max(0.0F, Math.min(editorScroll, Math.max(0, editorHeight - (edBottom - edTop))));
+		graphics.enableScissor(x0, edTop, x1, edBottom);
+		int y = edTop - Math.round(editorScroll);
+		int start = y;
 		if (!entry.stack.isEmpty()) {
 			graphics.fakeItem(entry.stack, x0 + 10, y);
 		}
 		graphics.text(font, entry.name, x0 + 32, y, LuceatLook.TEXT, false);
-		graphics.text(font, entry.key, x0 + 32, y + 11, LuceatLook.MUTED, false);
+		graphics.text(font, entry.key, x0 + 32, y + 11, LuceatLook.SOFT, false);
 		y += 26;
 		String kind = entry.block == null ? "Item only. It lights when you hold it, drop it or put it in a frame." : "Block. It lights when placed, held, dropped or in a frame.";
 		y = drawWrapped(graphics, kind, x0 + 10, y, x1 - x0 - 20, LuceatLook.SOFT) + 6;
@@ -345,51 +478,119 @@ public final class BlocksTab {
 		}
 		if (!lit) {
 			y = drawWrapped(graphics, "This one gives off no light.", x0 + 10, y, x1 - x0 - 20, LuceatLook.MUTED) + 8;
-			yButtons = y;
 			button(graphics, edX0, y, edX1, y + 22, "Make it glow", mx, my, true);
+			hit(edX0, y, edX1, y + 22, () -> {
+				BlockRule made = BlockRules.edit(entry.key);
+				made.added = true;
+				made.level = 10;
+				commit();
+				adding = false;
+			});
+			graphics.disableScissor();
+			editorHeight = y + 30 - start;
 			return;
 		}
 		boolean enabled = rule == null || rule.enabled;
-		yToggle = y;
-		graphics.text(font, "Gives light", edX0, y + 5, LuceatLook.TEXT, false);
-		int tx = edX1 - 30;
-		LuceatLook.round(graphics, tx, y + 2, tx + 30, y + 16, enabled ? LuceatLook.ACCENT : LuceatLook.TRACK);
-		int knob = enabled ? tx + 17 : tx + 3;
-		LuceatLook.round(graphics, knob, y + 4, knob + 10, y + 14, 0xFFFFFFFF);
-		y += 28;
-		yLevel = y;
-		int level = rule != null && rule.level >= 0 ? rule.level : entry.defaultLevel;
-		graphics.text(font, "Light level", edX0, y, LuceatLook.TEXT, false);
-		String levelText = (rule != null && rule.level >= 0 ? "" : "Default ") + level;
-		graphics.text(font, levelText, edX1 - font.width(levelText), y, rule != null && rule.level >= 0 ? LuceatLook.WARN : LuceatLook.SOFT, false);
-		slider(graphics, edX0, edX1, y + 14, level / 15.0F, slider == 1);
-		y += 32;
-		yColour = y;
-		float[] rgb = colour(entry);
-		boolean customColour = rule != null && rule.colour >= 0;
-		graphics.text(font, "Colour", edX0, y, LuceatLook.TEXT, false);
-		LuceatLook.round(graphics, edX0 + 48, y - 2, edX0 + 70, y + 10, pack(rgb));
-		graphics.outline(edX0 + 48, y - 2, 22, 12, 0x55FFFFFF);
-		String auto = customColour ? "Use automatic" : "Automatic";
-		int aw = font.width(auto) + 12;
-		boolean autoOver = LuceatLook.inside(mx, my, edX1 - aw, y - 3, edX1, y + 11);
-		LuceatLook.roundOutlined(graphics, edX1 - aw, y - 3, edX1, y + 11, customColour ? autoOver ? LuceatLook.CARD_HOVER : LuceatLook.CARD : LuceatLook.ACCENT_SOFT, customColour ? LuceatLook.BORDER : LuceatLook.ACCENT_DIM);
-		graphics.text(font, auto, edX1 - aw + 6, y, customColour ? LuceatLook.SOFT : LuceatLook.ACCENT, false);
-		y += 18;
-		yRed = y;
-		String[] names = {"Red", "Green", "Blue"};
-		for (int i = 0; i < 3; i++) {
-			graphics.text(font, names[i], edX0, y + i * 20, LuceatLook.SOFT, false);
-			slider(graphics, edX0 + 40, edX1, y + i * 20 + 4, rgb[i], slider == 2 + i);
+		y = header(graphics, "Light", y, mx, my);
+		if (!collapsed.contains("Light")) {
+			y = toggleRow(graphics, "Gives light", enabled, y, () -> setRule(r -> r.enabled = !r.enabled));
+			int level = rule != null && rule.level >= 0 ? rule.level : entry.defaultLevel;
+			boolean customLevel = rule != null && rule.level >= 0;
+			y = sliderRow(graphics, "Light level", (customLevel ? "" : "Default ") + level, customLevel, level / 15.0F, y + 2, 1,
+				customLevel ? () -> setRule(r -> r.level = -1) : null,
+				v -> {
+					int picked = Math.max(1, Math.round((float) v * 15.0F));
+					BlockRule edit = BlockRules.edit(entry.key);
+					edit.level = picked == entry.defaultLevel && !edit.added ? -1 : picked;
+				});
+			float[] rgb = colour(entry);
+			boolean customColour = rule != null && rule.colour >= 0;
+			graphics.text(font, "Colour", edX0, y + 3, LuceatLook.TEXT, false);
+			int sx = edX0 + 50;
+			boolean swatchOver = LuceatLook.inside(mx, my, sx, y, sx + 34, y + 16) && my >= edTop && my < edBottom;
+			LuceatLook.round(graphics, sx, y, sx + 34, y + 16, pack(rgb));
+			graphics.outline(sx, y, 34, 16, swatchOver ? 0xFFFFFFFF : 0x66FFFFFF);
+			hit(sx, y, sx + 34, y + 16, () -> {
+				picker.open(pack(colour(entry)) & 0xFFFFFF, rgbValue -> {
+					BlockRule edit = BlockRules.edit(entry.key);
+					edit.colour = rgbValue & 0xFFFFFF;
+					commit();
+				});
+			});
+			graphics.text(font, String.format(Locale.ROOT, "#%06X", pack(rgb) & 0xFFFFFF), sx + 40, y + 4, LuceatLook.SOFT, false);
+			String auto = customColour ? "Use automatic" : "Automatic";
+			int aw = font.width(auto) + 12;
+			boolean autoOver = LuceatLook.inside(mx, my, edX1 - aw, y + 20, edX1, y + 36) && my >= edTop && my < edBottom;
+			LuceatLook.roundOutlined(graphics, edX1 - aw, y + 20, edX1, y + 36, customColour ? autoOver ? LuceatLook.CARD_HOVER : LuceatLook.CARD : LuceatLook.ACCENT_SOFT, customColour ? LuceatLook.BORDER : LuceatLook.ACCENT_DIM);
+			graphics.text(font, auto, edX1 - aw + 6, y + 24, customColour ? LuceatLook.SOFT : LuceatLook.ACCENT, false);
+			if (customColour) {
+				hit(edX1 - aw, y + 20, edX1, y + 36, () -> setRule(r -> r.colour = -1));
+			}
+			y += 44;
 		}
-		y += 66;
-		yButtons = y;
+		y = header(graphics, "Behaviour", y, mx, my);
+		if (!collapsed.contains("Behaviour")) {
+			boolean customRadius = rule != null && Math.abs(rule.radius - 1.0F) > 0.001F;
+			float radius = rule == null ? 1.0F : rule.radius;
+			y = sliderRow(graphics, "Reach", String.format(Locale.ROOT, "x%.2f", radius), customRadius, (radius - 0.25F) / 2.25F, y + 2, 5,
+				customRadius ? () -> setRule(r -> r.radius = 1.0F) : null,
+				v -> {
+					float picked = 0.25F + (float) v * 2.25F;
+					picked = Math.abs(picked - 1.0F) < 0.04F ? 1.0F : Math.round(picked * 20.0F) / 20.0F;
+					BlockRules.edit(entry.key).radius = picked;
+				});
+			int flicker = rule == null ? -1 : rule.flicker;
+			y = cycleRow(graphics, "Flicker", tri(flicker, "On", "Off"), flicker >= 0, y, mx, my, () -> setRule(r -> r.flicker = next(r.flicker)));
+			int shadows = rule == null ? -1 : rule.shadows;
+			y = cycleRow(graphics, "Casts shadows", tri(shadows, "On", "Off"), shadows >= 0, y, mx, my, () -> setRule(r -> r.shadows = next(r.shadows)));
+			int water = rule == null ? -1 : rule.water;
+			y = cycleRow(graphics, "In water", tri(water, "Goes out", "Stays lit"), water >= 0, y, mx, my, () -> setRule(r -> r.water = next(r.water)));
+			boolean customShine = rule != null && rule.shine >= 0.0F;
+			float shine = customShine ? rule.shine : 0.0F;
+			y = sliderRow(graphics, "Shiny", customShine ? Math.round(shine * 100.0F) + "%" : "Automatic", customShine, shine, y + 2, 6,
+				customShine ? () -> setRule(r -> r.shine = -1.0F) : null,
+				v -> BlockRules.edit(entry.key).shine = Math.round((float) v * 20.0F) / 20.0F);
+		}
+		y = header(graphics, "Where it glows", y, mx, my);
+		if (!collapsed.contains("Where it glows")) {
+			boolean placed = rule == null || rule.whenPlaced;
+			boolean held = rule == null || rule.whenHeld;
+			boolean dropped = rule == null || rule.whenDropped;
+			boolean framed = rule == null || rule.whenFramed;
+			if (entry.block != null) {
+				y = toggleRow(graphics, "Placed in the world", placed, y + 2, () -> setRule(r -> r.whenPlaced = !r.whenPlaced));
+			}
+			y = toggleRow(graphics, "In your hand", held, y + (entry.block != null ? 0 : 2), () -> setRule(r -> r.whenHeld = !r.whenHeld));
+			y = toggleRow(graphics, "Dropped on the ground", dropped, y, () -> setRule(r -> r.whenDropped = !r.whenDropped));
+			y = toggleRow(graphics, "In item frames", framed, y, () -> setRule(r -> r.whenFramed = !r.whenFramed));
+		}
+		y += 4;
 		boolean changed = rule != null && rule.edited();
 		if (added) {
 			button(graphics, edX0, y, edX1, y + 22, "Delete rule", mx, my, true);
+			hit(edX0, y, edX1, y + 22, () -> {
+				BlockRules.remove(entry.key);
+				commit();
+			});
+			y += 28;
 		} else {
 			button(graphics, edX0, y, edX1, y + 22, "Reset to built in", mx, my, changed);
-			drawWrapped(graphics, "Built in rules cannot be deleted. Turn the light off instead.", edX0, y + 30, edX1 - edX0, LuceatLook.MUTED);
+			if (changed) {
+				hit(edX0, y, edX1, y + 22, () -> {
+					BlockRules.remove(entry.key);
+					commit();
+				});
+			}
+			y = drawWrapped(graphics, "Built in rules cannot be deleted. Turn the light off instead.", edX0, y + 30, edX1 - edX0, LuceatLook.MUTED) + 6;
+		}
+		graphics.disableScissor();
+		editorHeight = y - start;
+		if (picker.isOpen()) {
+			int ph = ColourPicker.HEIGHT;
+			int pw = ColourPicker.WIDTH;
+			int popX = x0 - pw - 6 >= 4 ? x0 - pw - 6 : x0 + 4;
+			int popY = Math.max(listY0, Math.min(listY1 - ph, edTop + 40));
+			picker.draw(graphics, font, popX, popY, mx, my);
 		}
 	}
 
@@ -401,7 +602,7 @@ public final class BlocksTab {
 	}
 
 	private void button(GuiGraphicsExtractor graphics, int x0, int y0, int x1, int y1, String label, int mx, int my, boolean enabled) {
-		boolean over = enabled && LuceatLook.inside(mx, my, x0, y0, x1, y1);
+		boolean over = enabled && LuceatLook.inside(mx, my, x0, y0, x1, y1) && my >= edTop && my < edBottom;
 		LuceatLook.roundOutlined(graphics, x0, y0, x1, y1, over ? LuceatLook.CARD_HOVER : LuceatLook.CARD, enabled ? LuceatLook.ACCENT_DIM : LuceatLook.BORDER);
 		graphics.text(font, label, x0 + (x1 - x0 - font.width(label)) / 2, y0 + (y1 - y0 - 8) / 2, enabled ? LuceatLook.TEXT : LuceatLook.MUTED, false);
 	}
@@ -421,6 +622,12 @@ public final class BlocksTab {
 	}
 
 	public boolean mouseClicked(double mx, double my) {
+		if (picker.isOpen()) {
+			boolean inside = picker.contains(mx, my);
+			if (picker.mouseClicked(mx, my) || inside) {
+				return true;
+			}
+		}
 		boolean inFilter = LuceatLook.inside(mx, my, listX0, listY0, listX1 - 70, listY0 + 20);
 		filterInput.focus(inFilter);
 		if (inFilter) {
@@ -432,6 +639,12 @@ public final class BlocksTab {
 				mode = Filter.DARK;
 				filterInput.focus(true);
 			}
+			scroll = 0.0F;
+			return true;
+		}
+		int sortW = font.width(sortLabel()) + 14;
+		if (LuceatLook.inside(mx, my, listX1 - sortW, listY0 + 24, listX1, listY0 + 42)) {
+			sort = Sort.values()[(sort.ordinal() + 1) % Sort.values().length];
 			scroll = 0.0F;
 			return true;
 		}
@@ -450,6 +663,10 @@ public final class BlocksTab {
 			int y = top - Math.round(scroll);
 			for (Entry entry : shown) {
 				if (my >= y && my < y + ROW) {
+					if (selected != entry) {
+						picker.close();
+						editorScroll = 0.0F;
+					}
 					selected = entry;
 					return true;
 				}
@@ -464,97 +681,56 @@ public final class BlocksTab {
 		if (selected == null || mx < edX0 - 10) {
 			return false;
 		}
-		Entry entry = selected;
-		BlockRule rule = BlockRules.get(entry.key);
-		boolean added = rule != null && rule.added;
-		boolean lit = entry.defaultLevel > 0 || added;
-		if (!lit) {
-			if (LuceatLook.inside(mx, my, edX0, yButtons, edX1, yButtons + 22)) {
-				BlockRule made = BlockRules.edit(entry.key);
-				made.added = true;
-				made.level = 10;
-				commit();
-				adding = false;
+		for (Hit hit : hits) {
+			if (LuceatLook.inside(mx, my, hit.x0(), hit.y0(), hit.x1(), hit.y1())) {
+				if (hit.slide() != null) {
+					activeSlide = hit.slide();
+					slider = hit.slide().id();
+					drag(mx);
+				} else {
+					hit.click().run();
+				}
 				return true;
 			}
-			return false;
-		}
-		if (LuceatLook.inside(mx, my, edX1 - 34, yToggle, edX1, yToggle + 18)) {
-			BlockRule edit = BlockRules.edit(entry.key);
-			edit.enabled = !edit.enabled;
-			commit();
-			return true;
-		}
-		if (LuceatLook.inside(mx, my, edX0, yLevel + 8, edX1, yLevel + 28)) {
-			slider = 1;
-			dragLevel(mx);
-			return true;
-		}
-		if (LuceatLook.inside(mx, my, edX1 - 90, yColour - 3, edX1, yColour + 11) && rule != null && rule.colour >= 0) {
-			rule.colour = -1;
-			commit();
-			return true;
-		}
-		for (int i = 0; i < 3; i++) {
-			int y = yRed + i * 20 + 4;
-			if (LuceatLook.inside(mx, my, edX0 + 36, y - 6, edX1 + 4, y + 10)) {
-				slider = 2 + i;
-				dragColour(i, mx);
-				return true;
-			}
-		}
-		if (LuceatLook.inside(mx, my, edX0, yButtons, edX1, yButtons + 22)) {
-			if (added) {
-				BlockRules.remove(entry.key);
-				commit();
-			} else if (rule != null && rule.edited()) {
-				rule.enabled = true;
-				rule.level = -1;
-				rule.colour = -1;
-				commit();
-			}
-			return true;
 		}
 		return false;
 	}
 
-	private void dragLevel(double mx) {
-		float fraction = (float) Math.max(0.0, Math.min(1.0, (mx - edX0) / (edX1 - edX0)));
-		int level = Math.max(1, Math.round(fraction * 15.0F));
-		BlockRule rule = BlockRules.edit(selected.key);
-		rule.level = level == selected.defaultLevel && !rule.added ? -1 : level;
+	private void drag(double mx) {
+		if (activeSlide == null) {
+			return;
+		}
+		double fraction = Math.max(0.0, Math.min(1.0, (mx - activeSlide.x0()) / (double) (activeSlide.x1() - activeSlide.x0())));
+		activeSlide.set().accept(fraction);
 	}
 
-	private void dragColour(int channel, double mx) {
-		BlockRule rule = BlockRules.edit(selected.key);
-		float[] base = rule.colour >= 0 ? rule.rgb() : colour(selected).clone();
-		float fraction = (float) Math.max(0.0, Math.min(1.0, (mx - (edX0 + 40)) / (edX1 - edX0 - 40)));
-		base[channel] = fraction;
-		rule.colour = Math.round(base[0] * 255.0F) << 16 | Math.round(base[1] * 255.0F) << 8 | Math.round(base[2] * 255.0F);
-	}
-
-	public boolean mouseDragged(double mx) {
-		if (slider == 1) {
-			dragLevel(mx);
+	public boolean mouseDragged(double mx, double my) {
+		if (picker.isOpen() && picker.mouseDragged(mx, my)) {
 			return true;
 		}
-		if (slider >= 2) {
-			dragColour(slider - 2, mx);
+		if (activeSlide != null) {
+			drag(mx);
 			return true;
 		}
 		return false;
 	}
 
 	public boolean mouseReleased() {
-		if (slider != 0) {
+		boolean pickerUp = picker.isOpen() && picker.mouseReleased();
+		if (activeSlide != null) {
+			activeSlide = null;
 			slider = 0;
 			commit();
 			return true;
 		}
-		return false;
+		return pickerUp;
 	}
 
 	public boolean mouseScrolled(double mx, double amount) {
+		if (selected != null && mx >= edX0 - 10 && mx > listX1 + 8) {
+			editorScroll -= (float) amount * 30.0F;
+			return true;
+		}
 		if (mx >= listX0 && mx <= listX1 + 8) {
 			scroll -= (float) amount * 30.0F;
 			return true;
@@ -563,6 +739,9 @@ public final class BlocksTab {
 	}
 
 	public boolean charTyped(CharacterEvent event) {
+		if (picker.isOpen() && picker.typing()) {
+			return picker.charTyped(event);
+		}
 		boolean used = filterInput.charTyped(event);
 		if (used) {
 			scroll = 0.0F;
@@ -571,6 +750,9 @@ public final class BlocksTab {
 	}
 
 	public boolean keyPressed(KeyEvent event) {
+		if (picker.isOpen() && picker.typing()) {
+			return picker.keyPressed(event);
+		}
 		boolean used = filterInput.keyPressed(event);
 		if (used) {
 			scroll = 0.0F;

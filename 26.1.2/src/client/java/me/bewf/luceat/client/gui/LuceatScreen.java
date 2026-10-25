@@ -1023,7 +1023,7 @@ public final class LuceatScreen extends Screen {
 		if (search.mouseDragged(event.x())) {
 			return true;
 		}
-		if (BLOCKS.equals(section) && blocks.mouseDragged(event.x())) {
+		if (BLOCKS.equals(section) && blocks.mouseDragged(event.x(), event.y())) {
 			return true;
 		}
 		if (panel != null && panel.mouseDragged(event.x(), event.y())) {
