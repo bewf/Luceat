@@ -9,6 +9,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.function.Predicate;
+import me.bewf.luceat.client.light.item.ItemLightRule;
+import me.bewf.luceat.client.light.item.ItemLightRules;
 
 import me.bewf.luceat.client.config.LuceatConfig;
 import me.bewf.luceat.client.light.block.BlockRule;
@@ -17,6 +19,8 @@ import me.bewf.luceat.client.light.block.BlockRules;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.chunk.LevelChunk;
 import net.minecraft.world.level.chunk.LevelChunkSection;
 import net.minecraft.world.level.block.state.BlockState;
@@ -249,10 +253,32 @@ public final class PlacedLights {
 		version++;
 	}
 
+	private static final Map<Block, Boolean> SENSITIVE = new IdentityHashMap<>();
+
+	private static boolean waterSensitive(Block block) {
+		return SENSITIVE.computeIfAbsent(block, key -> {
+			if (key.asItem() == net.minecraft.world.item.Items.AIR) {
+				return false;
+			}
+			for (ItemLightRule found : ItemLightRules.matching(new ItemStack(key.asItem()))) {
+				if (found.waterSensitive()) {
+					return true;
+				}
+			}
+			return false;
+		});
+	}
+
 	private static void offer(ClientLevel level, Section into, int x, int y, int z, BlockState state) {
 		BlockRule rule = BlockRules.rule(state);
 		if (rule != null && !rule.whenPlaced) {
 			return;
+		}
+		if (!state.getFluidState().isEmpty()) {
+			boolean out = rule != null && rule.water >= 0 ? rule.water == 1 : LuceatConfig.get().waterPutsOutLights && waterSensitive(state.getBlock());
+			if (out) {
+				return;
+			}
 		}
 		double openX = 0.0;
 		double openY = 0.0;
