@@ -37,7 +37,7 @@ public final class Presets {
 				c.plantShadows = false;
 				c.foliageShadows = ShadowQuality.OFF;
 				c.glassTint = false;
-				c.flicker = 0.0F;
+				c.flicker = 0.25F;
 				c.shadowedLights = 0;
 				c.lightBounce = 0.0F;
 				c.shine = 0.0F;
@@ -57,50 +57,19 @@ public final class Presets {
 				c.placedMinLevel = 6;
 				c.directionalShading = 0.4F;
 			}),
-		new Preset("Light",
-			"Quick, quiet and still pretty.",
-			"Light",
-			c -> {
-				c.shadows = true;
-				c.shadowDistance = 24;
-				c.shadowSoftness = 0.0F;
-				c.thinShadows = false;
-				c.plantShadows = false;
-				c.foliageShadows = ShadowQuality.FAST;
-				c.glassTint = false;
-				c.flicker = 0.0F;
-				c.shadowedLights = 1;
-				c.lightBounce = 0.0F;
-				c.shine = 0.0F;
-				c.maxLights = 48;
-				c.mergeFarLights = true;
-				c.lightRange = 56;
-				c.heldLights = true;
-				c.otherPlayers = true;
-				c.mobs = true;
-				c.droppedItems = true;
-				c.itemFrames = true;
-				c.naturalLights = true;
-				c.enchantGlow = true;
-				c.entityLights = true;
-				c.particleLights = true;
-				c.placedLights = true;
-				c.placedMinLevel = 4;
-				c.directionalShading = 0.6F;
-			}),
 		new Preset("Balanced",
 			"Perfectly balanced, as all things should be",
 			"Medium",
 			c -> {
 				c.shadows = true;
-				c.shadowDistance = 48;
+				c.shadowDistance = 40;
 				c.shadowSoftness = 0.0F;
 				c.thinShadows = true;
 				c.plantShadows = true;
 				c.foliageShadows = ShadowQuality.FANCY;
 				c.glassTint = true;
-				c.flicker = 0.0F;
-				c.shadowedLights = 3;
+				c.flicker = 0.25F;
+				c.shadowedLights = 2;
 				c.lightBounce = 0.25F;
 				c.shine = 0.35F;
 				c.maxLights = 96;
@@ -125,16 +94,16 @@ public final class Presets {
 			c -> {
 				c.shadows = true;
 				c.shadowDistance = 64;
-				c.shadowSoftness = 0.5F;
+				c.shadowSoftness = 0.7F;
 				c.thinShadows = true;
 				c.plantShadows = true;
 				c.foliageShadows = ShadowQuality.FANCY;
 				c.glassTint = true;
 				c.flicker = 0.3F;
-				c.shadowedLights = 5;
-				c.lightBounce = 0.5F;
-				c.shine = 0.6F;
-				c.maxLights = 160;
+				c.shadowedLights = 6;
+				c.lightBounce = 0.6F;
+				c.shine = 0.7F;
+				c.maxLights = 192;
 				c.mergeFarLights = true;
 				c.entityLights = true;
 				c.particleLights = true;
@@ -147,8 +116,8 @@ public final class Presets {
 				c.naturalLights = true;
 				c.enchantGlow = true;
 				c.placedLights = true;
-				c.placedMinLevel = 2;
-				c.directionalShading = 0.8F;
+				c.placedMinLevel = 1;
+				c.directionalShading = 0.85F;
 			}),
 		new Preset("HARDCORE",
 			"HARDCORE TO THE MEGA - Egg Head",
@@ -161,8 +130,8 @@ public final class Presets {
 				c.plantShadows = true;
 				c.foliageShadows = ShadowQuality.FANCY;
 				c.glassTint = true;
-				c.flicker = 0.4F;
-				c.shadowedLights = 8;
+				c.flicker = 0.5F;
+				c.shadowedLights = 12;
 				c.lightBounce = 1.0F;
 				c.shine = 1.0F;
 				c.maxLights = 256;
@@ -179,7 +148,7 @@ public final class Presets {
 				c.enchantGlow = true;
 				c.placedLights = true;
 				c.placedMinLevel = 1;
-				c.directionalShading = 0.9F;
+				c.directionalShading = 1.0F;
 			})
 	);
 
@@ -192,6 +161,9 @@ public final class Presets {
 
 	public static Preset byName(String name) {
 		if (name != null) {
+			if (name.equalsIgnoreCase("Light")) {
+				name = "Balanced";
+			}
 			for (Preset preset : ALL) {
 				if (preset.name().equalsIgnoreCase(name)) {
 					return preset;

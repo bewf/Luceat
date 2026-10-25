@@ -41,11 +41,11 @@ public final class HardwareHint {
 		} else if (strong) {
 			name = cores >= 6 ? "Phenomenal" : "Balanced";
 		} else if (middle) {
-			name = cores >= 6 ? "Balanced" : "Light";
+			name = "Balanced";
 		} else if (weak) {
-			name = cores >= 6 ? "Light" : "Potato";
+			name = cores >= 8 ? "Balanced" : "Potato";
 		} else {
-			name = "Light";
+			name = "Balanced";
 		}
 		return name;
 	}

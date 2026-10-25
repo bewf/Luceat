@@ -110,20 +110,20 @@ public final class PresetPicker extends Screen {
 		return out;
 	}
 
-	// x and width of each card at this moment, the fifth only exists once unlocked
+	// x and width of each card at this moment, the fourth  only exists once unlocked
 	private int[] layout() {
 		float r = reveal();
 		float p = holdProgress();
 		float shift = -p * 12.0F + (p > 0.0F ? (float) Math.sin(System.nanoTime() / 4.0E7) * p * 2.5F : 0.0F);
-		int[] four = slots(4, shift);
-		int[] five = slots(5, shift);
-		int[] out = new int[10];
-		for (int i = 0; i < 4; i++) {
+		int[] four = slots(3, shift);
+		int[] five = slots(4, shift);
+		int[] out = new int[8];
+		for (int i = 0; i < 3; i++) {
 			out[i * 2] = Math.round(four[i * 2] + (five[i * 2] - four[i * 2]) * r);
 			out[i * 2 + 1] = Math.round(four[i * 2 + 1] + (five[i * 2 + 1] - four[i * 2 + 1]) * r);
 		}
-		out[8] = five[8];
-		out[9] = Math.round(five[9] * r);
+		out[6] = five[6];
+		out[7] = Math.round(five[7] * r);
 		return out;
 	}
 
@@ -163,12 +163,12 @@ public final class PresetPicker extends Screen {
 		graphics.text(this.font, sub, (this.width - this.font.width(sub)) / 2, 42, LuceatLook.SOFT, true);
 
 		int[] layout = layout();
-		int count = reveal() > 0.0F && hardcore != null ? 5 : 4;
+		int count = reveal() > 0.0F && hardcore != null ? 4 : 3;
 		int top = cardTop();
 		int bottom = top + cardHeight();
 		LuceatConfig live = LuceatConfig.get();
 		for (int i = 0; i < count; i++) {
-			Presets.Preset preset = i < 4 ? normal.get(Math.min(i, normal.size() - 1)) : hardcore;
+			Presets.Preset preset = i < 3 ? normal.get(Math.min(i, normal.size() - 1)) : hardcore;
 			int x0 = layout[i * 2];
 			int w = layout[i * 2 + 1];
 			if (w < 24) {
@@ -176,7 +176,7 @@ public final class PresetPicker extends Screen {
 			}
 			boolean hover = LuceatLook.inside(mouseX, mouseY, x0, top, x0 + w, bottom);
 			boolean gold = preset.name().equalsIgnoreCase(recommended);
-			boolean hot = i == 4;
+			boolean hot = i == 3;
 			boolean current = preset.name().equalsIgnoreCase(live.preset) && live.presetChosen;
 			int lift = hover ? -3 : 0;
 			int border = hot ? FIRE : gold ? GOLD : current ? LuceatLook.ACCENT : LuceatLook.BORDER;
@@ -277,12 +277,12 @@ public final class PresetPicker extends Screen {
 			return true;
 		}
 		int[] layout = layout();
-		int count = reveal() >= 1.0F && hardcore != null ? 5 : 4;
+		int count = reveal() >= 1.0F && hardcore != null ? 4 : 3;
 		for (int i = 0; i < count; i++) {
 			int x0 = layout[i * 2];
 			int w = layout[i * 2 + 1];
 			if (LuceatLook.inside(mx, my, x0, cardTop(), x0 + w, cardTop() + cardHeight())) {
-				Presets.Preset preset = i < 4 ? normal.get(Math.min(i, normal.size() - 1)) : hardcore;
+				Presets.Preset preset = i < 3 ? normal.get(Math.min(i, normal.size() - 1)) : hardcore;
 				LuceatConfig config = LuceatConfig.get();
 				preset.applyTo(config);
 				LuceatConfig.save();
