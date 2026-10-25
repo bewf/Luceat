@@ -35,6 +35,7 @@ public final class TerrainShaderPatch {
 			uniform usampler3D @SAMPLER@;
 			uniform usampler3D @GRID@;
 			uniform sampler3D @SHINE@;
+			uniform sampler3D @BRICKS@;
 
 			vec3 luceatSpec;
 			uniform sampler2D @PATTERNS@;
@@ -52,6 +53,28 @@ public final class TerrainShaderPatch {
 			        return 0u;
 			    }
 			    return texelFetch(@SAMPLER@, luceatWrap(world), 0).r;
+			}
+
+			bool luceatBrick(ivec3 cell) {
+			    ivec3 world = cell + u_LuceatCamBlock.xyz;
+			    ivec3 offset = (world >> 4) - u_LuceatVol.xyz;
+			    if (any(greaterThan(abs(offset), ivec3(u_LuceatVol.w)))) {
+			        return false;
+			    }
+			    return texelFetch(@BRICKS@, luceatWrap(world) >> 2, 0).r > 0.0;
+			}
+
+			float luceatLeave(inout ivec3 cell, inout vec3 tMax, inout int axis, vec3 origin, vec3 dir, vec3 sgn, vec3 safe) {
+			    ivec3 corner = (((cell + u_LuceatCamBlock.xyz) >> 2) << 2) - u_LuceatCamBlock.xyz;
+			    vec3 reach = (vec3(corner) + 4.0 * max(sgn, 0.0) - origin) * sgn / safe;
+			    float tb = min(reach.x, min(reach.y, reach.z));
+			    axis = reach.x <= reach.y && reach.x <= reach.z ? 0 : (reach.y <= reach.z ? 1 : 2);
+			    ivec3 next = ivec3(floor(origin + dir * tb));
+			    next = clamp(next, corner, corner + ivec3(3));
+			    next[axis] = corner[axis] + (sgn[axis] > 0.0 ? 4 : -1);
+			    cell = next;
+			    tMax = max((vec3(next) + max(sgn, 0.0) - origin) * sgn / safe, vec3(tb));
+			    return tb;
 			}
 
 			vec3 luceatPattern(uint id, vec3 hit, ivec3 cell, int axis, bool positiveFace) {
@@ -149,6 +172,16 @@ public final class TerrainShaderPatch {
 			    int entryAxis = 0;
 			    vec3 trans = vec3(1.0);
 			    for (int i = 0; i < 96; i++) {
+			        if (!luceatBrick(cell)) {
+			            int leaveAxis = 0;
+			            float tb = luceatLeave(cell, tMax, leaveAxis, origin, dir, sgn, safe);
+			            if (tb >= limit) {
+			                break;
+			            }
+			            tEntry = tb;
+			            entryAxis = leaveAxis;
+			            continue;
+			        }
 			        float tExit = min(tMax.x, min(tMax.y, tMax.z));
 			        int exitAxis = tMax.x <= tMax.y && tMax.x <= tMax.z ? 0 : (tMax.y <= tMax.z ? 1 : 2);
 			        if (any(notEqual(cell, lightCell))) {
@@ -211,6 +244,14 @@ public final class TerrainShaderPatch {
 			    vec3 tMax = (vec3(cell) + max(sgn, 0.0) - origin) * sgn / safe;
 			    ivec3 stepCell = ivec3(sgn);
 			    for (int i = 0; i < 40; i++) {
+			        if (!luceatBrick(cell)) {
+			            int leaveAxis = 0;
+			            float tb = luceatLeave(cell, tMax, leaveAxis, origin, dir, sgn, safe);
+			            if (tb >= len) {
+			                break;
+			            }
+			            continue;
+			        }
 			        if (any(notEqual(cell, lightCell)) && luceatId(cell) == 1u) {
 			            return 0.0;
 			        }
@@ -276,6 +317,7 @@ public final class TerrainShaderPatch {
 			    float full = budget > 0.5 ? 0.5 / budget : 2.0;
 			    float cheap = full * 0.25;
 			    float sumPower = 0.0;
+			    bool reached = false;
 			    for (int g = 0; g < @TEXELS@; g++) {
 			        uvec4 slots = texelFetch(@GRID@, ivec3(gc.x * @TEXELS@ + g, gc.y, gc.z), 0);
 			        for (int c = 0; c < 4; c++) {
@@ -284,13 +326,20 @@ public final class TerrainShaderPatch {
 			                continue;
 			            }
 			            vec4 light = u_LuceatPosRadius[int(id) - 1];
-			            float level = clamp((light.w - length(light.xyz - pos)) / 15.0, 0.0, 1.0);
+			            float away = length(light.xyz - pos);
+			            if (light.w * 1.2 > away) {
+			                reached = true;
+			            }
+			            float level = clamp((light.w - away) / 15.0, 0.0, 1.0);
 			            if (level <= 0.0) {
 			                continue;
 			            }
 			            vec3 tint = u_LuceatColor[int(id) - 1].rgb;
 			            sumPower += level / (4.0 - 3.0 * level) * max(tint.r, max(tint.g, tint.b));
 			        }
+			    }
+			    if (!reached) {
+			        return vec3(0.0);
 			    }
 			    sumPower = max(sumPower, 1.0e-4);
 			    vec3 total = vec3(0.0);
@@ -382,6 +431,7 @@ public final class TerrainShaderPatch {
 			.replace("@SHAPES@", ShapeMasks.SAMPLER)
 			.replace("@GRID@", LightGrid.SAMPLER)
 			.replace("@SHINE@", ShadowVolume.SHINE_SAMPLER)
+			.replace("@BRICKS@", ShadowVolume.BRICK_SAMPLER)
 			.replace("@GX@", Integer.toString(LightGrid.GX))
 			.replace("@GY@", Integer.toString(LightGrid.GY))
 			.replace("@GZ@", Integer.toString(LightGrid.GZ))

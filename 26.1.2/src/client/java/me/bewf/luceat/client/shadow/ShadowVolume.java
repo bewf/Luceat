@@ -33,9 +33,14 @@ public final class ShadowVolume {
 	public static final int RELIABLE = HALF * CELL_SIZE;
 	public static final String SAMPLER = "u_LuceatVoxels";
 	public static final String SHINE_SAMPLER = "u_LuceatShine";
+	public static final String BRICK_SAMPLER = "u_LuceatBricks";
+	public static final int BRICK = 4;
+	public static final int BRICK_DIM = DIMENSION / BRICK;
 
 	private static final int UNIT = 14;
 	private static final int SHINE_UNIT = 11;
+	private static final int BRICK_UNIT = 10;
+	private static final int PER_CELL = CELL_SIZE / BRICK;
 	private static final int TOTAL = CELLS * CELLS * CELLS;
 	private static final int FILLS_PER_FRAME = 3;
 	private static final int DIRTY_PER_FRAME = 8;
@@ -53,10 +58,13 @@ public final class ShadowVolume {
 	private static final ByteBuffer cellData = BufferUtils.createByteBuffer(CELL_SIZE * CELL_SIZE * CELL_SIZE * 2).order(ByteOrder.nativeOrder());
 	private static final ByteBuffer shineData = BufferUtils.createByteBuffer(CELL_SIZE * CELL_SIZE * CELL_SIZE);
 	private static final ByteBuffer emptyIds = BufferUtils.createByteBuffer(CELL_SIZE * CELL_SIZE * CELL_SIZE * 2);
+	private static final ByteBuffer brickData = BufferUtils.createByteBuffer(PER_CELL * PER_CELL * PER_CELL);
+	private static final ByteBuffer emptyBricks = BufferUtils.createByteBuffer(PER_CELL * PER_CELL * PER_CELL);
 	private static final ByteBuffer emptyShine = BufferUtils.createByteBuffer(CELL_SIZE * CELL_SIZE * CELL_SIZE);
 
 	private static ClientLevel level;
 	private static int texture;
+	private static int brickTexture;
 	private static int shineTexture;
 	private static int frame;
 	private static int refreshCursor;
@@ -84,7 +92,7 @@ public final class ShadowVolume {
 	}
 
 	public static long bytes() {
-		return texture == 0 ? 0L : (long) DIMENSION * DIMENSION * DIMENSION * 3L;
+		return texture == 0 ? 0L : (long) DIMENSION * DIMENSION * DIMENSION * 3L + (long) BRICK_DIM * BRICK_DIM * BRICK_DIM;
 	}
 
 	public static void reset() {
@@ -138,6 +146,12 @@ public final class ShadowVolume {
 			GL13.glActiveTexture(GL13.GL_TEXTURE0 + SHINE_UNIT);
 			GL11.glBindTexture(GL12.GL_TEXTURE_3D, shineTexture);
 		}
+		int brickLocation = GL20.glGetUniformLocation(program, BRICK_SAMPLER);
+		if (brickLocation >= 0) {
+			GL20.glUniform1i(brickLocation, BRICK_UNIT);
+			GL13.glActiveTexture(GL13.GL_TEXTURE0 + BRICK_UNIT);
+			GL11.glBindTexture(GL12.GL_TEXTURE_3D, brickTexture);
+		}
 		GL13.glActiveTexture(previousUnit);
 	}
 
@@ -164,6 +178,15 @@ public final class ShadowVolume {
 		GL11.glTexParameteri(GL12.GL_TEXTURE_3D, GL11.GL_TEXTURE_WRAP_T, GL12.GL_CLAMP_TO_EDGE);
 		GL11.glTexParameteri(GL12.GL_TEXTURE_3D, GL12.GL_TEXTURE_WRAP_R, GL12.GL_CLAMP_TO_EDGE);
 		GL12.glTexImage3D(GL12.GL_TEXTURE_3D, 0, GL30.GL_R8, DIMENSION, DIMENSION, DIMENSION, 0, GL11.GL_RED, GL11.GL_UNSIGNED_BYTE, (ByteBuffer) null);
+		GL13.glActiveTexture(GL13.GL_TEXTURE0 + BRICK_UNIT);
+		brickTexture = GL11.glGenTextures();
+		GL11.glBindTexture(GL12.GL_TEXTURE_3D, brickTexture);
+		GL11.glTexParameteri(GL12.GL_TEXTURE_3D, GL11.GL_TEXTURE_MIN_FILTER, GL11.GL_NEAREST);
+		GL11.glTexParameteri(GL12.GL_TEXTURE_3D, GL11.GL_TEXTURE_MAG_FILTER, GL11.GL_NEAREST);
+		GL11.glTexParameteri(GL12.GL_TEXTURE_3D, GL11.GL_TEXTURE_WRAP_S, GL12.GL_CLAMP_TO_EDGE);
+		GL11.glTexParameteri(GL12.GL_TEXTURE_3D, GL11.GL_TEXTURE_WRAP_T, GL12.GL_CLAMP_TO_EDGE);
+		GL11.glTexParameteri(GL12.GL_TEXTURE_3D, GL12.GL_TEXTURE_WRAP_R, GL12.GL_CLAMP_TO_EDGE);
+		GL12.glTexImage3D(GL12.GL_TEXTURE_3D, 0, GL30.GL_R8, BRICK_DIM, BRICK_DIM, BRICK_DIM, 0, GL11.GL_RED, GL11.GL_UNSIGNED_BYTE, (ByteBuffer) null);
 		GL13.glActiveTexture(previousUnit);
 	}
 
@@ -270,6 +293,7 @@ public final class ShadowVolume {
 		LevelChunkSection section = sectionIndex >= 0 && sectionIndex < chunk.getSections().length ? chunk.getSection(sectionIndex) : null;
 		ByteBuffer ids = emptyIds;
 		ByteBuffer shine = emptyShine;
+		ByteBuffer bricks = emptyBricks;
 		if (section != null && !section.hasOnlyAir()) {
 			BlockPos.MutableBlockPos pos = new BlockPos.MutableBlockPos();
 			int originX = cx * CELL_SIZE;
@@ -277,6 +301,9 @@ public final class ShadowVolume {
 			int originZ = cz * CELL_SIZE;
 			cellData.clear();
 			shineData.clear();
+			for (int i = 0; i < PER_CELL * PER_CELL * PER_CELL; i++) {
+				brickData.put(i, (byte) 0);
+			}
 			for (int z = 0; z < CELL_SIZE; z++) {
 				for (int y = 0; y < CELL_SIZE; y++) {
 					for (int x = 0; x < CELL_SIZE; x++) {
@@ -287,7 +314,11 @@ public final class ShadowVolume {
 							continue;
 						}
 						pos.set(originX + x, originY + y, originZ + z);
-						cellData.putShort((short) Occluders.id(state, level, pos));
+						int id = Occluders.id(state, level, pos);
+						cellData.putShort((short) id);
+						if (id != 0) {
+							brickData.put((z / BRICK * PER_CELL + y / BRICK) * PER_CELL + x / BRICK, (byte) 1);
+						}
 						shineData.put((byte) Shine.of(state));
 					}
 				}
@@ -296,6 +327,7 @@ public final class ShadowVolume {
 			shineData.flip();
 			ids = cellData;
 			shine = shineData;
+			bricks = brickData;
 		}
 		GL12.glTexSubImage3D(
 			GL12.GL_TEXTURE_3D, 0,
@@ -308,6 +340,13 @@ public final class ShadowVolume {
 			GL12.GL_TEXTURE_3D, 0,
 			Math.floorMod(cx, CELLS) * CELL_SIZE, Math.floorMod(cy, CELLS) * CELL_SIZE, Math.floorMod(cz, CELLS) * CELL_SIZE,
 			CELL_SIZE, CELL_SIZE, CELL_SIZE, GL11.GL_RED, GL11.GL_UNSIGNED_BYTE, shine
+		);
+		GL13.glActiveTexture(GL13.GL_TEXTURE0 + BRICK_UNIT);
+		GL11.glBindTexture(GL12.GL_TEXTURE_3D, brickTexture);
+		GL12.glTexSubImage3D(
+			GL12.GL_TEXTURE_3D, 0,
+			Math.floorMod(cx, CELLS) * PER_CELL, Math.floorMod(cy, CELLS) * PER_CELL, Math.floorMod(cz, CELLS) * PER_CELL,
+			PER_CELL, PER_CELL, PER_CELL, GL11.GL_RED, GL11.GL_UNSIGNED_BYTE, bricks
 		);
 		GL13.glActiveTexture(GL13.GL_TEXTURE0 + UNIT);
 		int index = index(cx, cy, cz);
