@@ -5,6 +5,7 @@
   "plugin": "me.bewf.luceat.client.mixin.LuceatMixinPlugin",
   "client": [
     "ClientLevelMixin",
+    "DisplayNameMixin",
     "EntityRendererMixin",
     "ItemInHandRendererMixin",
     "ParticleMixin",
