@@ -4,6 +4,10 @@ Client-side dynamic lighting for Minecraft Java on Fabric. Lights are shaded on 
 
 Sodium is an optional companion. Status: early development.
 
+## Using it
+
+Press J in game, or type `/luceat`, to open the settings. `/luceat perf` shows which settings cost the most on your computer.
+
 ## Versions
 
 Every Minecraft version has its own folder with its own build.

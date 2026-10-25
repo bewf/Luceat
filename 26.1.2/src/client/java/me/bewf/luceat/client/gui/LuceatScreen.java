@@ -9,6 +9,7 @@ import java.util.Map;
 import me.bewf.luceat.client.compat.RenderBackend;
 import me.bewf.luceat.client.config.LuceatConfig;
 import me.bewf.luceat.client.config.Presets;
+import me.bewf.luceat.client.gui.presets.PresetPicker;
 import me.bewf.luceat.client.gui.preview.PreviewPanel;
 import me.bewf.luceat.client.gui.preview.SceneSpec;
 import me.bewf.luceat.client.gui.preview.Scenes;
@@ -35,10 +36,17 @@ import net.minecraft.resources.Identifier;
 import net.minecraft.util.FormattedCharSequence;
 
 public final class LuceatScreen extends Screen {
+	private static final String ALL = "All settings";
+	private static final String SPEED = "Speed test";
 	private static final String PRESETS = "Presets";
 	private static final String BLOCKS = "Blocks";
 	private static final String ABOUT = "About";
 	private static final Identifier LOGO = Identifier.fromNamespaceAndPath("luceat", "textures/gui/logo.png");
+	private static final Identifier LOGO_SMALL = Identifier.fromNamespaceAndPath("luceat", "textures/gui/logo_small.png");
+	private static final int CHOICE_HEIGHT = 48;
+	private static final int HEAD_HEIGHT = 26;
+	private static final int SIDE_ITEM = 21;
+	private static final int SIDE_STEP = 23;
 	private static final int ROW_HEIGHT = 34;
 	private static final int ROW_GAP = 4;
 	private static final int SIDEBAR_WIDTH = 116;
@@ -50,13 +58,18 @@ public final class LuceatScreen extends Screen {
 
 	private final Screen parent;
 	private final List<Setting> settings = LuceatSettings.create();
-	private final Map<String, Object> defaults = new HashMap<>();
+	private Map<String, Object> baseline;
+	private String baselineKey;
+	private SpeedTestPage speed;
+	private final List<String> redo = new ArrayList<>();
+	private String iconTip;
+	private boolean pickerShown;
 	private final PerfTest perf = new PerfTest();
 	private final TextInput search = new TextInput(32);
 	private final List<String> undo = new ArrayList<>();
 	private PreviewPanel panel;
 	private BlocksTab blocks;
-	private String section = LuceatSettings.LIGHTING;
+	private String section = ALL;
 	private float scroll;
 	private int dropdownScroll;
 	private Setting dragging;
@@ -80,9 +93,6 @@ public final class LuceatScreen extends Screen {
 	public LuceatScreen(Screen parent) {
 		super(Component.literal("Luceat"));
 		this.parent = parent;
-		for (Setting setting : LuceatSettings.create(new LuceatConfig())) {
-			defaults.put(setting.label(), setting.snapshot());
-		}
 	}
 
 	@Override
@@ -117,6 +127,9 @@ public final class LuceatScreen extends Screen {
 	@Override
 	public void removed() {
 		perf.cancel();
+		if (speed != null) {
+			speed.close();
+		}
 		LuceatConfig.save();
 		flushBlocks();
 		if (rebuildPending) {
@@ -128,6 +141,25 @@ public final class LuceatScreen extends Screen {
 	}
 
 	@Override
+	public void tick() {
+		super.tick();
+		if (SPEED.equals(section)) {
+			speed().tick();
+		}
+		if (!pickerShown && !LuceatConfig.get().presetChosen && this.minecraft != null && this.minecraft.screen == this) {
+			pickerShown = true;
+			this.minecraft.setScreen(new PresetPicker(this));
+		}
+	}
+
+	private SpeedTestPage speed() {
+		if (speed == null) {
+			speed = new SpeedTestPage();
+		}
+		return speed;
+	}
+
+	@Override
 	public void extractBackground(GuiGraphicsExtractor graphics, int mouseX, int mouseY, float partial) {
 		graphics.fill(0, 0, this.width, this.height, LuceatLook.BACKDROP);
 	}
@@ -136,33 +168,40 @@ public final class LuceatScreen extends Screen {
 		return search.focused() || !search.text().isEmpty();
 	}
 
+	private boolean specialPage() {
+		return PRESETS.equals(section) || BLOCKS.equals(section) || ABOUT.equals(section) || SPEED.equals(section);
+	}
+
 	@Override
 	public void extractRenderState(GuiGraphicsExtractor graphics, int mouseX, int mouseY, float partial) {
 		LuceatLook.roundOutlined(graphics, left, top, right, bottom, LuceatLook.WINDOW, LuceatLook.BORDER);
 		hovered = null;
+		iconTip = null;
 		drawSidebar(graphics, mouseX, mouseY);
-		Presets.Preset hoveredPreset = null;
-		boolean specialTab = PRESETS.equals(section) || BLOCKS.equals(section) || ABOUT.equals(section);
-		if (searching() || !specialTab) {
+		if (searching() || !specialPage()) {
 			drawSettings(graphics, mouseX, mouseY);
 		} else if (PRESETS.equals(section)) {
-			hoveredPreset = drawPresets(graphics, mouseX, mouseY);
+			drawPresets(graphics, mouseX, mouseY);
 		} else if (BLOCKS.equals(section)) {
 			blocks.drawList(graphics, listLeft, listTop(), listRight, listBottom(), mouseX, mouseY);
 			if (showSide) {
 				blocks.drawEditor(graphics, sideLeft, listTop(), right - 8, listBottom(), mouseX, mouseY);
 			}
+		} else if (SPEED.equals(section)) {
+			speed().render(graphics, listLeft, listTop(), right - 8, listBottom(), mouseX, mouseY, partial);
 		} else {
 			drawAbout(graphics);
 		}
-		if (showSide && !BLOCKS.equals(section) && !ABOUT.equals(section)) {
-			drawSide(graphics, mouseX, mouseY, hoveredPreset);
+		if (showSide && (searching() || !(BLOCKS.equals(section) || ABOUT.equals(section) || SPEED.equals(section)))) {
+			drawSide(graphics, mouseX, mouseY);
 		}
 		drawHeader(graphics, mouseX, mouseY);
 		if (search.focused()) {
 			drawDropdown(graphics, mouseX, mouseY);
 		}
-		if (hovered != null && dragging == null && !search.focused()) {
+		if (iconTip != null) {
+			graphics.setTooltipForNextFrame(this.font, this.font.split(Component.literal(iconTip), 200), mouseX, mouseY);
+		} else if (hovered != null && dragging == null && !search.focused()) {
 			showTooltip(graphics, hovered, mouseX, mouseY);
 		}
 		if (blocks != null && blocks.consumeDirty()) {
@@ -179,13 +218,26 @@ public final class LuceatScreen extends Screen {
 		return bottom - 10;
 	}
 
+	private int toggleX() {
+		String version = FabricLoader.getInstance().getModContainer("luceat").map(c -> c.getMetadata().getVersion().getFriendlyString()).orElse("");
+		return left + 38 + this.font.width("Luceat") + 6 + this.font.width(version) + 16;
+	}
+
 	private void drawHeader(GuiGraphicsExtractor graphics, int mouseX, int mouseY) {
 		graphics.fill(left + 1, top + 1, right - 1, top + HEADER_HEIGHT, LuceatLook.HEADER);
 		graphics.fill(left + 1, top + HEADER_HEIGHT, right - 1, top + HEADER_HEIGHT + 1, LuceatLook.BORDER);
-		graphics.blit(RenderPipelines.GUI_TEXTURED, LOGO, left + 8, top + 5, 0.0F, 0.0F, 24, 24, 48, 48, 48, 48);
+		graphics.blit(RenderPipelines.GUI_TEXTURED, LOGO_SMALL, left + 8, top + 5, 0.0F, 0.0F, 24, 24, 64, 64, 64, 64);
 		graphics.text(this.font, "Luceat", left + 38, top + 13, LuceatLook.ACCENT, false);
 		String version = FabricLoader.getInstance().getModContainer("luceat").map(c -> c.getMetadata().getVersion().getFriendlyString()).orElse("");
 		graphics.text(this.font, version, left + 38 + this.font.width("Luceat") + 6, top + 13, LuceatLook.MUTED, false);
+
+		boolean on = LuceatConfig.get().enabled;
+		int tx = toggleX();
+		LuceatLook.drawSwitch(graphics, tx, top + 10, on);
+		graphics.text(this.font, on ? "On" : "Off", tx + 36, top + 13, on ? LuceatLook.GOOD : LuceatLook.MUTED, false);
+		if (LuceatLook.inside(mouseX, mouseY, tx, top + 8, tx + 36 + this.font.width("Off") + 4, top + 28)) {
+			iconTip = on ? "Luceat is on. Click to turn it off." : "Luceat is off. Click to turn it on.";
+		}
 
 		int closeX = right - 28;
 		boolean closeHover = LuceatLook.inside(mouseX, mouseY, closeX, top + 7, closeX + 20, top + 27);
@@ -244,7 +296,7 @@ public final class LuceatScreen extends Screen {
 				LuceatLook.round(graphics, x0 + 3, ry, x1 - 3, ry + DROPDOWN_ROW, LuceatLook.ACCENT_SOFT);
 			}
 			graphics.text(this.font, setting.label(), x0 + 10, ry + 5, over ? 0xFFFFFFFF : LuceatLook.TEXT, false);
-			graphics.text(this.font, setting.section(), x1 - 10 - this.font.width(setting.section()), ry + 5, LuceatLook.MUTED, false);
+			graphics.text(this.font, setting.section(), x1 - 10 - this.font.width(setting.section()), ry + 5, over ? LuceatLook.SOFT : LuceatLook.MUTED, false);
 		}
 		if (found.size() > DROPDOWN_ROWS) {
 			String more = (found.size() - DROPDOWN_ROWS - dropdownScroll) + " more, scroll";
@@ -274,12 +326,44 @@ public final class LuceatScreen extends Screen {
 	private void jumpTo(Setting setting) {
 		search.focus(false);
 		search.set("");
-		section = setting.section();
-		List<Setting> rows = sectionSettings();
-		int index = Math.max(0, rows.indexOf(setting));
-		scroll = Math.max(0.0F, index * (ROW_HEIGHT + ROW_GAP) - 40);
+		setSection(setting.section());
+		List<Object> rows = items();
+		int offset = 0;
+		for (Object item : rows) {
+			if (item == setting) {
+				break;
+			}
+			offset += itemHeight(item) + ROW_GAP;
+		}
+		scroll = Math.max(0.0F, offset - 40);
 		flash = setting;
 		flashUntil = System.currentTimeMillis() + 1800L;
+	}
+
+	private void setSection(String name) {
+		if (SPEED.equals(section) && !SPEED.equals(name) && speed != null) {
+			speed.close();
+		}
+		section = name;
+		scroll = 0.0F;
+		if (blocks != null) {
+			blocks.unfocus();
+		}
+	}
+
+	private List<String> sidebarNames() {
+		List<String> names = new ArrayList<>();
+		names.add(ALL);
+		names.add(PRESETS);
+		names.add("-");
+		names.addAll(LuceatSettings.sections());
+		names.add("-");
+		names.add("~Tools");
+		names.add(BLOCKS);
+		names.add(SPEED);
+		names.add("-");
+		names.add(ABOUT);
+		return names;
 	}
 
 	private void drawSidebar(GuiGraphicsExtractor graphics, int mouseX, int mouseY) {
@@ -287,34 +371,56 @@ public final class LuceatScreen extends Screen {
 		int x1 = left + SIDEBAR_WIDTH;
 		int y = top + HEADER_HEIGHT + 10;
 		for (String name : sidebarNames()) {
+			if (name.equals("-")) {
+				graphics.fill(x0 + 8, y + 1, x1 - 8, y + 2, LuceatLook.BORDER);
+				y += 6;
+				continue;
+			}
+			if (name.startsWith("~")) {
+				graphics.text(this.font, name.substring(1), x0 + 10, y + 2, LuceatLook.MUTED, false);
+				y += 14;
+				continue;
+			}
 			boolean selected = !searching() && name.equals(section);
-			boolean hover = LuceatLook.inside(mouseX, mouseY, x0, y, x1, y + 24);
+			boolean hover = LuceatLook.inside(mouseX, mouseY, x0, y, x1, y + SIDE_ITEM);
 			if (selected) {
-				LuceatLook.round(graphics, x0, y, x1, y + 24, LuceatLook.ACCENT_SOFT);
-				graphics.fill(x0, y + 4, x0 + 2, y + 20, LuceatLook.ACCENT);
+				LuceatLook.round(graphics, x0, y, x1, y + SIDE_ITEM, LuceatLook.ACCENT_SOFT);
+				graphics.fill(x0, y + 4, x0 + 2, y + SIDE_ITEM - 4, LuceatLook.ACCENT);
 			} else if (hover) {
-				LuceatLook.round(graphics, x0, y, x1, y + 24, LuceatLook.CARD);
+				LuceatLook.round(graphics, x0, y, x1, y + SIDE_ITEM, LuceatLook.CARD);
 			}
-			graphics.text(this.font, name, x0 + 10, y + 8, selected ? LuceatLook.TEXT : LuceatLook.SOFT, false);
-			y += 28;
-			if (name.equals(PRESETS) || name.equals(LuceatSettings.GENERAL)) {
-				graphics.fill(x0 + 8, y - 2, x1 - 8, y - 1, LuceatLook.BORDER);
-				y += 4;
-			}
+			graphics.text(this.font, name, x0 + 10, y + 7, selected ? LuceatLook.TEXT : hover ? LuceatLook.TEXT : LuceatLook.SOFT, false);
+			y += SIDE_STEP;
 		}
 		long bytes = ShadowVolume.bytes() + PatternAtlas.bytes() + ShapeMasks.bytes();
-		int footer = bottom - 36;
-		graphics.text(this.font, "Video memory", x0 + 4, footer, LuceatLook.MUTED, false);
-		graphics.text(this.font, String.format(Locale.ROOT, "%.1f MB", bytes / 1048576.0), x0 + 4, footer + 12, bytes == 0 ? LuceatLook.MUTED : LuceatLook.TEXT, false);
+		int footer = bottom - 30;
+		if (footer > y + 4) {
+			graphics.text(this.font, "Video memory", x0 + 4, footer, LuceatLook.MUTED, false);
+			graphics.text(this.font, String.format(Locale.ROOT, "%.1f MB", bytes / 1048576.0), x0 + 4, footer + 11, bytes == 0 ? LuceatLook.MUTED : LuceatLook.TEXT, false);
+		}
 	}
 
-	private List<String> sidebarNames() {
-		List<String> names = new ArrayList<>();
-		names.add(PRESETS);
-		names.addAll(LuceatSettings.sections());
-		names.add(BLOCKS);
-		names.add(ABOUT);
-		return names;
+	private boolean clickSidebar(double mx, double my) {
+		int x0 = left + 6;
+		int x1 = left + SIDEBAR_WIDTH;
+		int y = top + HEADER_HEIGHT + 10;
+		for (String name : sidebarNames()) {
+			if (name.equals("-")) {
+				y += 6;
+				continue;
+			}
+			if (name.startsWith("~")) {
+				y += 14;
+				continue;
+			}
+			if (LuceatLook.inside(mx, my, x0, y, x1, y + SIDE_ITEM)) {
+				search.set("");
+				setSection(name);
+				return true;
+			}
+			y += SIDE_STEP;
+		}
+		return false;
 	}
 
 	private List<Setting> sectionSettings() {
@@ -327,78 +433,198 @@ public final class LuceatScreen extends Screen {
 		return result;
 	}
 
-	private List<Setting> visible() {
-		return searching() ? matches() : sectionSettings();
+	private Setting masterToggle() {
+		for (Setting setting : settings) {
+			if (setting.section().equals(LuceatSettings.GENERAL) && setting.label().equals("Luceat")) {
+				return setting;
+			}
+		}
+		return null;
+	}
+
+	private List<Object> items() {
+		List<Object> out = new ArrayList<>();
+		if (searching()) {
+			out.addAll(matches());
+			return out;
+		}
+		if (ALL.equals(section)) {
+			Setting master = masterToggle();
+			if (master != null) {
+				out.add(master);
+			}
+			for (String name : LuceatSettings.sections()) {
+				out.add(name);
+				for (Setting setting : settings) {
+					if (setting.section().equals(name) && setting != master) {
+						out.add(setting);
+					}
+				}
+			}
+			return out;
+		}
+		out.addAll(sectionSettings());
+		return out;
+	}
+
+	private int itemHeight(Object item) {
+		if (item instanceof String) {
+			return HEAD_HEIGHT;
+		}
+		return item instanceof ChoiceSetting<?> ? CHOICE_HEIGHT : ROW_HEIGHT;
+	}
+
+	private List<Setting> settingsOf(List<Object> rows) {
+		List<Setting> result = new ArrayList<>();
+		for (Object item : rows) {
+			if (item instanceof Setting setting) {
+				result.add(setting);
+			}
+		}
+		return result;
+	}
+
+	private List<Setting> settingsIn(String sectionName) {
+		List<Setting> result = new ArrayList<>();
+		for (Setting setting : settings) {
+			if (setting.section().equals(sectionName)) {
+				result.add(setting);
+			}
+		}
+		return result;
+	}
+
+	private Map<String, Object> baseline() {
+		String key = String.valueOf(LuceatConfig.get().preset);
+		if (baseline == null || !key.equals(baselineKey)) {
+			baseline = new HashMap<>();
+			for (Setting setting : LuceatSettings.create(Presets.baseline(LuceatConfig.get()))) {
+				baseline.put(setting.label(), setting.snapshot());
+			}
+			baselineKey = key;
+		}
+		return baseline;
 	}
 
 	private boolean isDefault(Setting setting) {
-		return Setting.same(setting.snapshot(), defaults.get(setting.label()));
+		return Setting.same(setting.snapshot(), baseline().get(setting.label()));
 	}
 
-	private int maxScroll(int count) {
-		return Math.max(0, count * (ROW_HEIGHT + ROW_GAP) - (listBottom() - listTop() - STRIP_HEIGHT));
-	}
-
-	private void drawStrip(GuiGraphicsExtractor graphics, String title, int mouseX, int mouseY, List<Setting> rows) {
-		graphics.text(this.font, title, listLeft + 2, listTop() + 4, LuceatLook.ACCENT, false);
+	private int changedCount(List<Setting> rows) {
 		int changed = 0;
 		for (Setting setting : rows) {
 			if (!isDefault(setting)) {
 				changed++;
 			}
 		}
-		int bx1 = listRight;
-		String label = "Reset " + (searching() ? "these" : "section");
-		int bw = this.font.width(label) + 16;
-		boolean enabled = changed > 0;
-		boolean over = enabled && LuceatLook.inside(mouseX, mouseY, bx1 - bw, listTop(), bx1, listTop() + 20);
-		LuceatLook.roundOutlined(graphics, bx1 - bw, listTop(), bx1, listTop() + 20, over ? LuceatLook.CARD_HOVER : LuceatLook.CARD, enabled ? LuceatLook.ACCENT_DIM : LuceatLook.BORDER);
-		graphics.text(this.font, label, bx1 - bw + 8, listTop() + 6, enabled ? LuceatLook.TEXT : LuceatLook.MUTED, false);
-		String state = changed == 0 ? "All at default" : changed + (changed == 1 ? " changed" : " changed");
-		graphics.text(this.font, state, bx1 - bw - 10 - this.font.width(state), listTop() + 6, changed == 0 ? LuceatLook.MUTED : LuceatLook.WARN, false);
+		return changed;
 	}
 
-	private boolean stripReset(double mx, double my) {
-		List<Setting> rows = visible();
-		String label = "Reset " + (searching() ? "these" : "section");
-		int bw = this.font.width(label) + 16;
-		if (!LuceatLook.inside(mx, my, listRight - bw, listTop(), listRight, listTop() + 20)) {
-			return false;
-		}
+	private void resetSettings(List<Setting> rows) {
 		pushUndo();
 		for (Setting setting : rows) {
 			if (!isDefault(setting)) {
-				setting.restore(defaults.get(setting.label()));
+				setting.restore(baseline().get(setting.label()));
 				applyChanged(setting);
 			}
 		}
 		flushRebuild();
+	}
+
+	private int totalHeight(List<Object> rows) {
+		int total = 0;
+		for (Object item : rows) {
+			total += itemHeight(item) + ROW_GAP;
+		}
+		return total;
+	}
+
+	private int maxScroll(List<Object> rows) {
+		return Math.max(0, totalHeight(rows) - (listBottom() - listTop() - STRIP_HEIGHT));
+	}
+
+	private String fit(String text, int width) {
+		if (this.font.width(text) <= width) {
+			return text;
+		}
+		String cut = text;
+		while (cut.length() > 1 && this.font.width(cut + "...") > width) {
+			cut = cut.substring(0, cut.length() - 1);
+		}
+		return cut + "...";
+	}
+
+	private void drawResetIcon(GuiGraphicsExtractor graphics, int x, int y, boolean enabled, boolean over, int mouseX, int mouseY, String tip) {
+		int colour = !enabled ? LuceatLook.MUTED : over ? LuceatLook.ACCENT : LuceatLook.WARN;
+		LuceatLook.resetIcon(graphics, x, y, colour);
+		if (enabled && over && mouseX >= 0) {
+			iconTip = tip;
+		}
+	}
+
+	private void drawStrip(GuiGraphicsExtractor graphics, String title, int mouseX, int mouseY, List<Setting> rows) {
+		graphics.text(this.font, title, listLeft + 2, listTop() + 4, LuceatLook.ACCENT, false);
+		int changed = changedCount(rows);
+		int bx1 = listRight;
+		boolean enabled = changed > 0;
+		boolean over = enabled && LuceatLook.inside(mouseX, mouseY, bx1 - 22, listTop(), bx1, listTop() + 20);
+		LuceatLook.roundOutlined(graphics, bx1 - 22, listTop(), bx1, listTop() + 20, over ? LuceatLook.CARD_HOVER : LuceatLook.CARD, enabled ? LuceatLook.ACCENT_DIM : LuceatLook.BORDER);
+		drawResetIcon(graphics, bx1 - 22 + (22 - LuceatLook.ICON_W) / 2, listTop() + (20 - LuceatLook.ICON_H) / 2, enabled, over, mouseX, mouseY,
+			searching() ? "Put these back to the preset values" : ALL.equals(section) ? "Put every setting back to the preset values" : "Put this section back to the preset values");
+		String state = changed == 0 ? "All at preset values" : changed + " changed";
+		graphics.text(this.font, state, bx1 - 22 - 10 - this.font.width(state), listTop() + 6, changed == 0 ? LuceatLook.MUTED : LuceatLook.WARN, false);
+	}
+
+	private boolean stripReset(double mx, double my) {
+		if (!LuceatLook.inside(mx, my, listRight - 22, listTop(), listRight, listTop() + 20)) {
+			return false;
+		}
+		resetSettings(settingsOf(items()));
 		return true;
 	}
 
+	private void drawSectionHead(GuiGraphicsExtractor graphics, String name, int y, int mouseX, int mouseY, int areaTop) {
+		graphics.text(this.font, name, listLeft + 2, y + 8, LuceatLook.ACCENT, false);
+		int lineX = listLeft + 4 + this.font.width(name);
+		graphics.fill(lineX, y + 12, listRight - 24, y + 13, LuceatLook.BORDER);
+		List<Setting> group = settingsIn(name);
+		boolean enabled = changedCount(group) > 0;
+		int ix = listRight - 16;
+		boolean over = enabled && mouseY >= areaTop && mouseY < listBottom() && LuceatLook.inside(mouseX, mouseY, ix - 3, y + 4, ix + LuceatLook.ICON_W + 3, y + 20);
+		drawResetIcon(graphics, ix, y + 9, enabled, over, mouseX, mouseY, "Put " + name.toLowerCase(Locale.ROOT) + " back to the preset values");
+	}
+
 	private void drawSettings(GuiGraphicsExtractor graphics, int mouseX, int mouseY) {
-		List<Setting> rows = visible();
-		drawStrip(graphics, searching() ? "Search results" : section, mouseX, mouseY, rows);
+		List<Object> rows = items();
+		String title = searching() ? "Search results" : section;
+		drawStrip(graphics, title, mouseX, mouseY, settingsOf(rows));
 		int areaTop = listTop() + STRIP_HEIGHT;
-		scroll = Math.max(0.0F, Math.min(scroll, maxScroll(rows.size())));
+		scroll = Math.max(0.0F, Math.min(scroll, maxScroll(rows)));
 		graphics.enableScissor(listLeft - 2, areaTop, listRight + 2, listBottom());
 		int y = areaTop - Math.round(scroll);
-		for (Setting setting : rows) {
-			boolean inView = y + ROW_HEIGHT > areaTop && y < listBottom();
-			boolean hover = inView && !search.focused() && LuceatLook.inside(mouseX, mouseY, listLeft, y, listRight, y + ROW_HEIGHT) && mouseY >= areaTop && mouseY < listBottom();
-			if (hover) {
-				hovered = setting;
+		for (Object item : rows) {
+			int height = itemHeight(item);
+			boolean inView = y + height > areaTop && y < listBottom();
+			if (item instanceof String name) {
+				if (inView) {
+					drawSectionHead(graphics, name, y, mouseX, mouseY, areaTop);
+				}
+			} else if (item instanceof Setting setting) {
+				boolean hover = inView && !search.focused() && LuceatLook.inside(mouseX, mouseY, listLeft, y, listRight, y + height) && mouseY >= areaTop && mouseY < listBottom();
+				if (hover) {
+					hovered = setting;
+				}
+				if (inView) {
+					drawRow(graphics, setting, y, height, hover, mouseX, mouseY, areaTop);
+				}
 			}
-			if (inView) {
-				drawRow(graphics, setting, y, hover, mouseX, mouseY);
-			}
-			y += ROW_HEIGHT + ROW_GAP;
+			y += height + ROW_GAP;
 		}
 		graphics.disableScissor();
 		if (rows.isEmpty()) {
 			graphics.text(this.font, "Nothing matches that.", listLeft + 8, areaTop + 8, LuceatLook.MUTED, false);
 		}
-		int max = maxScroll(rows.size());
+		int max = maxScroll(rows);
 		if (max > 0) {
 			int trackTop = areaTop;
 			int trackHeight = listBottom() - areaTop;
@@ -408,16 +634,20 @@ public final class LuceatScreen extends Screen {
 		}
 	}
 
-	private void drawRow(GuiGraphicsExtractor graphics, Setting setting, int y, boolean hover, int mouseX, int mouseY) {
+	private int choiceX(ChoiceSetting<?> choice) {
+		return listRight - 10 - 100;
+	}
+
+	private void drawRow(GuiGraphicsExtractor graphics, Setting setting, int y, int height, boolean hover, int mouseX, int mouseY, int areaTop) {
 		boolean flashing = setting == flash && System.currentTimeMillis() < flashUntil;
 		int fill = flashing ? LuceatLook.mix(LuceatLook.CARD, LuceatLook.ACCENT, 0.35F) : hover ? LuceatLook.CARD_HOVER : LuceatLook.CARD;
-		LuceatLook.round(graphics, listLeft, y, listRight, y + ROW_HEIGHT, fill);
+		LuceatLook.round(graphics, listLeft, y, listRight, y + height, fill);
 		graphics.text(this.font, setting.label(), listLeft + 10, y + 7, LuceatLook.TEXT, false);
 		boolean changed = !isDefault(setting);
 		if (changed) {
 			int rx = listLeft + 10 + this.font.width(setting.label()) + 8;
-			boolean over = LuceatLook.inside(mouseX, mouseY, rx - 2, y + 4, rx + this.font.width("reset") + 3, y + 17);
-			graphics.text(this.font, "reset", rx, y + 7, over ? LuceatLook.ACCENT : LuceatLook.WARN, false);
+			boolean over = mouseY >= areaTop && mouseY < listBottom() && LuceatLook.inside(mouseX, mouseY, rx - 3, y + 4, rx + LuceatLook.ICON_W + 3, y + 17);
+			drawResetIcon(graphics, rx, y + 7, true, over, mouseX, mouseY, "Back to the preset value");
 		}
 		String costText = "Cost: " + setting.cost().label();
 		graphics.text(this.font, costText, listLeft + 10, y + 19, setting.cost().colour(), false);
@@ -429,10 +659,7 @@ public final class LuceatScreen extends Screen {
 		int controlRight = listRight - 10;
 		if (setting instanceof ToggleSetting toggle) {
 			int x = controlRight - 30;
-			boolean on = toggle.value();
-			LuceatLook.round(graphics, x, y + 10, x + 30, y + 24, on ? LuceatLook.ACCENT : LuceatLook.TRACK);
-			int knob = on ? x + 17 : x + 3;
-			LuceatLook.round(graphics, knob, y + 12, knob + 10, y + 22, 0xFFFFFFFF);
+			LuceatLook.drawSwitch(graphics, x, y + 10, toggle.value());
 			drawTestPill(graphics, setting, x - 8, y, mouseX, mouseY);
 		} else if (setting instanceof SliderSetting slider) {
 			int trackLeft = controlRight - 110;
@@ -443,15 +670,14 @@ public final class LuceatScreen extends Screen {
 			String value = slider.valueText();
 			graphics.text(this.font, value, trackLeft - 8 - this.font.width(value), y + 13, LuceatLook.SOFT, false);
 		} else if (setting instanceof ChoiceSetting<?> choice) {
-			int width = 40;
-			int x = controlRight - choice.count() * (width + 2) + 2;
-			for (int i = 0; i < choice.count(); i++) {
-				boolean selected = i == choice.index();
-				int bx = x + i * (width + 2);
-				boolean over = LuceatLook.inside(mouseX, mouseY, bx, y + 8, bx + width, y + 26);
-				LuceatLook.round(graphics, bx, y + 8, bx + width, y + 26, selected ? LuceatLook.ACCENT : over ? LuceatLook.CARD_HOVER : LuceatLook.TRACK);
-				String name = choice.name(i);
-				graphics.text(this.font, name, bx + (width - this.font.width(name)) / 2, y + 13, selected ? 0xFFFFFFFF : LuceatLook.SOFT, false);
+			int x = choiceX(choice);
+			boolean over = LuceatLook.inside(mouseX, mouseY, x, y + 8, x + 100, y + 26) && mouseY >= areaTop && mouseY < listBottom();
+			LuceatLook.roundOutlined(graphics, x, y + 8, x + 100, y + 26, over ? LuceatLook.ACCENT_DIM : LuceatLook.ACCENT_SOFT, LuceatLook.ACCENT);
+			String name = choice.name(choice.index());
+			graphics.text(this.font, name, x + (100 - this.font.width(name)) / 2, y + 14, 0xFFFFFFFF, false);
+			String note = choice.note(choice.index());
+			if (!note.isEmpty()) {
+				graphics.text(this.font, fit(note, listRight - listLeft - 20), listLeft + 10, y + 33, LuceatLook.SOFT, false);
 			}
 			drawTestPill(graphics, setting, x - 8, y, mouseX, mouseY);
 		}
@@ -491,48 +717,45 @@ public final class LuceatScreen extends Screen {
 		return cachedPreset;
 	}
 
-	private Presets.Preset drawPresets(GuiGraphicsExtractor graphics, int mouseX, int mouseY) {
+	private int presetButtonX0() {
+		return listLeft + 12;
+	}
+
+	private int presetButtonY0() {
+		return listTop() + STRIP_HEIGHT + 78;
+	}
+
+	private void drawPresets(GuiGraphicsExtractor graphics, int mouseX, int mouseY) {
 		graphics.text(this.font, "Presets", listLeft + 2, listTop() + 4, LuceatLook.ACCENT, false);
 		Presets.Preset current = currentPreset();
-		String state = current == null ? "Custom settings" : "Using " + current.name();
-		graphics.text(this.font, state, listRight - this.font.width(state), listTop() + 4, current == null ? LuceatLook.WARN : LuceatLook.GOOD, false);
+		Presets.Preset named = Presets.byName(LuceatConfig.get().preset);
 		int y = listTop() + STRIP_HEIGHT;
-		Presets.Preset hoverPreset = null;
-		for (Presets.Preset preset : Presets.all()) {
-			boolean active = preset == current;
-			boolean hover = LuceatLook.inside(mouseX, mouseY, listLeft, y, listRight, y + CARD_HEIGHT) && y + CARD_HEIGHT <= listBottom() + 4;
-			if (hover) {
-				hoverPreset = preset;
-			}
-			LuceatLook.roundOutlined(graphics, listLeft, y, listRight, y + CARD_HEIGHT, hover ? LuceatLook.CARD_HOVER : LuceatLook.CARD, active ? LuceatLook.GOOD : hover ? LuceatLook.ACCENT_DIM : LuceatLook.CARD);
-			graphics.text(this.font, preset.name(), listLeft + 12, y + 9, LuceatLook.TEXT, false);
-			String cost = "Cost: " + preset.cost();
-			graphics.text(this.font, cost, listLeft + 12 + this.font.width(preset.name()) + 10, y + 9, costColour(preset.cost()), false);
-			int bw = 56;
-			int bx0 = listRight - 12 - bw;
-			boolean btnOver = LuceatLook.inside(mouseX, mouseY, bx0, y + 8, bx0 + bw, y + 28);
-			if (active) {
-				LuceatLook.round(graphics, bx0, y + 8, bx0 + bw, y + 28, 0x3340E08A);
-				graphics.text(this.font, "In use", bx0 + (bw - this.font.width("In use")) / 2, y + 14, LuceatLook.GOOD, false);
-			} else {
-				LuceatLook.round(graphics, bx0, y + 8, bx0 + bw, y + 28, btnOver ? LuceatLook.ACCENT : LuceatLook.ACCENT_DIM);
-				graphics.text(this.font, "Use", bx0 + (bw - this.font.width("Use")) / 2, y + 14, 0xFFFFFFFF, false);
-			}
-			int lineY = y + 24;
-			int shown = 0;
-			for (FormattedCharSequence line : this.font.split(Component.literal(preset.blurb()).withStyle(Style.EMPTY.withColor(0xB4B4C4)), bx0 - listLeft - 24)) {
-				if (shown++ >= 3) {
+		LuceatLook.roundOutlined(graphics, listLeft, y, listRight, y + 138, LuceatLook.CARD, current != null ? LuceatLook.GOOD : LuceatLook.BORDER);
+		String title = current != null ? current.name() : named != null ? named.name() + " (changed)" : "No preset chosen";
+		graphics.text(this.font, title, listLeft + 12, y + 10, LuceatLook.TEXT, false);
+		Presets.Preset shown = current != null ? current : named;
+		if (shown != null) {
+			String cost = "Cost: " + shown.cost();
+			graphics.text(this.font, cost, listRight - 12 - this.font.width(cost), y + 10, costColour(shown.cost()), false);
+			int lineY = y + 26;
+			int count = 0;
+			for (FormattedCharSequence line : this.font.split(Component.literal(shown.blurb()).withStyle(Style.EMPTY.withColor(0xB4B4C4)), listRight - listLeft - 24)) {
+				if (count++ >= 3) {
 					break;
 				}
 				graphics.text(this.font, line, listLeft + 12, lineY, 0xFFB4B4C4, false);
 				lineY += 10;
 			}
-			y += CARD_HEIGHT + 6;
+		} else {
+			drawWrappedText(graphics, "Pick a preset to start from. You can change anything after.", listLeft + 12, y + 26, listRight - listLeft - 24, LuceatLook.SOFT);
 		}
-		if (current == null) {
-			drawWrappedText(graphics, "Your settings do not match a preset. Picking one replaces them. You can press Undo to get them back.", listLeft + 2, y + 2, listRight - listLeft - 4, LuceatLook.MUTED);
-		}
-		return hoverPreset;
+		int bx0 = presetButtonX0();
+		int by0 = presetButtonY0();
+		int bw = this.font.width("Choose preset") + 24;
+		boolean over = LuceatLook.inside(mouseX, mouseY, bx0, by0, bx0 + bw, by0 + 22);
+		LuceatLook.round(graphics, bx0, by0, bx0 + bw, by0 + 22, over ? LuceatLook.ACCENT : LuceatLook.ACCENT_DIM);
+		graphics.text(this.font, "Choose preset", bx0 + 12, by0 + 7, 0xFFFFFFFF, false);
+		drawWrappedText(graphics, "The preset you pick is what the reset buttons go back to.", listLeft + 2, y + 146, listRight - listLeft - 4, LuceatLook.MUTED);
 	}
 
 	private static int costColour(String cost) {
@@ -556,15 +779,17 @@ public final class LuceatScreen extends Screen {
 	private void drawAbout(GuiGraphicsExtractor graphics) {
 		int x = listLeft + 4;
 		int y = listTop() + 6;
-		graphics.blit(RenderPipelines.GUI_TEXTURED, LOGO, x, y, 0.0F, 0.0F, 48, 48, 48, 48, 48, 48);
-		graphics.text(this.font, "Luceat", x + 60, y + 8, LuceatLook.ACCENT, false);
-		graphics.text(this.font, "Made by bëwf", x + 60, y + 22, LuceatLook.SOFT, false);
-		y += 62;
+		graphics.blit(RenderPipelines.GUI_TEXTURED, LOGO, x, y, 0.0F, 0.0F, 80, 80, 256, 256, 256, 256);
+		graphics.text(this.font, "Luceat", x + 96, y + 18, LuceatLook.ACCENT, false);
+		String version = FabricLoader.getInstance().getModContainer("luceat").map(c -> c.getMetadata().getVersion().getFriendlyString()).orElse("");
+		graphics.text(this.font, "Version " + version, x + 96, y + 32, LuceatLook.SOFT, false);
+		graphics.text(this.font, "Made by bewf", x + 96, y + 46, LuceatLook.SOFT, false);
+		y += 94;
 		String[] paragraphs = {
 			"Luceat adds dynamic lights to held items, dropped items, other players, placed blocks, and more.",
 			"You can customise light colours, brightness, and shadows to create a look you like. You can add lights to any block you want.",
 			"You can hover a setting to see it in the live preview.",
-			"Open this menu any time with /luceat or the K key.",
+			"Open this menu any time with /luceat or the " + LuceatMenu.keyLabel() + " key."
 		};
 		for (String paragraph : paragraphs) {
 			y = drawWrappedText(graphics, paragraph, x, y, listRight - x, LuceatLook.SOFT) + 6;
@@ -576,17 +801,11 @@ public final class LuceatScreen extends Screen {
 		}
 	}
 
-	private void drawSide(GuiGraphicsExtractor graphics, int mouseX, int mouseY, Presets.Preset hoveredPreset) {
+	private void drawSide(GuiGraphicsExtractor graphics, int mouseX, int mouseY) {
 		LuceatConfig live = LuceatConfig.get();
 		if (PRESETS.equals(section) && !searching()) {
-			if (hoveredPreset != null) {
-				panel.setOverride(hoveredPreset.preview(live));
-				LuceatConfig now = live.copy();
-				panel.setSpec(Scenes.showcase("Now", hoveredPreset.name(), c -> c.copyFrom(now)));
-			} else {
-				panel.setOverride(null);
-				panel.setSpec(new SceneSpec(Scenes.scene("showcase"), "Move over a preset to see it here next to your current settings.", null, null, null, null));
-			}
+			panel.setOverride(null);
+			panel.setSpec(new SceneSpec(Scenes.scene("showcase"), "This is how your current settings look.", null, null, null, null));
 		} else {
 			panel.setOverride(null);
 			if (hovered != null) {
@@ -624,14 +843,27 @@ public final class LuceatScreen extends Screen {
 				undo.remove(0);
 			}
 		}
+		redo.clear();
 	}
 
 	private void undoLast() {
 		if (undo.isEmpty()) {
 			return;
 		}
+		redo.add(LuceatConfig.snapshot());
 		String previous = undo.remove(undo.size() - 1);
 		LuceatConfig.restore(previous);
+		LightSpecs.clearCache();
+		ShadowVolume.reset();
+	}
+
+	private void redoLast() {
+		if (redo.isEmpty()) {
+			return;
+		}
+		undo.add(LuceatConfig.snapshot());
+		String next = redo.remove(redo.size() - 1);
+		LuceatConfig.restore(next);
 		LightSpecs.clearCache();
 		ShadowVolume.reset();
 	}
@@ -648,6 +880,7 @@ public final class LuceatScreen extends Screen {
 		}
 		boolean onSearch = LuceatLook.inside(mx, my, searchX0(), top + 7, searchX1(), top + 27);
 		if (onSearch) {
+			search.mouseClicked(mx, my);
 			search.focus(true);
 			if (blocks != null) {
 				blocks.unfocus();
@@ -665,62 +898,44 @@ public final class LuceatScreen extends Screen {
 			undoLast();
 			return true;
 		}
+		int tx = toggleX();
+		if (LuceatLook.inside(mx, my, tx, top + 8, tx + 36 + this.font.width("Off") + 4, top + 28)) {
+			pushUndo();
+			LuceatConfig.get().enabled = !LuceatConfig.get().enabled;
+			return true;
+		}
 		if (clickSidebar(mx, my)) {
 			return true;
 		}
-		if (showSide && !BLOCKS.equals(section) && !ABOUT.equals(section) && panel.mouseClicked(mx, my)) {
+		boolean settingsPage = searching() || !specialPage();
+		if (showSide && (settingsPage || PRESETS.equals(section)) && panel.mouseClicked(mx, my)) {
 			return true;
 		}
-		if (BLOCKS.equals(section) && !searching()) {
-			return blocks.mouseClicked(mx, my) || super.mouseClicked(event, doubleClick);
-		}
-		if (PRESETS.equals(section) && !searching()) {
-			return clickPresets(mx, my) || super.mouseClicked(event, doubleClick);
-		}
-		if (ABOUT.equals(section) && !searching()) {
+		if (settingsPage) {
+			if (stripReset(mx, my) || clickList(mx, my)) {
+				return true;
+			}
 			return super.mouseClicked(event, doubleClick);
 		}
-		if (stripReset(mx, my) || clickList(mx, my)) {
-			return true;
+		if (BLOCKS.equals(section)) {
+			return blocks.mouseClicked(mx, my) || super.mouseClicked(event, doubleClick);
+		}
+		if (PRESETS.equals(section)) {
+			return clickPresets(mx, my) || super.mouseClicked(event, doubleClick);
+		}
+		if (SPEED.equals(section)) {
+			return speed().click(mx, my, event.button()) || super.mouseClicked(event, doubleClick);
 		}
 		return super.mouseClicked(event, doubleClick);
 	}
 
-	private boolean clickSidebar(double mx, double my) {
-		int x0 = left + 6;
-		int x1 = left + SIDEBAR_WIDTH;
-		int y = top + HEADER_HEIGHT + 10;
-		for (String name : sidebarNames()) {
-			if (LuceatLook.inside(mx, my, x0, y, x1, y + 24)) {
-				section = name;
-				search.set("");
-				scroll = 0.0F;
-				if (blocks != null) {
-					blocks.unfocus();
-				}
-				return true;
-			}
-			y += 28;
-			if (name.equals(PRESETS) || name.equals(LuceatSettings.GENERAL)) {
-				y += 4;
-			}
-		}
-		return false;
-	}
-
 	private boolean clickPresets(double mx, double my) {
-		int y = listTop() + STRIP_HEIGHT;
-		for (Presets.Preset preset : Presets.all()) {
-			if (LuceatLook.inside(mx, my, listLeft, y, listRight, y + CARD_HEIGHT)) {
-				if (preset != currentPreset()) {
-					pushUndo();
-					preset.apply().accept(LuceatConfig.get());
-					LightSpecs.clearCache();
-					ShadowVolume.reset();
-				}
-				return true;
-			}
-			y += CARD_HEIGHT + 6;
+		int bx0 = presetButtonX0();
+		int by0 = presetButtonY0();
+		int bw = this.font.width("Choose preset") + 24;
+		if (LuceatLook.inside(mx, my, bx0, by0, bx0 + bw, by0 + 22)) {
+			this.minecraft.setScreen(new PresetPicker(this));
+			return true;
 		}
 		return false;
 	}
@@ -730,14 +945,24 @@ public final class LuceatScreen extends Screen {
 		if (my < areaTop || my >= listBottom()) {
 			return false;
 		}
-		List<Setting> rows = visible();
+		List<Object> rows = items();
 		int y = areaTop - Math.round(scroll);
-		for (Setting setting : rows) {
-			if (LuceatLook.inside(mx, my, listLeft, y, listRight, y + ROW_HEIGHT)) {
+		for (Object item : rows) {
+			int height = itemHeight(item);
+			if (item instanceof String name) {
+				int ix = listRight - 16;
+				if (LuceatLook.inside(mx, my, ix - 3, y + 4, ix + LuceatLook.ICON_W + 3, y + 20)) {
+					List<Setting> group = settingsIn(name);
+					if (changedCount(group) > 0) {
+						resetSettings(group);
+					}
+					return true;
+				}
+			} else if (item instanceof Setting setting && LuceatLook.inside(mx, my, listLeft, y, listRight, y + height)) {
 				clickRow(setting, y, mx, my);
 				return true;
 			}
-			y += ROW_HEIGHT + ROW_GAP;
+			y += height + ROW_GAP;
 		}
 		return false;
 	}
@@ -745,11 +970,8 @@ public final class LuceatScreen extends Screen {
 	private void clickRow(Setting setting, int y, double mx, double my) {
 		if (!isDefault(setting)) {
 			int rx = listLeft + 10 + this.font.width(setting.label()) + 8;
-			if (LuceatLook.inside(mx, my, rx - 2, y + 4, rx + this.font.width("reset") + 3, y + 17)) {
-				pushUndo();
-				setting.restore(defaults.get(setting.label()));
-				applyChanged(setting);
-				flushRebuild();
+			if (LuceatLook.inside(mx, my, rx - 3, y + 4, rx + LuceatLook.ICON_W + 3, y + 17)) {
+				resetSettings(List.of(setting));
 				return;
 			}
 		}
@@ -770,22 +992,17 @@ public final class LuceatScreen extends Screen {
 			dragging = slider;
 			dragSlider(slider, mx);
 		} else if (setting instanceof ChoiceSetting<?> choice) {
-			int width = 40;
-			int x = controlRight - choice.count() * (width + 2) + 2;
+			int x = choiceX(choice);
 			int pillRight = x - 8;
 			if (LuceatLook.inside(mx, my, pillRight - 34, y + 9, pillRight, y + 25)) {
 				perf.start(setting);
 				return;
 			}
-			for (int i = 0; i < choice.count(); i++) {
-				int bx = x + i * (width + 2);
-				if (LuceatLook.inside(mx, my, bx, y + 8, bx + width, y + 26)) {
-					pushUndo();
-					choice.choose(i);
-					applyChanged(setting);
-					flushRebuild();
-					return;
-				}
+			if (LuceatLook.inside(mx, my, x, y + 8, x + 100, y + 26)) {
+				pushUndo();
+				choice.next();
+				applyChanged(setting);
+				flushRebuild();
 			}
 		}
 	}
@@ -803,6 +1020,9 @@ public final class LuceatScreen extends Screen {
 			dragSlider(slider, event.x());
 			return true;
 		}
+		if (search.mouseDragged(event.x())) {
+			return true;
+		}
 		if (BLOCKS.equals(section) && blocks.mouseDragged(event.x())) {
 			return true;
 		}
@@ -817,6 +1037,7 @@ public final class LuceatScreen extends Screen {
 		boolean was = dragging != null;
 		if (dragging != null && dragBefore != null && !dragBefore.equals(LuceatConfig.snapshot())) {
 			undo.add(dragBefore);
+			redo.clear();
 			if (undo.size() > 40) {
 				undo.remove(0);
 			}
@@ -824,9 +1045,10 @@ public final class LuceatScreen extends Screen {
 		dragging = null;
 		dragBefore = null;
 		flushRebuild();
+		boolean searchUp = search.mouseReleased();
 		boolean blockUp = BLOCKS.equals(section) && blocks.mouseReleased();
 		boolean panelUp = panel != null && panel.mouseReleased();
-		return was || blockUp || panelUp || super.mouseReleased(event);
+		return was || searchUp || blockUp || panelUp || super.mouseReleased(event);
 	}
 
 	@Override
@@ -837,6 +1059,9 @@ public final class LuceatScreen extends Screen {
 		}
 		if (BLOCKS.equals(section) && !searching()) {
 			return blocks.mouseScrolled(x, scrollY) || super.mouseScrolled(x, y, scrollX, scrollY);
+		}
+		if (SPEED.equals(section) && !searching()) {
+			return speed().scroll(x, y, scrollY) || super.mouseScrolled(x, y, scrollX, scrollY);
 		}
 		if (showSide && x >= sideLeft && !ABOUT.equals(section)) {
 			panel.mouseScrolled(x, y, scrollY);
@@ -854,7 +1079,7 @@ public final class LuceatScreen extends Screen {
 		if (BLOCKS.equals(section) && !search.focused()) {
 			return blocks.charTyped(event) || super.charTyped(event);
 		}
-		if (!search.focused() && !ABOUT.equals(section) && event.codepoint() >= 32 && event.codepoint() != 127) {
+		if (!search.focused() && !ABOUT.equals(section) && !SPEED.equals(section) && event.codepoint() >= 32 && event.codepoint() != 127) {
 			search.focus(true);
 		}
 		if (search.charTyped(event)) {
@@ -883,6 +1108,21 @@ public final class LuceatScreen extends Screen {
 				return true;
 			}
 			return super.keyPressed(event);
+		}
+		if (!search.focused() && event.hasControlDown()) {
+			int key = event.key();
+			if (key == org.lwjgl.glfw.GLFW.GLFW_KEY_Z) {
+				if (event.hasShiftDown()) {
+					redoLast();
+				} else {
+					undoLast();
+				}
+				return true;
+			}
+			if (key == org.lwjgl.glfw.GLFW.GLFW_KEY_Y) {
+				redoLast();
+				return true;
+			}
 		}
 		if (!search.focused() && !search.text().isEmpty() && event.key() == org.lwjgl.glfw.GLFW.GLFW_KEY_BACKSPACE) {
 			search.focus(true);
