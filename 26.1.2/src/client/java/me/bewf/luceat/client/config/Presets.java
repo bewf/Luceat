@@ -61,6 +61,7 @@ public final class Presets {
 			"Perfectly balanced, as all things should be",
 			"Medium",
 			c -> {
+				c.placedReach = 1.1F;
 				c.shadows = true;
 				c.shadowDistance = 40;
 				c.shadowSoftness = 0.0F;
@@ -92,6 +93,7 @@ public final class Presets {
 			"Every torch thinks it’s the main character.",
 			"Heavy",
 			c -> {
+				c.placedReach = 1.2F;
 				c.shadows = true;
 				c.shadowDistance = 64;
 				c.shadowSoftness = 0.7F;
@@ -123,6 +125,7 @@ public final class Presets {
 			"HARDCORE TO THE MEGA - Egg Head",
 			"Max",
 			c -> {
+				c.placedReach = 1.35F;
 				c.shadows = true;
 				c.shadowDistance = 96;
 				c.shadowSoftness = 1.0F;
@@ -131,7 +134,7 @@ public final class Presets {
 				c.foliageShadows = ShadowQuality.FANCY;
 				c.glassTint = true;
 				c.flicker = 0.5F;
-				c.shadowedLights = 12;
+				c.shadowedLights = 8;
 				c.lightBounce = 1.0F;
 				c.shine = 1.0F;
 				c.maxLights = 256;

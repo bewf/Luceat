@@ -43,6 +43,8 @@ public final class LuceatConfig {
 	public int maxLights = 96;
 	public boolean mergeFarLights = true;
 	public boolean adaptiveQuality = true;
+	public float placedReach = 1.0F;
+	public boolean autoLights = true;
 	public int lightRange = 64;
 	public boolean entityLights = true;
 	public boolean particleLights = true;

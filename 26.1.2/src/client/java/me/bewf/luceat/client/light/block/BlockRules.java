@@ -5,6 +5,7 @@ import java.io.Reader;
 import java.io.Writer;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import me.bewf.luceat.client.config.LuceatConfig;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.IdentityHashMap;
@@ -153,19 +154,31 @@ public final class BlockRules {
 		return known;
 	}
 
-	public static int emission(BlockState state) {
-		Map<Block, BlockRule> map = byBlock;
-		if (map.isEmpty()) {
-			return state.getLightEmission();
+	private static final Map<Block, Boolean> VANILLA = new java.util.IdentityHashMap<>();
+
+	// blocks from other mods only count when the automatic setting is on, unless they have a rule of their own
+	public static boolean allowed(Block block) {
+		if (LuceatConfig.get().autoLights) {
+			return true;
 		}
-		BlockRule rule = map.get(state.getBlock());
+		Boolean known = VANILLA.get(block);
+		if (known == null) {
+			known = "minecraft".equals(BuiltInRegistries.BLOCK.getKey(block).getNamespace());
+			VANILLA.put(block, known);
+		}
+		return known;
+	}
+
+	public static int emission(BlockState state) {
+		int natural = state.getLightEmission();
+		Map<Block, BlockRule> map = byBlock;
+		BlockRule rule = map.isEmpty() ? null : map.get(state.getBlock());
 		if (rule == null) {
-			return state.getLightEmission();
+			return natural > 0 && !allowed(state.getBlock()) ? 0 : natural;
 		}
 		if (!rule.enabled) {
 			return 0;
 		}
-		int natural = state.getLightEmission();
 		if (rule.level < 0) {
 			return natural;
 		}

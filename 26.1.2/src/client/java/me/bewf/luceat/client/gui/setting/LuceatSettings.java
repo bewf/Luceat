@@ -101,6 +101,18 @@ public final class LuceatSettings {
 		all.add(new SliderSetting(PLACED, "Placed light strength",
 			"How bright the light from placed blocks is. Higher is brighter.",
 			Cost.NONE, false, 0.0F, 2.0F, 0.05F, "x", () -> c.placedStrength, value -> c.placedStrength = value));
+		all.add(new SliderSetting(PLACED, "Placed light reach",
+			"How far the light from placed blocks reaches. Higher lets it spread further before it fades out.",
+			Cost.LOW, false, 0.8F, 1.6F, 0.05F, "x", () -> c.placedReach, value -> {
+				c.placedReach = value;
+				ShadowVolume.reset();
+			}));
+		all.add(new ToggleSetting(PLACED, "Blocks from other mods",
+			"Blocks from other mods that give off light get a Luceat light too, with a colour picked from their texture.",
+			Cost.LOW, false, () -> c.autoLights, value -> {
+				c.autoLights = value;
+				ShadowVolume.reset();
+			}));
 		all.add(new SliderSetting(PLACED, "Replace normal light",
 			"How much of the normal Minecraft block light is swapped for Luceat's light. At zero, placed light blocks look the way they always did.",
 			Cost.NONE, false, 0.0F, 1.0F, 0.05F, "", () -> c.vanillaReplace, value -> c.vanillaReplace = value));
@@ -152,7 +164,7 @@ public final class LuceatSettings {
 			"Lights that are far from you and close to each other are joined into one bigger light.",
 			Cost.NONE, false, () -> c.mergeFarLights, value -> c.mergeFarLights = value));
 		all.add(new ToggleSetting(PERFORMANCE, "Adaptive quality",
-			"When the frame rate drops, Luceat quietly eases off shadows and bounce, and brings them back when the game has room again. Nothing is lowered while the game runs smoothly.",
+			"When the frame rate drops, shadows and bounce ease off a little, then come back when the game has room again.",
 			Cost.NONE, false, () -> c.adaptiveQuality, value -> c.adaptiveQuality = value));
 		all.add(new SliderSetting(PERFORMANCE, "Light range",
 			"How far away Luceat looks for lights. Lights past this fade out smoothly.",
@@ -164,10 +176,9 @@ public final class LuceatSettings {
 			"Shadows fade out on things farther from you than this. Lower is faster.",
 			Cost.MEDIUM, false, 8.0F, 128.0F, 8.0F, " blocks", () -> c.shadowDistance, value -> c.shadowDistance = Math.round(value)));
 
-		all.add(new ChoiceSetting<>(GENERAL, "Shader packs",
-			"A shader pack draws the world its own way, so Luceat's light does not show while one is on. This needs Iris. Click to change.",
-			Cost.NONE, false, ShaderPackMode.values(), new String[]{"Leave them", "Turn off"}, () -> c.shaderPacks, value -> c.shaderPacks = value)
-			.withNotes("Luceat does nothing about shader packs.", "Luceat switches the pack off for you while Luceat is on."));
+		all.add(new ToggleSetting(GENERAL, "Use Luceat over shader packs",
+			"Switches your shader pack off while Luceat is on, so Luceat's lighting is what you see. Needs Iris.",
+			Cost.NONE, false, () -> c.shaderPacks == ShaderPackMode.TURN_OFF, value -> c.shaderPacks = value ? ShaderPackMode.TURN_OFF : ShaderPackMode.LEAVE));
 		all.add(new ToggleSetting(GENERAL, "Update notices",
 			"Checks Modrinth when the game starts and tells you in chat if a new version is out.",
 			Cost.NONE, false, () -> c.updateChecker, value -> c.updateChecker = value));

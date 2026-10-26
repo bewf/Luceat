@@ -29,7 +29,8 @@ import net.minecraft.world.phys.Vec3;
 // finds every placed light and keeps the ones that matter for the screen
 public final class PlacedLights {
 	private static final int SECTION = 16;
-	private static final int SCANS_PER_FRAME = 6;
+	private static final long SCAN_NANOS = 600_000L;
+	private static final int MAX_SCANS = 24;
 	private static final int SWEEP_FRAMES = 20;
 	private static final int MAX_CANDIDATES = 16384;
 	private static final int TABLE = 8192;
@@ -172,11 +173,12 @@ public final class PlacedLights {
 			sweepCellY = sy;
 			sweepCellZ = sz;
 		}
-		int budget = SCANS_PER_FRAME;
-		while (budget > 0 && !queue.isEmpty()) {
+		long started = System.nanoTime();
+		int scans = 0;
+		while (scans < MAX_SCANS && !queue.isEmpty() && (scans == 0 || System.nanoTime() - started < SCAN_NANOS)) {
 			long[] next = queue.remove(queue.size() - 1);
 			scan(level, (int) next[0], (int) next[1], (int) next[2]);
-			budget--;
+			scans++;
 		}
 	}
 
@@ -305,7 +307,7 @@ public final class PlacedLights {
 			py += openY / length * 0.62;
 			pz += openZ / length * 0.62;
 		}
-		float power = BlockRules.emission(state);
+		float power = Math.min(24.0F, BlockRules.emission(state) * LuceatConfig.get().placedReach);
 		boolean flames = LightSource.warm(colourOf(state)[0], colourOf(state)[2], power);
 		boolean skip = false;
 		if (rule != null) {
@@ -337,7 +339,7 @@ public final class PlacedLights {
 			return;
 		}
 		LuceatConfig config = LuceatConfig.get();
-		int signature = config.lightRange * 31 + (config.mergeFarLights ? 1 : 0) + config.placedMinLevel * 7 + (config.placedLights ? 3 : 0);
+		int signature = config.lightRange * 31 + (config.mergeFarLights ? 1 : 0) + config.placedMinLevel * 7 + Math.round(config.placedReach * 20.0F) * 131 + (config.placedLights ? 3 : 0);
 		double fx = LightCull.forwardX();
 		double fy = LightCull.forwardY();
 		double fz = LightCull.forwardZ();
