@@ -51,6 +51,7 @@ public final class LightEngine {
 		boolean fresh = config != lastConfig || LuceatConfig.revision() != lastRevision || level != lastLevel || time != lastTime || partialTick != lastPartial || camera.x != lastX || camera.y != lastY || camera.z != lastZ;
 		if (fresh) {
 			built = false;
+			Governor.frame(minecraft, config);
 			lastConfig = config;
 			lastRevision = LuceatConfig.revision();
 			lastLevel = level;

@@ -136,6 +136,7 @@ public final class Presets {
 				c.shine = 1.0F;
 				c.maxLights = 256;
 				c.mergeFarLights = false;
+				c.adaptiveQuality = false;
 				c.entityLights = true;
 				c.particleLights = true;
 				c.lightRange = 128;

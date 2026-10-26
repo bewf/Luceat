@@ -151,6 +151,9 @@ public final class LuceatSettings {
 		all.add(new ToggleSetting(PERFORMANCE, "Join faraway lights",
 			"Lights that are far from you and close to each other are joined into one bigger light.",
 			Cost.NONE, false, () -> c.mergeFarLights, value -> c.mergeFarLights = value));
+		all.add(new ToggleSetting(PERFORMANCE, "Adaptive quality",
+			"When the frame rate drops, Luceat quietly eases off shadows and bounce, and brings them back when the game has room again. Nothing is lowered while the game runs smoothly.",
+			Cost.NONE, false, () -> c.adaptiveQuality, value -> c.adaptiveQuality = value));
 		all.add(new SliderSetting(PERFORMANCE, "Light range",
 			"How far away Luceat looks for lights. Lights past this fade out smoothly.",
 			Cost.LOW, false, 16.0F, 128.0F, 8.0F, " blocks", () -> c.lightRange, value -> c.lightRange = Math.round(value)));

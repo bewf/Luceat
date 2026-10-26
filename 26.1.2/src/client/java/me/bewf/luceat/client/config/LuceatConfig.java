@@ -42,6 +42,7 @@ public final class LuceatConfig {
 	public boolean waterPutsOutLights = true;
 	public int maxLights = 96;
 	public boolean mergeFarLights = true;
+	public boolean adaptiveQuality = true;
 	public int lightRange = 64;
 	public boolean entityLights = true;
 	public boolean particleLights = true;

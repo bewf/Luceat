@@ -312,8 +312,10 @@ public final class TerrainShaderPatch {
 			    if (any(lessThan(gc, ivec3(0))) || any(greaterThanEqual(gc, ivec3(@GX@, @GY@, @GZ@)))) {
 			        return vec3(0.0);
 			    }
-			    float shadowFade = u_LuceatState.y > 0.5 ? 1.0 - smoothstep(0.6 * u_LuceatExtra.y, u_LuceatExtra.y, length(pos)) : 0.0;
-			    float budget = u_LuceatMore.z;
+			    float quality = clamp(u_LuceatMore.w, 0.3, 1.0);
+			    float shadowReach = u_LuceatExtra.y * mix(0.6, 1.0, quality);
+			    float shadowFade = u_LuceatState.y > 0.5 ? 1.0 - smoothstep(0.6 * shadowReach, shadowReach, length(pos)) : 0.0;
+			    float budget = u_LuceatMore.z * quality;
 			    float full = budget > 0.5 ? 0.5 / budget : 2.0;
 			    float cheap = full * 0.25;
 			    float sumPower = 0.0;
@@ -345,7 +347,7 @@ public final class TerrainShaderPatch {
 			    vec3 total = vec3(0.0);
 			    vec3 shiny = vec3(0.0);
 			    float placedCover = 0.0;
-			    float bounce = u_LuceatMore.x;
+			    float bounce = u_LuceatMore.x * smoothstep(0.35, 0.6, quality);
 			    float gloss = 0.0;
 			    if (u_LuceatMore.y > 0.001) {
 			        ivec3 inner = ivec3(floor(pos + u_LuceatCamFrac.xyz - normal * 0.25)) + u_LuceatCamBlock.xyz;
@@ -398,7 +400,7 @@ public final class TerrainShaderPatch {
 			                    }
 			                    vec3 solved = base;
 			                    if (wFull > 0.01) {
-			                        solved = luceatShadow(pos, normal, light.xyz, share > 0.4 && dist < 24.0);
+			                        solved = luceatShadow(pos, normal, light.xyz, share > 0.4 && dist < 24.0 && quality > 0.7);
 			                    }
 			                    visible = mix(vec3(1.0), mix(base, solved, wFull), u_LuceatOptions.z * shadowFade);
 			                }
