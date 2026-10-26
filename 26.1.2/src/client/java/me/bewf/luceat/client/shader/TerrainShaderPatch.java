@@ -284,15 +284,15 @@ public final class TerrainShaderPatch {
 			    vec3 up = cross(dir, side);
 			    ivec3 home = ivec3(floor(lightPos + u_LuceatCamFrac.xyz));
 			    vec3 total = centre;
-			    for (int k = 0; k < 3; k++) {
-			        float angle = 2.0943951 * float(k) + 0.5;
+			    for (int k = 0; k < 2; k++) {
+			        float angle = 3.1415927 * float(k) + 0.5;
 			        vec3 spot = lightPos + (side * cos(angle) + up * sin(angle)) * radius;
 			        if (ivec3(floor(spot + u_LuceatCamFrac.xyz)) != home) {
 			            spot = lightPos;
 			        }
 			        total += luceatVisibility(pos, normal, spot);
 			    }
-			    return total * 0.25;
+			    return total * 0.3333333;
 			}
 
 			vec3 luceatSoft(vec3 x, float cap) {
@@ -400,7 +400,7 @@ public final class TerrainShaderPatch {
 			                    }
 			                    vec3 solved = base;
 			                    if (wFull > 0.01) {
-			                        solved = luceatShadow(pos, normal, light.xyz, share > 0.4 && dist < 24.0 && quality > 0.7);
+			                        solved = luceatShadow(pos, normal, light.xyz, share > 0.4 && dist < 16.0 && quality > 0.7);
 			                    }
 			                    visible = mix(vec3(1.0), mix(base, solved, wFull), u_LuceatOptions.z * shadowFade);
 			                }
@@ -413,7 +413,7 @@ public final class TerrainShaderPatch {
 			            if (bounceLevel > 0.0 && ndotl < 0.6) {
 			                float curvedBounce = bounceLevel / (4.0 - 3.0 * bounceLevel);
 			                float seen = 1.0;
-			                if (wCheap > 0.01) {
+			                if (wCheap > 0.01 && share > 0.2) {
 			                    seen = mix(1.0, luceatCheap(pos + normal * 0.6, normal, light.xyz), wCheap * u_LuceatOptions.z * shadowFade);
 			                }
 			                total += tint * (u_LuceatState.z * bounce * 0.2 * curvedBounce * (1.0 - clamp(ndotl, 0.0, 1.0)) * strength * seen);
