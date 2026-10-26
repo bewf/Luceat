@@ -6,6 +6,8 @@ import java.util.List;
 import java.util.Map;
 
 import me.bewf.luceat.client.config.LuceatConfig;
+import me.bewf.luceat.client.light.block.BlockRule;
+import me.bewf.luceat.client.light.block.BlockRules;
 
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
@@ -71,12 +73,13 @@ public final class HeldLights {
 	private static void add(List<LightSource> out, ClientLevel level, ItemStack stack, boolean submerged, LivingEntity entity, float partialTick, boolean rightSide) {
 		LightSpec spec = LightSpecs.of(stack, submerged);
 		if (spec.level() > 0) {
-			Vec3 hand = handPosition(level, entity, partialTick, rightSide);
+			BlockRule rule = BlockRules.forItem(stack.getItem());
+			Vec3 hand = handPosition(level, entity, partialTick, rightSide, rule != null ? rule.heldHeight : -1.0F);
 			out.add(new LightSource(hand.x, hand.y, hand.z, spec.red(), spec.green(), spec.blue(), spec.level(), false, spec.fire(), LightSmoother.key(1, entity.getId(), rightSide ? 1 : 0)));
 		}
 	}
 
-	private static Vec3 handPosition(ClientLevel level, LivingEntity entity, float partialTick, boolean rightSide) {
+	private static Vec3 handPosition(ClientLevel level, LivingEntity entity, float partialTick, boolean rightSide, float heightOverride) {
 		LuceatConfig config = LuceatConfig.get();
 		double side = rightSide ? 1.0 : -1.0;
 		float yaw = Mth.rotLerp(partialTick, entity.yBodyRotO, entity.yBodyRot) * (float) (Math.PI / 180.0);
@@ -89,7 +92,8 @@ public final class HeldLights {
 
 		long now = System.nanoTime();
 		long key = LightSmoother.key(1, entity.getId(), rightSide ? 1 : 0);
-		float wantHeight = entity.getBbHeight() * (entity.isCrouching() ? config.heldHeight * 0.86F : config.heldHeight);
+		float height = heightOverride >= 0.0F ? heightOverride : config.heldHeight;
+		float wantHeight = entity.getBbHeight() * (entity.isCrouching() ? height * 0.86F : height);
 		Smooth smooth = SMOOTH.get(key);
 		if (smooth == null) {
 			smooth = new Smooth();

@@ -338,7 +338,7 @@ public final class BlocksTab {
 					LuceatLook.roundOutlined(graphics, rx, y + 7, rx + bw, y + 21, 0xFF16161B, colourBadge);
 					graphics.text(font, badge, rx + 5, y + 11, isSelected && !added ? 0xFFB9D4FF : colourBadge, false);
 					if (LuceatLook.inside(mx, my, rx, y + 7, rx + bw, y + 21) && my >= top) {
-						String text = added ? "A rule you made. You can delete it." : "Comes with Minecraft or Luceat. You can turn it off or change it, but you cannot delete it.";
+						String text = added ? "A rule you made." : "Comes with the game or Luceat.";
 						tip = font.split(Component.literal(text).withStyle(Style.EMPTY.withColor(0xDDDDE6)), 200);
 					}
 				}
@@ -457,6 +457,7 @@ public final class BlocksTab {
 		BlockRule rule = BlockRules.get(entry.key);
 		boolean added = rule != null && rule.added;
 		boolean lit = entry.defaultLevel > 0 || added;
+		drawTrash(graphics, x1, y0, mx, my, added);
 		editorScroll = Math.max(0.0F, Math.min(editorScroll, Math.max(0, editorHeight - (edBottom - edTop))));
 		graphics.enableScissor(x0, edTop, x1, edBottom);
 		int y = edTop - Math.round(editorScroll);
@@ -470,7 +471,7 @@ public final class BlocksTab {
 		String kind = entry.block == null ? "Item only. It lights when you hold it, drop it or put it in a frame." : "Block. It lights when placed, held, dropped or in a frame.";
 		y = drawWrapped(graphics, kind, x0 + 10, y, x1 - x0 - 20, LuceatLook.SOFT) + 6;
 		if (builtIn(entry)) {
-			graphics.text(font, "Built in. You can change it but not delete it.", x0 + 10, y, BUILT_IN, false);
+			graphics.text(font, "Built in", x0 + 10, y, BUILT_IN, false);
 			y += 14;
 		} else if (added) {
 			graphics.text(font, "Made by you.", x0 + 10, y, LuceatLook.ACCENT, false);
@@ -551,6 +552,13 @@ public final class BlocksTab {
 				customShine ? () -> setRule(r -> r.shine = -1.0F) : null,
 				v -> BlockRules.edit(entry.key).shine = Math.round((float) v * 20.0F) / 20.0F);
 		}
+		if (!collapsed.contains("Behaviour")) {
+			boolean customHeight = rule != null && rule.heldHeight >= 0.0F;
+			float height = customHeight ? rule.heldHeight : 0.0F;
+			y = sliderRow(graphics, "Height when held", customHeight ? Math.round(height * 100.0F) + "%" : "Automatic", customHeight, (height - 0.3F) / 1.0F, y + 2, 7,
+				customHeight ? () -> setRule(r -> r.heldHeight = -1.0F) : null,
+				v -> BlockRules.edit(entry.key).heldHeight = Math.round((0.3F + (float) v * 1.0F) * 50.0F) / 50.0F);
+		}
 		y = header(graphics, "Where it glows", y, mx, my);
 		if (!collapsed.contains("Where it glows")) {
 			boolean placed = rule == null || rule.whenPlaced;
@@ -567,12 +575,7 @@ public final class BlocksTab {
 		y += 4;
 		boolean changed = rule != null && rule.edited();
 		if (added) {
-			button(graphics, edX0, y, edX1, y + 22, "Delete rule", mx, my, true);
-			hit(edX0, y, edX1, y + 22, () -> {
-				BlockRules.remove(entry.key);
-				commit();
-			});
-			y += 28;
+			y += 4;
 		} else {
 			button(graphics, edX0, y, edX1, y + 22, "Reset to built in", mx, my, changed);
 			if (changed) {
@@ -581,7 +584,7 @@ public final class BlocksTab {
 					commit();
 				});
 			}
-			y = drawWrapped(graphics, "Built in rules cannot be deleted. Turn the light off instead.", edX0, y + 30, edX1 - edX0, LuceatLook.MUTED) + 6;
+			y += 30;
 		}
 		graphics.disableScissor();
 		editorHeight = y - start;
@@ -591,6 +594,34 @@ public final class BlocksTab {
 			int popX = x0 - pw - 6 >= 4 ? x0 - pw - 6 : x0 + 4;
 			int popY = Math.max(listY0, Math.min(listY1 - ph, edTop + 40));
 			picker.draw(graphics, font, popX, popY, mx, my);
+		}
+	}
+
+	private int trashX0;
+	private int trashY0;
+	private boolean trashActive;
+
+	private void drawTrash(GuiGraphicsExtractor graphics, int x1, int y0, int mx, int my, boolean show) {
+		trashActive = show;
+		if (!show) {
+			return;
+		}
+		trashX0 = x1 - 26;
+		trashY0 = y0 + 4;
+		boolean over = LuceatLook.inside(mx, my, trashX0 - 3, trashY0 - 3, trashX0 + 15, trashY0 + 17);
+		int shake = over ? Math.round((float) Math.sin(System.nanoTime() / 3.0E7) * 1.6F) : 0;
+		int x = trashX0 + shake;
+		int y = trashY0;
+		int colour = over ? LuceatLook.BAD : LuceatLook.SOFT;
+		int lift = over ? 2 : 0;
+		graphics.fill(x + 4, y - lift, x + 8, y + 1 - lift, colour);
+		graphics.fill(x - 1 + (over ? -1 : 0), y + 1 - lift, x + 13 + (over ? -1 : 0), y + 3 - lift, colour);
+		graphics.fill(x + 1, y + 4, x + 11, y + 14, colour);
+		graphics.fill(x + 3, y + 6, x + 4, y + 12, 0xFF1D1D24);
+		graphics.fill(x + 5, y + 6, x + 6, y + 12, 0xFF1D1D24);
+		graphics.fill(x + 7, y + 6, x + 8, y + 12, 0xFF1D1D24);
+		if (over) {
+			graphics.setTooltipForNextFrame(font, font.split(Component.literal("Delete this rule"), 120), mx, my);
 		}
 	}
 
@@ -680,6 +711,11 @@ public final class BlocksTab {
 	private boolean clickEditor(double mx, double my) {
 		if (selected == null || mx < edX0 - 10) {
 			return false;
+		}
+		if (trashActive && LuceatLook.inside(mx, my, trashX0 - 3, trashY0 - 3, trashX0 + 15, trashY0 + 17)) {
+			BlockRules.remove(selected.key);
+			commit();
+			return true;
 		}
 		for (Hit hit : hits) {
 			if (LuceatLook.inside(mx, my, hit.x0(), hit.y0(), hit.x1(), hit.y1())) {

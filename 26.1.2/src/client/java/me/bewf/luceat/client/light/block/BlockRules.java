@@ -108,6 +108,7 @@ public final class BlockRules {
 			copy.shadows = rule.shadows;
 			copy.water = rule.water;
 			copy.shine = rule.shine;
+			copy.heldHeight = rule.heldHeight;
 			copy.whenPlaced = rule.whenPlaced;
 			copy.whenHeld = rule.whenHeld;
 			copy.whenDropped = rule.whenDropped;
