@@ -8,6 +8,8 @@ import me.bewf.luceat.client.config.LuceatConfig;
 import me.bewf.luceat.client.shadow.PatternAtlas;
 import me.bewf.luceat.client.shadow.ShadowVolume;
 import me.bewf.luceat.client.shadow.ShapeMasks;
+import me.bewf.luceat.client.shader.ShaderVariant;
+import me.bewf.luceat.client.shader.TerrainShaderPatch;
 
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
@@ -31,7 +33,7 @@ public final class LightEngine {
 	}
 
 	public static void upload(int program) {
-		if (!RenderBackend.terrainPathAvailable()) {
+		if (!RenderBackend.terrainPathAvailable() || TerrainShaderPatch.built() == ShaderVariant.OFF) {
 			return;
 		}
 		try {
@@ -81,7 +83,9 @@ public final class LightEngine {
 		LightCull.setup(minecraft, camera, partialTick);
 		List<LightSource> found = new ArrayList<>(EntityLights.collect(minecraft, camera, partialTick));
 		found.removeIf(light -> !LightCull.sees(light.x(), light.y(), light.z(), light.radius()));
-		ShadowVolume.update(minecraft.level, camera);
+		if (TerrainShaderPatch.built() == ShaderVariant.FULL) {
+			ShadowVolume.update(minecraft.level, camera);
+		}
 		if (config.placedLights) {
 			PlacedLights.update(minecraft.level, camera);
 			PlacedLights.collect(camera, Math.min(config.maxLights, LightBuffer.MAX_LIGHTS) - found.size(), found);
