@@ -6,6 +6,7 @@ import java.util.Locale;
 
 import me.bewf.luceat.client.config.LuceatConfig;
 import me.bewf.luceat.client.config.Presets;
+import me.bewf.luceat.client.gui.LuceatFonts;
 import me.bewf.luceat.client.gui.LuceatLook;
 
 import net.minecraft.client.gui.GuiGraphicsExtractor;
@@ -34,6 +35,12 @@ public final class PresetPicker extends Screen {
 	private float crush;
 	private long revealStart = -1L;
 	private boolean unlocked;
+	private final float[] hover = new float[4];
+	private float tint;
+	private int tintColour = 0xFF4FD1C5;
+	private Presets.Preset chosen;
+	private int chosenIndex;
+	private long chosenAt;
 
 	public PresetPicker(Screen parent) {
 		super(Component.literal("Choose a preset"));
@@ -66,6 +73,85 @@ public final class PresetPicker extends Screen {
 	@Override
 	public void extractBackground(GuiGraphicsExtractor graphics, int mouseX, int mouseY, float partial) {
 		graphics.fill(0, 0, this.width, this.height, 0xE00B0B10);
+		graphics.fill(0, 0, this.width, this.height, alpha(tintColour, Math.round(tint * 28.0F)));
+	}
+
+	private static int alpha(int rgb, int a) {
+		return (Math.max(0, Math.min(255, a)) << 24) | (rgb & 0xFFFFFF);
+	}
+
+	private static int accent(Presets.Preset preset) {
+		return switch (preset.name().toUpperCase(Locale.ROOT)) {
+			case "POTATO" -> 0xFFC9975B;
+			case "BALANCED" -> 0xFF4FD1C5;
+			case "PHENOMENAL" -> 0xFFB68CFF;
+			default -> FIRE;
+		};
+	}
+
+	private static float hash(int a, int b) {
+		int h = a * 374761393 + b * 668265263;
+		h = (h ^ (h >>> 13)) * 1274126177;
+		return ((h ^ (h >>> 16)) & 0xFFFF) / 65535.0F;
+	}
+
+	private static void outline(GuiGraphicsExtractor graphics, int x0, int y0, int x1, int y1, int colour) {
+		graphics.fill(x0, y0, x1, y0 + 1, colour);
+		graphics.fill(x0, y1 - 1, x1, y1, colour);
+		graphics.fill(x0, y0, x0 + 1, y1, colour);
+		graphics.fill(x1 - 1, y0, x1, y1, colour);
+	}
+
+	private void particles(GuiGraphicsExtractor graphics, int index, int x0, int y0, int x1, int y1, int colour, long now) {
+		int w = x1 - x0;
+		int h = y1 - y0;
+		double t = now / 1.0E9;
+		for (int k = 0; k < 14; k++) {
+			float seed = hash(index, k);
+			float seed2 = hash(k, index + 7);
+			int px;
+			int py;
+			int a;
+			int size = 1;
+			switch (index) {
+				case 0 -> {
+					double phase = (t * 0.07 + seed) % 1.0;
+					px = x0 + Math.round(seed2 * (w - 2));
+					py = y1 - 2 - (int) (phase * (h - 2));
+					a = (int) (90 * Math.sin(phase * Math.PI));
+				}
+				case 1 -> {
+					double phase = (t * 0.11 + seed) % 1.0;
+					px = x0 + 1 + Math.round(seed2 * (w - 4) + (float) Math.sin(t * 1.3 + k) * 3.0F);
+					py = y1 - 2 - (int) (phase * (h - 2));
+					a = (int) (150 * Math.sin(phase * Math.PI));
+				}
+				case 2 -> {
+					double phase = (t * 0.45 + seed) % 1.0;
+					px = x0 + 2 + Math.round(seed2 * (w - 6));
+					py = y0 + 2 + Math.round(hash(k, 3 + index) * (h - 6));
+					a = (int) (255 * Math.pow(Math.sin(phase * Math.PI), 3.0));
+					size = a > 170 ? 2 : 1;
+				}
+				default -> {
+					double phase = (t * 0.34 + seed) % 1.0;
+					px = x0 + 1 + Math.round(seed2 * (w - 4) + (float) Math.sin(t * 5.0 + k * 2.0) * 2.0F);
+					py = y1 - 2 - (int) (phase * (h - 2));
+					a = (int) (230 * (1.0 - phase));
+				}
+			}
+			if (px < x0 || py < y0 || px + size > x1 || py + size > y1 || a < 8) {
+				continue;
+			}
+			int c = index == 3 && k % 3 == 0 ? 0xFFD35A : colour;
+			graphics.fill(px, py, px + size, py + size, alpha(c, a));
+			if (index == 2 && size == 2) {
+				graphics.fill(px - 1, py, px, py + 1, alpha(c, a / 2));
+				graphics.fill(px + 2, py, px + 3, py + 1, alpha(c, a / 2));
+				graphics.fill(px, py - 1, px + 1, py, alpha(c, a / 2));
+				graphics.fill(px, py + 2, px + 1, py + 3, alpha(c, a / 2));
+			}
+		}
 	}
 
 	private float reveal() {
@@ -136,7 +222,7 @@ public final class PresetPicker extends Screen {
 		StringBuilder line = new StringBuilder();
 		for (String word : text.split(" ")) {
 			String tryLine = line.isEmpty() ? word : line + " " + word;
-			if (this.font.width(tryLine) > width && !line.isEmpty()) {
+			if (LuceatFonts.width(this.font, LuceatFonts.quote(tryLine)) > width && !line.isEmpty()) {
 				lines.add(line.toString());
 				line = new StringBuilder(word);
 			} else {
@@ -151,16 +237,36 @@ public final class PresetPicker extends Screen {
 
 	@Override
 	public void extractRenderState(GuiGraphicsExtractor graphics, int mouseX, int mouseY, float partial) {
+		long now = System.nanoTime();
+		float targetTint = 0.0F;
+		int[] pre = layout();
+		int preCount = reveal() > 0.0F && hardcore != null ? 4 : 3;
+		for (int i = 0; i < preCount; i++) {
+			boolean over = chosen == null && LuceatLook.inside(mouseX, mouseY, pre[i * 2], cardTop(), pre[i * 2] + pre[i * 2 + 1], cardTop() + cardHeight());
+			hover[i] += ((over ? 1.0F : 0.0F) - hover[i]) * 0.22F;
+			if (over) {
+				targetTint = 1.0F;
+				tintColour = accent(i < 3 ? normal.get(Math.min(i, normal.size() - 1)) : hardcore);
+			}
+		}
+		tint += (targetTint - tint) * 0.12F;
 		super.extractRenderState(graphics, mouseX, mouseY, partial);
 		PresetFilmstrips.step();
-		long now = System.nanoTime();
 		if (holding && holdProgress() >= 1.0F && hardcore != null && !unlocked) {
 			unlock();
 		}
-		String heading = "How much light do you want?";
-		graphics.text(this.font, heading, (this.width - this.font.width(heading)) / 2, 26, LuceatLook.TEXT, true);
-		String sub = "You can change this any time in the settings";
-		graphics.text(this.font, sub, (this.width - this.font.width(sub)) / 2, 42, LuceatLook.SOFT, true);
+		if (chosen != null && now - chosenAt > 380_000_000L) {
+			Presets.Preset preset = chosen;
+			chosen = null;
+			LuceatConfig config = LuceatConfig.get();
+			preset.applyTo(config);
+			LuceatConfig.save();
+			onClose();
+			return;
+		}
+		Component heading = LuceatFonts.title("How much light do you want?");
+		LuceatFonts.centred(graphics, this.font, heading, this.width / 2, 24, LuceatLook.TEXT, true);
+		LuceatFonts.centred(graphics, this.font, LuceatFonts.body("You can change this any time in the settings"), this.width / 2, 42, LuceatLook.SOFT, true);
 
 		int[] layout = layout();
 		int count = reveal() > 0.0F && hardcore != null ? 4 : 3;
@@ -174,15 +280,28 @@ public final class PresetPicker extends Screen {
 			if (w < 24) {
 				continue;
 			}
-			boolean hover = LuceatLook.inside(mouseX, mouseY, x0, top, x0 + w, bottom);
+			float h = hover[i];
 			boolean gold = preset.name().equalsIgnoreCase(recommended);
 			boolean hot = i == 3;
 			boolean current = preset.name().equalsIgnoreCase(live.preset) && live.presetChosen;
-			int lift = hover ? -3 : 0;
-			int border = hot ? FIRE : gold ? GOLD : current ? LuceatLook.ACCENT : LuceatLook.BORDER;
-			LuceatLook.roundOutlined(graphics, x0, top + lift, x0 + w, bottom + lift, hover ? LuceatLook.CARD_HOVER : LuceatLook.CARD, border);
+			int colour = accent(preset);
+			int lift = -Math.round(h * 4.0F);
+			for (int g = 1; g <= 5; g++) {
+				graphics.fill(x0 - g, top + lift - g, x0 + w + g, bottom + lift + g, alpha(colour, Math.round(h * 26.0F / g)));
+			}
+			int border = LuceatLook.mix(hot ? FIRE : gold ? GOLD : current ? LuceatLook.ACCENT : LuceatLook.BORDER, colour, h);
+			LuceatLook.roundOutlined(graphics, x0, top + lift, x0 + w, bottom + lift, LuceatLook.mix(LuceatLook.CARD, LuceatLook.CARD_HOVER, h), border);
 			if (gold || hot) {
 				LuceatLook.round(graphics, x0 + 1, top + lift + 1, x0 + w - 1, top + lift + 3, border);
+			}
+			if (h > 0.02F || gold || hot) {
+				double sweep = (now / 1.8E9 + i * 0.23) % 1.0;
+				int sx = x0 + (int) (sweep * (w + 40)) - 20;
+				int from = Math.max(x0 + 5, sx - 14);
+				int to = Math.min(x0 + w - 5, sx + 14);
+				if (to > from) {
+					graphics.fill(from, top + lift, to, top + lift + 1, alpha(colour, Math.round(220.0F * Math.max(h, 0.55F))));
+				}
 			}
 			int pad = 8;
 			int imgW = w - pad * 2;
@@ -195,41 +314,46 @@ public final class PresetPicker extends Screen {
 				graphics.blit(tex, imgX, imgY, imgX + imgW, imgY + imgH, 0.0F, 1.0F, 0.0F, 1.0F);
 			} else {
 				graphics.fill(imgX, imgY, imgX + imgW, imgY + imgH, 0xFF111116);
-				String wait = "Getting ready";
 				int dots = (int) (now / 400_000_000L % 4);
-				graphics.text(this.font, wait + ".".repeat(dots), imgX + 8, imgY + imgH / 2 - 4, LuceatLook.MUTED, false);
+				graphics.text(this.font, "Getting ready" + ".".repeat(dots), imgX + 8, imgY + imgH / 2 - 4, LuceatLook.MUTED, false);
 			}
+			particles(graphics, i, imgX, imgY, imgX + imgW, imgY + imgH, colour, now);
+			outline(graphics, imgX - 1, imgY - 1, imgX + imgW + 1, imgY + imgH + 1, alpha(colour, 60 + Math.round(h * 120.0F)));
 			int y = imgY + imgH + 10;
-			graphics.text(this.font, title(preset.name()), x0 + pad, y, hot ? FIRE : LuceatLook.TEXT, true);
-			String cost = preset.cost();
-			graphics.text(this.font, cost, x0 + w - pad - this.font.width(cost), y, LuceatLook.SOFT, false);
-			y += 14;
+			LuceatFonts.draw(graphics, this.font, LuceatFonts.title(title(preset.name())), x0 + pad, y, hot ? FIRE : LuceatLook.mix(LuceatLook.TEXT, colour, h * 0.6F), true);
+			Component cost = LuceatFonts.body(preset.cost());
+			LuceatFonts.draw(graphics, this.font, cost, x0 + w - pad - LuceatFonts.width(this.font, cost), y, LuceatLook.SOFT, false);
+			y += 15;
 			for (String line : wrap("“" + preset.blurb() + "”", w - pad * 2)) {
 				if (y + 9 > bottom - 22) {
 					break;
 				}
-				graphics.text(this.font, line, x0 + pad, y, LuceatLook.SOFT, false);
-				y += 11;
+				LuceatFonts.draw(graphics, this.font, LuceatFonts.quote(line), x0 + pad, y, LuceatLook.SOFT, false);
+				y += 12;
 			}
 			if (gold) {
-				String tag = "Recommended for you";
-				int tw = this.font.width(tag) + 12;
+				Component tag = LuceatFonts.body("Recommended for you");
+				int tw = LuceatFonts.width(this.font, tag) + 12;
 				int tx = x0 + (w - tw) / 2;
 				LuceatLook.round(graphics, tx, bottom + lift - 20, tx + tw, bottom + lift - 6, GOLD);
-				graphics.text(this.font, tag, tx + 6, bottom + lift - 17, 0xFF1A1405, false);
+				LuceatFonts.draw(graphics, this.font, tag, tx + 6, bottom + lift - 17, 0xFF1A1405, false);
 			} else if (current) {
-				String tag = "Current";
-				graphics.text(this.font, tag, x0 + (w - this.font.width(tag)) / 2, bottom + lift - 17, LuceatLook.ACCENT, false);
+				LuceatFonts.centred(graphics, this.font, LuceatFonts.body("Current"), x0 + w / 2, bottom + lift - 17, LuceatLook.ACCENT, false);
+			}
+			if (chosen != null && chosenIndex == i) {
+				float t = (now - chosenAt) / 380_000_000.0F;
+				for (int r = 0; r < 3; r++) {
+					int grow = Math.round(t * (30.0F + r * 14.0F));
+					outline(graphics, x0 - grow, top + lift - grow, x0 + w + grow, bottom + lift + grow, alpha(colour, Math.round((1.0F - t) * 200.0F / (r + 1))));
+				}
 			}
 		}
 		drawCrack(graphics, now);
 		String gpu = HardwareHint.gpuName();
 		if (!gpu.isEmpty()) {
-			String line = gpu;
-			graphics.text(this.font, line, (this.width - this.font.width(line)) / 2, this.height - 30, LuceatLook.MUTED, false);
+			LuceatFonts.centred(graphics, this.font, LuceatFonts.body(gpu), this.width / 2, this.height - 30, LuceatLook.MUTED, false);
 		}
-		String skip = "Esc to skip";
-		graphics.text(this.font, skip, (this.width - this.font.width(skip)) / 2, this.height - 16, LuceatLook.MUTED, false);
+		LuceatFonts.centred(graphics, this.font, LuceatFonts.body("Esc to skip"), this.width / 2, this.height - 16, LuceatLook.MUTED, false);
 	}
 
 	// a thin glowing split on the right edge that grows while you hold and pull
@@ -270,6 +394,9 @@ public final class PresetPicker extends Screen {
 		}
 		double mx = event.x();
 		double my = event.y();
+		if (chosen != null) {
+			return true;
+		}
 		if (inCrackZone(mx, my)) {
 			holding = true;
 			holdStart = System.nanoTime();
