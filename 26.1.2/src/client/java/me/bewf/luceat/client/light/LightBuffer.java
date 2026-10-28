@@ -18,7 +18,7 @@ public final class LightBuffer {
 	public static final int BINDING = 7;
 	public static final String BLOCK_NAME = "LuceatLights";
 
-	private static final int HEADER = 128;
+	private static final int HEADER = 160;
 	private static final int SIZE = HEADER + MAX_LIGHTS * 32;
 
 	private final ByteBuffer scratch = BufferUtils.createByteBuffer(SIZE);
@@ -35,10 +35,15 @@ public final class LightBuffer {
 		int blockY = (int) Math.floor(camera.y);
 		int blockZ = (int) Math.floor(camera.z);
 		this.scratch.putInt(blockX).putInt(blockY).putInt(blockZ).putInt(0);
-		this.scratch.putFloat((float) (camera.x - blockX)).putFloat((float) (camera.y - blockY)).putFloat((float) (camera.z - blockZ)).putFloat(0.0F);
+		this.scratch.putFloat((float) (camera.x - blockX)).putFloat((float) (camera.y - blockY)).putFloat((float) (camera.z - blockZ)).putFloat((float) (System.nanoTime() / 1.0E9 % 1000.0));
 		this.scratch.putInt(ShadowVolume.centreX()).putInt(ShadowVolume.centreY()).putInt(ShadowVolume.centreZ()).putInt(ShadowVolume.HALF);
 		this.scratch.putFloat(config.lightBounce).putFloat(config.shine).putFloat(config.shadows ? config.shadowedLights : 0).putFloat(Governor.quality());
 		this.scratch.putInt(LightGrid.originX()).putInt(LightGrid.originY()).putInt(LightGrid.originZ()).putInt(LightGrid.SLOTS / 4);
+		net.minecraft.client.Minecraft minecraft = net.minecraft.client.Minecraft.getInstance();
+		float[] sun = SunLight.values(minecraft.level, minecraft.getDeltaTracker().getGameTimeDeltaPartialTick(false), config);
+		for (int i = 0; i < 8; i++) {
+			this.scratch.putFloat(sun[i]);
+		}
 		for (int i = 0; i < MAX_LIGHTS; i++) {
 			if (i < count) {
 				LightSource light = lights.get(i);

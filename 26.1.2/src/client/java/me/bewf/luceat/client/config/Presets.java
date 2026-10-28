@@ -42,6 +42,9 @@ public final class Presets {
 				c.lightBounce = 0.0F;
 				c.lightSpread = false;
 				c.spillStrength = 0.0F;
+				c.sunShadows = false;
+				c.sunShadowStrength = 0.65F;
+				c.caustics = false;
 				c.shine = 0.0F;
 				c.maxLights = 24;
 				c.mergeFarLights = true;
@@ -76,6 +79,9 @@ public final class Presets {
 				c.lightBounce = 0.25F;
 				c.lightSpread = false;
 				c.spillStrength = 0.0F;
+				c.sunShadows = false;
+				c.sunShadowStrength = 0.65F;
+				c.caustics = true;
 				c.shine = 0.35F;
 				c.maxLights = 96;
 				c.mergeFarLights = true;
@@ -110,6 +116,9 @@ public final class Presets {
 				c.lightBounce = 0.6F;
 				c.lightSpread = true;
 				c.spillStrength = 0.6F;
+				c.sunShadows = true;
+				c.sunShadowStrength = 0.65F;
+				c.caustics = true;
 				c.shine = 0.7F;
 				c.maxLights = 192;
 				c.mergeFarLights = true;
@@ -144,6 +153,9 @@ public final class Presets {
 				c.lightBounce = 1.0F;
 				c.lightSpread = true;
 				c.spillStrength = 0.85F;
+				c.sunShadows = true;
+				c.sunShadowStrength = 0.65F;
+				c.caustics = true;
 				c.shine = 1.0F;
 				c.maxLights = 256;
 				c.mergeFarLights = false;

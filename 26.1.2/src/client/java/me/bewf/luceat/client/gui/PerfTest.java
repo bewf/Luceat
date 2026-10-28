@@ -76,7 +76,7 @@ public final class PerfTest {
 			return;
 		}
 		String label = setting.label().toLowerCase(Locale.ROOT);
-		boolean needsRays = setting.rebuildsShadows() || label.contains("shadow") || label.contains("bounce") || label.contains("shin");
+		boolean needsRays = setting.rebuildsShadows() || label.contains("shadow") || label.contains("bounce") || label.contains("shin") || label.contains("sun") || label.contains("water");
 		me.bewf.luceat.client.shader.ShaderVariant variant = me.bewf.luceat.client.shader.TerrainShaderPatch.built();
 		boolean needsSpread = label.contains("corner");
 		if (needsSpread && (variant == null || !variant.spread())) {

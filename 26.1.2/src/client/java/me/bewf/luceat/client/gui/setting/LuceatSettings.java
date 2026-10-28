@@ -69,6 +69,15 @@ public final class LuceatSettings {
 			"Enchanted items give off a small purple glow while you hold them.",
 			Cost.LOW, false, () -> c.enchantGlow, value -> c.enchantGlow = value));
 
+		all.add(new ToggleSetting(SHADOWS, "Sun shadows",
+			"Trees, roofs and cliffs cast shadows from the sun on the ground near you.",
+			Cost.HIGH, false, () -> c.sunShadows, value -> c.sunShadows = value));
+		all.add(new SliderSetting(SHADOWS, "Sun shadow strength",
+			"How dark sun shadows are.",
+			Cost.NONE, false, 0.0F, 1.0F, 0.05F, "", () -> c.sunShadowStrength, value -> c.sunShadowStrength = value));
+		all.add(new ToggleSetting(SHADOWS, "Water light patterns",
+			"Moving bright streaks of sunlight on the bottom of pools and the sea.",
+			Cost.LOW, false, () -> c.caustics, value -> c.caustics = value));
 		all.add(new ToggleSetting(SHADOWS, "Shadows",
 			"Adds Shadows to lights. Stop light from going through blocks.",
 			Cost.HIGH, false, () -> c.shadows, value -> c.shadows = value));

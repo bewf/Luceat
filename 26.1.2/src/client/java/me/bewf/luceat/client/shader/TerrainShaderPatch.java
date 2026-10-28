@@ -29,6 +29,8 @@ public final class TerrainShaderPatch {
 			    ivec4 u_LuceatVol;
 			    vec4 u_LuceatMore;
 			    ivec4 u_LuceatGridOrigin;
+			    vec4 u_LuceatSun;
+			    vec4 u_LuceatSun2;
 			    vec4 u_LuceatPosRadius[@LIGHTS@];
 			    vec4 u_LuceatColor[@LIGHTS@];
 			};
@@ -300,6 +302,51 @@ public final class TerrainShaderPatch {
 			    return total * 0.3333333;
 			}
 
+			float luceatCaustic(vec2 p, float t) {
+			    vec2 q = p * 0.09817477;
+			    q += vec2(sin(q.y * 5.0 + t), cos(q.x * 4.0 - t * 0.8)) * 0.5;
+			    float a = sin(q.x * 6.0 + sin(q.y * 5.0 + t * 0.7));
+			    float b = sin(q.y * 7.0 + sin(q.x * 6.0 - t * 0.6));
+			    return pow(clamp(1.0 - abs(a * b), 0.0, 1.0), 5.0);
+			}
+
+			vec3 luceatSun(vec3 pos, vec3 normal, vec4 baseColor) {
+			    float power = u_LuceatSun.w;
+			    float sky = max(baseColor.r, max(baseColor.g, baseColor.b));
+			    float reach = u_LuceatSun2.y;
+			    float fadeOut = 1.0 - smoothstep(0.6 * reach, reach, length(pos));
+			    if (power <= 0.001 || sky < 0.15 || fadeOut <= 0.01) {
+			        return vec3(0.0);
+			    }
+			    vec3 sun = u_LuceatSun.xyz;
+			    float facing = dot(normal, sun);
+			    vec3 result = vec3(0.0);
+			    if (u_LuceatSun2.x > 0.0 && facing > 0.0 && u_LuceatMore.w > 0.5) {
+			        vec3 seen = luceatVisibility(pos, normal, pos + sun * 48.0);
+			        result -= baseColor.rgb * (vec3(1.0) - seen) * (u_LuceatSun2.x * power * facing * fadeOut);
+			    }
+			    if (u_LuceatSun2.z > 0.5) {
+			        ivec3 cell = ivec3(floor(pos + u_LuceatCamFrac.xyz + normal * 0.5)) + u_LuceatCamBlock.xyz;
+			        ivec3 away = (cell >> 4) - u_LuceatVol.xyz;
+			        if (all(lessThanEqual(abs(away), ivec3(u_LuceatVol.w))) && texelFetch(@SHINE@, luceatWrap(cell), 0).r > 0.99) {
+			            int depth = 0;
+			            for (int k = 1; k < 16; k++) {
+			                if (texelFetch(@SHINE@, luceatWrap(cell + ivec3(0, k, 0)), 0).r < 0.99) {
+			                    break;
+			                }
+			                depth = k;
+			            }
+			            vec2 flat2 = vec2(cell.xz & 63) + fract(pos.xz + u_LuceatCamFrac.xz);
+			            float pattern = luceatCaustic(flat2, u_LuceatCamFrac.w);
+			            result += baseColor.rgb * (pattern * 0.9 * power * exp(-float(depth) * 0.12) * fadeOut * clamp(facing + 0.3, 0.0, 1.0));
+			        }
+			    }
+			    return result;
+			}
+#else
+			vec3 luceatSun(vec3 pos, vec3 normal, vec4 baseColor) {
+			    return vec3(0.0);
+			}
 #endif
 
 			vec3 luceatSoft(vec3 x, float cap) {
@@ -516,7 +563,7 @@ public final class TerrainShaderPatch {
 		String lighting = defines + FRAGMENT_LIGHTING;
 		String patched = replaceOnce(source, "flat in uint v_Material;", "flat in uint v_Material;\n" + lighting);
 		patched = replaceOnce(patched, "color *= v_Color;", "vec3 luceatAlbedo = color.rgb;\n    vec3 luceatFaceNormal = luceatNormal(v_LuceatPos);\n    color *= v_Color;");
-		return replaceOnce(patched, "fragColor = _linearFog(", "color.rgb += luceatAlbedo * luceatLight(v_LuceatPos, luceatFaceNormal, v_Color, v_LuceatBase);\n    color.rgb += luceatSpec;\n\n    fragColor = _linearFog(");
+		return replaceOnce(patched, "fragColor = _linearFog(", "color.rgb += luceatAlbedo * luceatLight(v_LuceatPos, luceatFaceNormal, v_Color, v_LuceatBase);\n    color.rgb += luceatAlbedo * luceatSun(v_LuceatPos, luceatFaceNormal, v_LuceatBase);\n    color.rgb = max(color.rgb, vec3(0.0));\n    color.rgb += luceatSpec;\n\n    fragColor = _linearFog(");
 	}
 
 	private static String replaceOnce(String source, String anchor, String replacement) {

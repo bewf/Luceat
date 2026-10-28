@@ -29,6 +29,9 @@ public final class LuceatConfig {
 	public float lightBounce = 0.25F;
 	public float shine = 0.4F;
 	public boolean lightSpread = false;
+	public boolean sunShadows = false;
+	public float sunShadowStrength = 0.65F;
+	public boolean caustics = false;
 	public float spillStrength = 0.6F;
 	public boolean textureColours = true;
 
@@ -164,6 +167,7 @@ public final class LuceatConfig {
 		lightBounce = Math.max(0.0F, Math.min(lightBounce, 1.0F));
 		shine = Math.max(0.0F, Math.min(shine, 1.0F));
 		spillStrength = Math.max(0.0F, Math.min(spillStrength, 1.0F));
+		sunShadowStrength = Math.max(0.0F, Math.min(sunShadowStrength, 1.0F));
 		lightRange = Math.max(8, Math.min(lightRange, 128));
 		placedStrength = Math.max(0.0F, Math.min(placedStrength, 2.0F));
 		vanillaReplace = Math.max(0.0F, Math.min(vanillaReplace, 1.0F));

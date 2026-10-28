@@ -36,7 +36,7 @@ public enum ShaderVariant {
 		if (!config.enabled || !RenderBackend.terrainPathAvailable()) {
 			return OFF;
 		}
-		boolean wantRays = config.shadows && config.shadowedLights > 0 || config.lightBounce > 0.0F || config.shine > 0.0F;
+		boolean wantRays = config.shadows && config.shadowedLights > 0 || config.lightBounce > 0.0F || config.shine > 0.0F || config.sunShadows || config.caustics;
 		boolean wantSpread = config.lightSpread && LightSpread.supported();
 		if (wantSpread) {
 			return wantRays ? FULL_SPREAD : LEAN_SPREAD;

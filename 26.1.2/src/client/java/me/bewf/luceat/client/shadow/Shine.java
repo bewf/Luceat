@@ -24,6 +24,9 @@ public final class Shine {
 		if (state.isAir()) {
 			return 0;
 		}
+		if (state.getFluidState().is(net.minecraft.tags.FluidTags.WATER)) {
+			return 255;
+		}
 		Integer known = KNOWN.get(state);
 		if (known != null) {
 			return known;
