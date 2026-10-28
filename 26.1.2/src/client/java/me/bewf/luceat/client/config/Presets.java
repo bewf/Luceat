@@ -40,6 +40,8 @@ public final class Presets {
 				c.flicker = 0.25F;
 				c.shadowedLights = 0;
 				c.lightBounce = 0.0F;
+				c.lightSpread = false;
+				c.spillStrength = 0.0F;
 				c.shine = 0.0F;
 				c.maxLights = 24;
 				c.mergeFarLights = true;
@@ -72,6 +74,8 @@ public final class Presets {
 				c.flicker = 0.25F;
 				c.shadowedLights = 2;
 				c.lightBounce = 0.25F;
+				c.lightSpread = false;
+				c.spillStrength = 0.0F;
 				c.shine = 0.35F;
 				c.maxLights = 96;
 				c.mergeFarLights = true;
@@ -104,6 +108,8 @@ public final class Presets {
 				c.flicker = 0.3F;
 				c.shadowedLights = 6;
 				c.lightBounce = 0.6F;
+				c.lightSpread = true;
+				c.spillStrength = 0.6F;
 				c.shine = 0.7F;
 				c.maxLights = 192;
 				c.mergeFarLights = true;
@@ -136,6 +142,8 @@ public final class Presets {
 				c.flicker = 0.5F;
 				c.shadowedLights = 8;
 				c.lightBounce = 1.0F;
+				c.lightSpread = true;
+				c.spillStrength = 0.85F;
 				c.shine = 1.0F;
 				c.maxLights = 256;
 				c.mergeFarLights = false;

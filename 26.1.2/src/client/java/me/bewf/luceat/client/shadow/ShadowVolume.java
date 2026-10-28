@@ -37,7 +37,7 @@ public final class ShadowVolume {
 	public static final int BRICK = 4;
 	public static final int BRICK_DIM = DIMENSION / BRICK;
 
-	private static final int UNIT = 14;
+	public static final int UNIT = 14;
 	private static final int SHINE_UNIT = 11;
 	private static final int BRICK_UNIT = 10;
 	private static final int PER_CELL = CELL_SIZE / BRICK;
@@ -77,6 +77,10 @@ public final class ShadowVolume {
 	private static boolean complete;
 
 	private ShadowVolume() {
+	}
+
+	public static int texture() {
+		return texture;
 	}
 
 	public static int centreX() {

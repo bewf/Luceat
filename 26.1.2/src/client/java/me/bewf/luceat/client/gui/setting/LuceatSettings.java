@@ -50,6 +50,12 @@ public final class LuceatSettings {
 		all.add(new SliderSetting(LIGHTING, "Light bounce",
 			"Shadows keep some light to simulate light bouncing off the walls around them. At zero shadows go fully dark.",
 			Cost.LOW, false, 0.0F, 1.0F, 0.05F, "", () -> c.lightBounce, value -> c.lightBounce = value));
+		all.add(new ToggleSetting(LIGHTING, "Light around corners",
+			"Light spreads around corners and through gaps, so rooms next to a lit room glow a little. Needs OpenGL 4.3.",
+			Cost.MEDIUM, false, () -> c.lightSpread, value -> c.lightSpread = value));
+		all.add(new SliderSetting(LIGHTING, "Corner light strength",
+			"How strong the light around corners is.",
+			Cost.NONE, false, 0.0F, 1.0F, 0.05F, "", () -> c.spillStrength, value -> c.spillStrength = value));
 		all.add(new SliderSetting(LIGHTING, "Shiny surfaces",
 			"Shiny stuff being shiny. At zero nothing is shiny.",
 			Cost.LOW, true, 0.0F, 1.0F, 0.05F, "", () -> c.shine, value -> c.shine = value));

@@ -73,10 +73,18 @@ public final class LightEngine {
 			LightGrid.update(lights, camera);
 			BUFFER.update(lights, camera);
 			built = true;
+			ShaderVariant variant = TerrainShaderPatch.built();
+			if (variant != null && variant.spread()) {
+				LightSpread.update(BUFFER);
+			}
 		}
 		BUFFER.bind(program);
 		LightGrid.bind(program);
 		ShadowVolume.bind(program);
+		ShaderVariant bound = TerrainShaderPatch.built();
+		if (bound != null && bound.spread()) {
+			LightSpread.bind(program);
+		}
 		PatternAtlas.bind(program);
 		ShapeMasks.bind(program);
 	}
@@ -99,7 +107,8 @@ public final class LightEngine {
 		LightCull.setup(minecraft, camera, partialTick);
 		List<LightSource> found = new ArrayList<>(EntityLights.collect(minecraft, camera, partialTick));
 		found.removeIf(light -> !LightCull.sees(light.x(), light.y(), light.z(), light.radius()));
-		if (TerrainShaderPatch.built() == ShaderVariant.FULL) {
+		ShaderVariant built = TerrainShaderPatch.built();
+		if (built != null && built.usesVolume()) {
 			ShadowVolume.update(minecraft.level, camera);
 		}
 		if (config.placedLights) {

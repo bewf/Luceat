@@ -3,6 +3,7 @@ package me.bewf.luceat.client.shader;
 import me.bewf.luceat.Luceat;
 import me.bewf.luceat.client.light.LightBuffer;
 import me.bewf.luceat.client.light.LightGrid;
+import me.bewf.luceat.client.light.LightSpread;
 import me.bewf.luceat.client.shadow.PatternAtlas;
 import me.bewf.luceat.client.shadow.ShapeMasks;
 import me.bewf.luceat.client.shadow.ShadowVolume;
@@ -36,6 +37,9 @@ public final class TerrainShaderPatch {
 			uniform usampler3D @GRID@;
 			uniform sampler3D @SHINE@;
 			uniform sampler3D @BRICKS@;
+#ifdef LUCEAT_SPREAD
+			uniform sampler3D @SPREAD@;
+#endif
 
 			vec3 luceatSpec;
 			uniform sampler2D @PATTERNS@;
@@ -435,6 +439,15 @@ public final class TerrainShaderPatch {
 			            }
 			        }
 			    }
+#ifdef LUCEAT_SPREAD
+			    if (u_LuceatExtra.w > 0.001) {
+			        vec3 q = pos + normal * 0.6;
+			        vec3 tc = (vec3(u_LuceatCamBlock.xyz & 63) + q + u_LuceatCamFrac.xyz) / 64.0;
+			        float edge = 1.0 - smoothstep(20.0, 28.0, max(abs(q.x), max(abs(q.y), abs(q.z))));
+			        float direct = max(total.r, max(total.g, total.b));
+			        total += texture(@SPREAD@, tc).rgb * (u_LuceatState.z * u_LuceatExtra.w * edge * (1.0 - smoothstep(0.0, 0.6, direct)));
+			    }
+#endif
 			    luceatSpec = min(shiny, vec3(1.0)) * fade;
 			    vec3 blockPart = max(vertexColor.rgb - baseColor.rgb, vec3(0.0));
 			    float coverage = clamp(placedCover * fade / max(dot(blockPart, vec3(0.299, 0.587, 0.114)), 0.02), 0.0, 1.0);
@@ -449,6 +462,7 @@ public final class TerrainShaderPatch {
 			.replace("@GRID@", LightGrid.SAMPLER)
 			.replace("@SHINE@", ShadowVolume.SHINE_SAMPLER)
 			.replace("@BRICKS@", ShadowVolume.BRICK_SAMPLER)
+			.replace("@SPREAD@", LightSpread.SAMPLER)
 			.replace("@GX@", Integer.toString(LightGrid.GX))
 			.replace("@GY@", Integer.toString(LightGrid.GY))
 			.replace("@GZ@", Integer.toString(LightGrid.GZ))
@@ -498,7 +512,8 @@ public final class TerrainShaderPatch {
 	}
 
 	private static String patchFragment(String source) {
-		String lighting = current == ShaderVariant.FULL ? "\n#define LUCEAT_RAYS 1" + FRAGMENT_LIGHTING : FRAGMENT_LIGHTING;
+		String defines = (current.rays() ? "\n#define LUCEAT_RAYS 1" : "") + (current.spread() ? "\n#define LUCEAT_SPREAD 1" : "");
+		String lighting = defines + FRAGMENT_LIGHTING;
 		String patched = replaceOnce(source, "flat in uint v_Material;", "flat in uint v_Material;\n" + lighting);
 		patched = replaceOnce(patched, "color *= v_Color;", "vec3 luceatAlbedo = color.rgb;\n    vec3 luceatFaceNormal = luceatNormal(v_LuceatPos);\n    color *= v_Color;");
 		return replaceOnce(patched, "fragColor = _linearFog(", "color.rgb += luceatAlbedo * luceatLight(v_LuceatPos, luceatFaceNormal, v_Color, v_LuceatBase);\n    color.rgb += luceatSpec;\n\n    fragColor = _linearFog(");
