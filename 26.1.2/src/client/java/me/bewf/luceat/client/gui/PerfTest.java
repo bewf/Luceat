@@ -6,14 +6,18 @@ import java.util.Map;
 
 import me.bewf.luceat.client.gui.setting.Cost;
 import me.bewf.luceat.client.gui.setting.Setting;
+import me.bewf.luceat.client.light.FrameClock;
+import me.bewf.luceat.client.light.TestLoad;
 import me.bewf.luceat.client.shadow.ShadowVolume;
 
 import net.minecraft.client.Minecraft;
 
 public final class PerfTest {
-	private static final int ROUNDS = 3;
-	private static final int WARM_FRAMES = 12;
-	private static final int SAMPLE_FRAMES = 40;
+	private static final int ROUNDS = 2;
+	private static final long WARM_NANOS = 300_000_000L;
+	private static final long SAMPLE_NANOS = 700_000_000L;
+	private static final int MIN_WARM = 2;
+	private static final int MIN_SAMPLE = 4;
 	private static final int STEPS = ROUNDS * 2;
 
 	public record Result(float millis, float percent) {
@@ -39,7 +43,9 @@ public final class PerfTest {
 	private double sum;
 	private double totalA;
 	private double totalB;
-	private long last;
+	private long phaseStart;
+	private int seenCount;
+	private long lastCall;
 	private String note = "";
 
 	public boolean running() {
@@ -92,13 +98,16 @@ public final class PerfTest {
 		snapshot = setting.snapshot();
 		setting.useTestState(false);
 		applied(setting);
+		TestLoad.set(true);
 		phase = Phase.WARM;
 		step = 0;
 		frames = 0;
 		sum = 0.0;
 		totalA = 0.0;
 		totalB = 0.0;
-		last = 0L;
+		phaseStart = System.nanoTime();
+		seenCount = FrameClock.count();
+		lastCall = 0L;
 	}
 
 	public void cancel() {
@@ -106,6 +115,7 @@ public final class PerfTest {
 			target.restore(snapshot);
 			applied(target);
 			phase = Phase.IDLE;
+			TestLoad.set(false);
 		}
 	}
 
@@ -114,32 +124,47 @@ public final class PerfTest {
 			return;
 		}
 		long now = System.nanoTime();
-		if (last == 0L) {
-			last = now;
+		double millis = -1.0;
+		int count = FrameClock.count();
+		if (count != seenCount) {
+			int fresh = count - seenCount;
+			seenCount = count;
+			millis = FrameClock.millis();
+			frames += fresh - 1;
+			sum += millis * (fresh - 1);
+			lastCall = now;
+		} else if (lastCall != 0L && now - lastCall > 400_000_000L) {
+			millis = (now - lastCall) / 1.0E6;
+			lastCall = now;
+		} else if (lastCall == 0L) {
+			lastCall = now;
+		}
+		if (millis < 0.0) {
 			return;
 		}
-		double millis = (now - last) / 1.0E6;
-		last = now;
 		frames++;
 		if (phase == Phase.WARM) {
-			if (frames >= WARM_FRAMES) {
+			if (frames >= MIN_WARM && now - phaseStart >= WARM_NANOS) {
 				phase = Phase.SAMPLE;
 				frames = 0;
 				sum = 0.0;
+				phaseStart = now;
 			}
 			return;
 		}
 		sum += millis;
-		if (frames < SAMPLE_FRAMES) {
+		if (frames < MIN_SAMPLE || now - phaseStart < SAMPLE_NANOS) {
 			return;
 		}
+		double average = sum / frames;
 		if (step % 2 == 0) {
-			totalA += sum / SAMPLE_FRAMES;
+			totalA += average;
 		} else {
-			totalB += sum / SAMPLE_FRAMES;
+			totalB += average;
 		}
 		step++;
 		frames = 0;
+		sum = 0.0;
 		if (step >= STEPS) {
 			target.restore(snapshot);
 			applied(target);
@@ -150,20 +175,21 @@ public final class PerfTest {
 			results.put(target, new Result(difference, percent));
 			note = "";
 			phase = Phase.IDLE;
+			TestLoad.set(false);
 			return;
 		}
 		target.useTestState(step % 2 == 1);
 		applied(target);
 		phase = Phase.WARM;
+		phaseStart = now;
 	}
 
 	public int progress() {
 		if (!running()) {
 			return 0;
 		}
-		int unit = WARM_FRAMES + SAMPLE_FRAMES;
-		int done = step * unit + (phase == Phase.WARM ? frames : WARM_FRAMES + frames);
-		return Math.min(100, done * 100 / (STEPS * unit));
+		float inStep = phase == Phase.SAMPLE ? 0.3F + 0.7F * Math.min(1.0F, (System.nanoTime() - phaseStart) / (float) SAMPLE_NANOS) : 0.3F * Math.min(1.0F, (System.nanoTime() - phaseStart) / (float) WARM_NANOS);
+		return Math.min(100, Math.round((step + inStep) * 100.0F / STEPS));
 	}
 
 	private static void applied(Setting setting) {

@@ -55,6 +55,9 @@ public final class LightEngine {
 		boolean fresh = config != lastConfig || LuceatConfig.revision() != lastRevision || level != lastLevel || time != lastTime || partialTick != lastPartial || camera.x != lastX || camera.y != lastY || camera.z != lastZ;
 		if (fresh) {
 			built = false;
+			FrameClock.frame();
+			Panic.frame(FrameClock.millis(), lights.size());
+			Stats.frame(FrameClock.millis(), lights.size());
 			Governor.frame(minecraft, config);
 			lastConfig = config;
 			lastRevision = LuceatConfig.revision();
@@ -64,18 +67,26 @@ public final class LightEngine {
 			lastX = camera.x;
 			lastY = camera.y;
 			lastZ = camera.z;
-			lights = config.enabled ? gather(minecraft, camera, partialTick, config) : List.of();
+			long gatherStart = System.nanoTime();
+			lights = config.enabled && !Panic.paused() ? gather(minecraft, camera, partialTick, config) : List.of();
+			Stats.record(Stats.GATHER, System.nanoTime() - gatherStart);
 			if (!config.enabled) {
 				LightSmoother.clear();
 			}
 		}
 		if (!built) {
+			long gridStart = System.nanoTime();
 			LightGrid.update(lights, camera);
+			Stats.record(Stats.GRID, System.nanoTime() - gridStart);
+			long bufferStart = System.nanoTime();
 			BUFFER.update(lights, camera);
+			Stats.record(Stats.BUFFER, System.nanoTime() - bufferStart);
 			built = true;
 			ShaderVariant variant = TerrainShaderPatch.built();
 			if (variant != null && variant.spread()) {
+				long spreadStart = System.nanoTime();
 				LightSpread.update(BUFFER);
+				Stats.record(Stats.SPREAD, System.nanoTime() - spreadStart);
 			}
 		}
 		BUFFER.bind(program);
@@ -107,13 +118,18 @@ public final class LightEngine {
 		LightCull.setup(minecraft, camera, partialTick);
 		List<LightSource> found = new ArrayList<>(EntityLights.collect(minecraft, camera, partialTick));
 		found.removeIf(light -> !LightCull.sees(light.x(), light.y(), light.z(), light.radius()));
+		found.addAll(TestLoad.lights(camera));
 		ShaderVariant built = TerrainShaderPatch.built();
 		if (built != null && built.usesVolume()) {
+			long volumeStart = System.nanoTime();
 			ShadowVolume.update(minecraft.level, camera);
+			Stats.record(Stats.VOLUME, System.nanoTime() - volumeStart);
 		}
 		if (config.placedLights) {
+			long placedStart = System.nanoTime();
 			PlacedLights.update(minecraft.level, camera);
 			PlacedLights.collect(camera, Math.min(config.maxLights, LightBuffer.MAX_LIGHTS) - found.size(), found);
+			Stats.record(Stats.PLACED, System.nanoTime() - placedStart);
 		}
 		return LightSmoother.apply(found);
 	}

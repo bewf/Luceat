@@ -188,7 +188,7 @@ public final class LuceatScreen extends Screen {
 				blocks.drawEditor(graphics, sideLeft, listTop(), right - 8, listBottom(), mouseX, mouseY);
 			}
 		} else if (SPEED.equals(section)) {
-			speed().render(graphics, listLeft, listTop(), right - 8, listBottom(), mouseX, mouseY, partial);
+			speed().render(graphics, listLeft, listTop(), right - 8 - listLeft, listBottom() - listTop(), mouseX, mouseY, partial);
 		} else {
 			drawAbout(graphics);
 		}

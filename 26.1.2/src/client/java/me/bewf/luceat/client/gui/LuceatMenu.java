@@ -48,6 +48,22 @@ public final class LuceatMenu {
 				context.getSource().sendFeedback(prefix().append(Component.literal(config.enabled ? "Luceat is on." : "Luceat is off.")));
 				return 1;
 			}))
+			.then(ClientCommands.literal("resume").executes(context -> {
+				me.bewf.luceat.client.light.Panic.resume();
+				context.getSource().sendFeedback(prefix().append(Component.literal("Lights are back on.")));
+				return 1;
+			}))
+			.then(ClientCommands.literal("stats").executes(context -> {
+				var variant = me.bewf.luceat.client.shader.TerrainShaderPatch.built();
+				context.getSource().sendFeedback(prefix().append(Component.literal("Shader " + (variant == null ? "not built yet" : variant.name().toLowerCase(java.util.Locale.ROOT)) + ", " + me.bewf.luceat.client.light.Stats.lights() + " lights, " + me.bewf.luceat.client.light.LightGrid.cellsUsed() + " grid cells, frame " + Math.round(me.bewf.luceat.client.light.Stats.frameMillis()) + " ms" + (me.bewf.luceat.client.light.Panic.paused() ? ", lights paused" : "") + ".")));
+				StringBuilder line = new StringBuilder();
+				for (int i = 0; i < me.bewf.luceat.client.light.Stats.NAMES.length; i++) {
+					line.append(me.bewf.luceat.client.light.Stats.NAMES[i]).append(' ').append(String.format(java.util.Locale.ROOT, "%.2f", me.bewf.luceat.client.light.Stats.stage(i))).append(" ms");
+					line.append(i + 1 < me.bewf.luceat.client.light.Stats.NAMES.length ? ", " : ".");
+				}
+				context.getSource().sendFeedback(prefix().append(Component.literal(line.toString())));
+				return 1;
+			}))
 			.then(ClientCommands.literal("perf").executes(context -> {
 				for (String line : SpeedTestPage.chatReport()) {
 					context.getSource().sendFeedback(prefix().append(Component.literal(line)));

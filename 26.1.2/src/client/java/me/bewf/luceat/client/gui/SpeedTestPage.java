@@ -17,6 +17,7 @@ public final class SpeedTestPage {
 	}
 
 	private static List<Row> last = List.of();
+	private static String stoppedNote = "";
 
 	private final PerfTest perf = new PerfTest();
 	private final List<Setting> queue = new ArrayList<>();
@@ -33,6 +34,8 @@ public final class SpeedTestPage {
 	private int viewHeight;
 	private double fps;
 	private long lastFrame;
+	private int seenFrames;
+	private long clockSeen;
 
 	public SpeedTestPage() {
 	}
@@ -48,6 +51,9 @@ public final class SpeedTestPage {
 	}
 
 	public void close() {
+		if (running) {
+			stoppedNote = "The test stopped because you left this page. Your settings were put back.";
+		}
 		stop();
 	}
 
@@ -75,6 +81,7 @@ public final class SpeedTestPage {
 		perf.forget();
 		total = queue.size();
 		note = "";
+		stoppedNote = "";
 		running = total > 0;
 		scroll = 0;
 		if (!running) {
@@ -161,17 +168,23 @@ public final class SpeedTestPage {
 			perf.frame();
 		}
 		long now = System.nanoTime();
-		if (lastFrame != 0L) {
+		int clock = me.bewf.luceat.client.light.FrameClock.count();
+		if (clock != seenFrames) {
+			seenFrames = clock;
+			clockSeen = now;
+			double instant = 1000.0 / Math.max(0.01, me.bewf.luceat.client.light.FrameClock.millis());
+			fps = fps == 0.0 ? instant : fps + (instant - fps) * 0.25;
+		} else if (now - clockSeen > 500_000_000L && lastFrame != 0L) {
 			double instant = 1.0E9 / Math.max(1L, now - lastFrame);
-			fps = fps == 0.0 ? instant : fps + (instant - fps) * 0.05;
+			fps = fps == 0.0 ? instant : fps + (instant - fps) * 0.1;
 		}
 		lastFrame = now;
 
 		g.text(font, "Speed test", x + 4, y + 4, LuceatLook.ACCENT, false);
 		String hardware = RenderBackend.kind().label() + ", " + Runtime.getRuntime().availableProcessors() + " threads, " + String.format(Locale.ROOT, "%.0f fps now", fps);
 		g.text(font, hardware, x + 4, y + 18, LuceatLook.MUTED, false);
-		g.text(font, "Finds which settings cost the most on this PC. Results depend on what is on screen,", x + 4, y + 32, LuceatLook.SOFT, false);
-		g.text(font, "so stand somewhere busy like your base. Your settings are put back afterwards.", x + 4, y + 43, LuceatLook.SOFT, false);
+		g.text(font, "Finds which settings cost the most on this PC. It adds six test lights around you,", x + 4, y + 32, LuceatLook.SOFT, false);
+		g.text(font, "so stand still where you can see terrain. Your settings are put back afterwards.", x + 4, y + 43, LuceatLook.SOFT, false);
 
 		String label = running ? "Stop" : "Start";
 		int bw = font.width(label) + 24;
@@ -199,6 +212,8 @@ public final class SpeedTestPage {
 			g.text(font, "Testing " + name, barX0, startY0 + 16, LuceatLook.MUTED, false);
 		} else if (!note.isEmpty()) {
 			g.text(font, note, barX0, startY0 + 5, LuceatLook.WARN, false);
+		} else if (!stoppedNote.isEmpty() && !running) {
+			g.text(font, stoppedNote, barX0, startY0 + 5, LuceatLook.WARN, false);
 		}
 
 		int listTop = y + 84;
