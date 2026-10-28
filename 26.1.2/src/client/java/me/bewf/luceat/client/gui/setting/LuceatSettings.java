@@ -176,9 +176,9 @@ public final class LuceatSettings {
 			"Shadows fade out on things farther from you than this. Lower is faster.",
 			Cost.MEDIUM, false, 8.0F, 128.0F, 8.0F, " blocks", () -> c.shadowDistance, value -> c.shadowDistance = Math.round(value)));
 
-		all.add(new ToggleSetting(GENERAL, "Use Luceat over shader packs",
-			"Switches your shader pack off while Luceat is on, so Luceat's lighting is what you see. Needs Iris.",
-			Cost.NONE, false, () -> c.shaderPacks == ShaderPackMode.TURN_OFF, value -> c.shaderPacks = value ? ShaderPackMode.TURN_OFF : ShaderPackMode.LEAVE));
+		all.add(new ChoiceSetting<>(GENERAL, "When a shader pack is on",
+			"Off: Luceat does nothing while a pack is on. Overwrite: switches the pack off so Luceat's lighting shows. Compatible: keeps the pack and lights held items, mobs, dropped items and particles with the game's own light, with no Luceat shader.",
+			Cost.NONE, false, ShaderPackMode.values(), new String[]{"Off", "Overwrite", "Compatible"}, () -> c.shaderPacks, value -> c.shaderPacks = value));
 		all.add(new ToggleSetting(GENERAL, "Update notices",
 			"Checks Modrinth when the game starts and tells you in chat if a new version is out.",
 			Cost.NONE, false, () -> c.updateChecker, value -> c.updateChecker = value));

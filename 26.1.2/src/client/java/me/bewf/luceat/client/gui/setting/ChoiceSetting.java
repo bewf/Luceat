@@ -54,7 +54,7 @@ public final class ChoiceSetting<E extends Enum<E>> extends Setting {
 
 	@Override
 	public boolean testable() {
-		return true;
+		return cost() != Cost.NONE;
 	}
 
 	@Override

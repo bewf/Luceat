@@ -2,5 +2,6 @@ package me.bewf.luceat.client.config;
 
 public enum ShaderPackMode {
 	LEAVE,
-	TURN_OFF
+	TURN_OFF,
+	COMPATIBLE
 }

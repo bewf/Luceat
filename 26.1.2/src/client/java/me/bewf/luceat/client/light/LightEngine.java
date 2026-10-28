@@ -3,8 +3,10 @@ package me.bewf.luceat.client.light;
 import java.util.ArrayList;
 import java.util.List;
 
+import me.bewf.luceat.client.compat.IrisCompat;
 import me.bewf.luceat.client.compat.RenderBackend;
 import me.bewf.luceat.client.config.LuceatConfig;
+import me.bewf.luceat.client.config.ShaderPackMode;
 import me.bewf.luceat.client.shadow.PatternAtlas;
 import me.bewf.luceat.client.shadow.ShadowVolume;
 import me.bewf.luceat.client.shadow.ShapeMasks;
@@ -77,6 +79,20 @@ public final class LightEngine {
 		ShadowVolume.bind(program);
 		PatternAtlas.bind(program);
 		ShapeMasks.bind(program);
+	}
+
+	public static void tickCompatible(Minecraft minecraft) {
+		LuceatConfig config = LuceatConfig.get();
+		if (minecraft.level == null || !config.enabled || config.shaderPacks != ShaderPackMode.COMPATIBLE || !IrisCompat.packOn()) {
+			return;
+		}
+		try {
+			Vec3 camera = minecraft.gameRenderer.getMainCamera().position();
+			float partialTick = minecraft.getDeltaTracker().getGameTimeDeltaPartialTick(false);
+			lights = gather(minecraft, camera, partialTick, config);
+			LightGrid.update(lights, camera);
+		} catch (RuntimeException ignored) {
+		}
 	}
 
 	private static List<LightSource> gather(Minecraft minecraft, Vec3 camera, float partialTick, LuceatConfig config) {

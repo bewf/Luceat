@@ -1,5 +1,6 @@
 package me.bewf.luceat.client.light;
 
+import me.bewf.luceat.client.compat.IrisCompat;
 import me.bewf.luceat.client.config.LuceatConfig;
 
 // lets things drawn outside the terrain shader, like particles and mobs, pick up the same lights
@@ -9,7 +10,7 @@ public final class LightSampler {
 
 	public static int particle(double x, double y, double z, int lightCoords) {
 		LuceatConfig config = LuceatConfig.get();
-		if (!config.enabled || !config.particleLights) {
+		if (!config.enabled || !config.particleLights || IrisCompat.standDown()) {
 			return lightCoords;
 		}
 		return sample(x, y, z, lightCoords);
@@ -17,7 +18,7 @@ public final class LightSampler {
 
 	public static int entity(double x, double y, double z, int lightCoords) {
 		LuceatConfig config = LuceatConfig.get();
-		if (!config.enabled || !config.entityLights) {
+		if (!config.enabled || !config.entityLights || IrisCompat.standDown()) {
 			return lightCoords;
 		}
 		return sample(x, y, z, lightCoords);

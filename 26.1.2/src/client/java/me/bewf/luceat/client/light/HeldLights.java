@@ -64,7 +64,7 @@ public final class HeldLights {
 	}
 
 	public static int brighten(int level, int lightCoords) {
-		if (!LuceatConfig.get().enabled || level <= LightCoordsUtil.block(lightCoords)) {
+		if (!LuceatConfig.get().enabled || me.bewf.luceat.client.compat.IrisCompat.standDown() || level <= LightCoordsUtil.block(lightCoords)) {
 			return lightCoords;
 		}
 		return LightCoordsUtil.withBlock(lightCoords, level);

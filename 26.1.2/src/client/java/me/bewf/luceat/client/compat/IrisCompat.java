@@ -18,8 +18,17 @@ public final class IrisCompat {
 	private static Method getConfig;
 	private static Method setEnabled;
 	private static int counter;
+	private static boolean packOn;
 
 	private IrisCompat() {
+	}
+
+	public static boolean packOn() {
+		return packOn;
+	}
+
+	public static boolean standDown() {
+		return packOn && LuceatConfig.get().shaderPacks == ShaderPackMode.LEAVE;
 	}
 
 	public static boolean installed() {
@@ -36,7 +45,8 @@ public final class IrisCompat {
 		}
 		counter = 0;
 		LuceatConfig config = LuceatConfig.get();
-		if (!config.enabled || config.shaderPacks != ShaderPackMode.TURN_OFF || !installed()) {
+		if (!config.enabled || !installed()) {
+			packOn = false;
 			return;
 		}
 		try {
@@ -48,9 +58,11 @@ public final class IrisCompat {
 				Class<?> configClass = Class.forName("net.irisshaders.iris.api.v0.IrisApiConfig");
 				setEnabled = configClass.getMethod("setShadersEnabledAndApply", boolean.class);
 			}
-			if (Boolean.TRUE.equals(inUse.invoke(api))) {
+			packOn = Boolean.TRUE.equals(inUse.invoke(api));
+			if (packOn && config.shaderPacks == ShaderPackMode.TURN_OFF) {
 				Object irisConfig = getConfig.invoke(api);
 				setEnabled.invoke(irisConfig, false);
+				packOn = false;
 				Luceat.LOGGER.info("Luceat turned the shader pack off");
 			}
 		} catch (Throwable error) {

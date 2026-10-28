@@ -70,7 +70,7 @@ public final class LuceatConfig {
 	public float entityShadowStrength = 0.5F;
 
 	public boolean updateChecker = true;
-	public ShaderPackMode shaderPacks = ShaderPackMode.LEAVE;
+	public ShaderPackMode shaderPacks = ShaderPackMode.COMPATIBLE;
 	public boolean fancyNames = true;
 
 	private static int revision;
@@ -174,7 +174,7 @@ public final class LuceatConfig {
 			preset = "";
 		}
 		if (shaderPacks == null) {
-			shaderPacks = ShaderPackMode.LEAVE;
+			shaderPacks = ShaderPackMode.COMPATIBLE;
 		}
 		if (foliageShadows == null) {
 			foliageShadows = ShadowQuality.FANCY;
