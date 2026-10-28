@@ -75,6 +75,12 @@ public final class PerfTest {
 			note = "Turn VSync off in the video settings first, or the test cannot see small changes.";
 			return;
 		}
+		String label = setting.label().toLowerCase(Locale.ROOT);
+		boolean needsRays = setting.rebuildsShadows() || label.contains("shadow") || label.contains("bounce") || label.contains("shin");
+		if (needsRays && me.bewf.luceat.client.shader.TerrainShaderPatch.built() != me.bewf.luceat.client.shader.ShaderVariant.FULL) {
+			note = "Turn on shadows, bounce or shine first, so the shader has that code to test.";
+			return;
+		}
 		note = "";
 		target = setting;
 		snapshot = setting.snapshot();
