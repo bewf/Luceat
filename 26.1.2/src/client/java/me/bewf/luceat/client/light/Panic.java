@@ -41,6 +41,12 @@ public final class Panic {
 		if (TestLoad.active()) {
 			return;
 		}
+		if (!me.bewf.luceat.client.config.LuceatConfig.get().autoPause) {
+			if (paused) {
+				resume();
+			}
+			return;
+		}
 		if (paused) {
 			if (!reported && afterFrames < AFTER_FRAMES) {
 				afterFrames++;

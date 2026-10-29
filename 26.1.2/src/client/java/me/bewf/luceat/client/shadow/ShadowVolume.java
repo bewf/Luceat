@@ -42,7 +42,6 @@ public final class ShadowVolume {
 	private static final int BRICK_UNIT = 10;
 	private static final int PER_CELL = CELL_SIZE / BRICK;
 	private static final int TOTAL = CELLS * CELLS * CELLS;
-	private static final int FILLS_PER_FRAME = 3;
 	private static final int DIRTY_PER_FRAME = 8;
 	private static final int REFRESH_INTERVAL = 20;
 	private static final int[] UNPACK = {
@@ -54,6 +53,7 @@ public final class ShadowVolume {
 	private static final int[] cellY = new int[TOTAL];
 	private static final int[] cellZ = new int[TOTAL];
 	private static final boolean[] valid = new boolean[TOTAL];
+	private static final long[] sums = new long[TOTAL];
 	private static final Set<Long> dirty = new HashSet<>();
 	private static final ByteBuffer cellData = BufferUtils.createByteBuffer(CELL_SIZE * CELL_SIZE * CELL_SIZE * 2).order(ByteOrder.nativeOrder());
 	private static final ByteBuffer shineData = BufferUtils.createByteBuffer(CELL_SIZE * CELL_SIZE * CELL_SIZE);
@@ -75,12 +75,17 @@ public final class ShadowVolume {
 	private static int filledY;
 	private static int filledZ;
 	private static boolean complete;
+	private static int revision;
 
 	private ShadowVolume() {
 	}
 
 	public static int texture() {
 		return texture;
+	}
+
+	public static int revision() {
+		return revision;
 	}
 
 	public static int centreX() {
@@ -240,7 +245,8 @@ public final class ShadowVolume {
 		}
 		complete = false;
 		missing.sort((a, b) -> Integer.compare(a[3], b[3]));
-		int want = missing.size() > 30 ? FILLS_PER_FRAME * 2 : FILLS_PER_FRAME;
+		int fills = me.bewf.luceat.client.config.LuceatConfig.get().shadowUpdates;
+		int want = missing.size() > 30 ? fills * 2 : fills;
 		int done = 0;
 		for (int i = 0; i < missing.size() && done < want; i++) {
 			int[] cell = missing.get(i);
@@ -298,6 +304,7 @@ public final class ShadowVolume {
 		ByteBuffer ids = emptyIds;
 		ByteBuffer shine = emptyShine;
 		ByteBuffer bricks = emptyBricks;
+		long hash = 7L;
 		if (section != null && !section.hasOnlyAir()) {
 			BlockPos.MutableBlockPos pos = new BlockPos.MutableBlockPos();
 			int originX = cx * CELL_SIZE;
@@ -315,6 +322,7 @@ public final class ShadowVolume {
 						if (state.isAir()) {
 							cellData.putShort((short) 0);
 							shineData.put((byte) 0);
+							hash *= 31L;
 							continue;
 						}
 						pos.set(originX + x, originY + y, originZ + z);
@@ -323,7 +331,9 @@ public final class ShadowVolume {
 						if (id != 0) {
 							brickData.put((z / BRICK * PER_CELL + y / BRICK) * PER_CELL + x / BRICK, (byte) 1);
 						}
-						shineData.put((byte) Shine.of(state));
+						int shineValue = Shine.of(state);
+						shineData.put((byte) shineValue);
+						hash = hash * 31L + id * 257L + shineValue;
 					}
 				}
 			}
@@ -333,6 +343,12 @@ public final class ShadowVolume {
 			shine = shineData;
 			bricks = brickData;
 		}
+		int slot = index(cx, cy, cz);
+		if (valid[slot] && cellX[slot] == cx && cellY[slot] == cy && cellZ[slot] == cz && sums[slot] == hash) {
+			return true;
+		}
+		sums[slot] = hash;
+		revision++;
 		GL12.glTexSubImage3D(
 			GL12.GL_TEXTURE_3D, 0,
 			Math.floorMod(cx, CELLS) * CELL_SIZE, Math.floorMod(cy, CELLS) * CELL_SIZE, Math.floorMod(cz, CELLS) * CELL_SIZE,

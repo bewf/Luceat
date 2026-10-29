@@ -29,17 +29,13 @@ import net.minecraft.world.phys.Vec3;
 // finds every placed light and keeps the ones that matter for the screen
 public final class PlacedLights {
 	private static final int SECTION = 16;
-	private static final long SCAN_NANOS = 600_000L;
 	private static final int MAX_SCANS = 24;
 	private static final int SWEEP_FRAMES = 20;
 	private static final int MAX_CANDIDATES = 16384;
 	private static final int TABLE = 8192;
-	private static final double NEAR = 28.0;
-	private static final double FAR = 56.0;
 	private static final double CLOSE = 7.0;
 	private static final double SETTLE = 3.0;
 	private static final int[] SIZES = {0, 2, 4, 8};
-	private static final int DENSE = 8;
 	private static final int DENSE_HARD = 24;
 	private static final double SECTION_RADIUS = 14.0;
 	private static final float[] DEFAULT_COLOUR = {1.0F, 0.7F, 0.35F};
@@ -189,7 +185,8 @@ public final class PlacedLights {
 		}
 		long started = System.nanoTime();
 		int scans = 0;
-		while (scans < MAX_SCANS && !queue.isEmpty() && (scans == 0 || System.nanoTime() - started < SCAN_NANOS)) {
+		long budget = (long) (config.scanBudget * 1_000_000.0F);
+		while (scans < MAX_SCANS && !queue.isEmpty() && (scans == 0 || System.nanoTime() - started < budget)) {
 			long[] next = queue.remove(queue.size() - 1);
 			scan(level, (int) next[0], (int) next[1], (int) next[2]);
 			scans++;
@@ -296,13 +293,15 @@ public final class PlacedLights {
 				return;
 			}
 		}
+		boolean buried = LuceatConfig.get().skipBuried;
 		double openX = 0.0;
 		double openY = 0.0;
 		double openZ = 0.0;
 		boolean exposed = false;
 		for (Direction side : SIDES) {
 			probe.set(x + side.getStepX(), y + side.getStepY(), z + side.getStepZ());
-			if (!level.getBlockState(probe).isSolidRender()) {
+			BlockState next = level.getBlockState(probe);
+			if (!next.isSolidRender() && !(buried && next.is(state.getBlock()))) {
 				exposed = true;
 				openX += side.getStepX();
 				openY += side.getStepY();
@@ -353,7 +352,7 @@ public final class PlacedLights {
 			return;
 		}
 		LuceatConfig config = LuceatConfig.get();
-		int signature = config.lightRange * 31 + (config.mergeFarLights ? 1 : 0) + config.placedMinLevel * 7 + Math.round(config.placedReach * 20.0F) * 131 + (config.placedLights ? 3 : 0);
+		int signature = config.lightRange * 31 + (config.mergeFarLights ? 1 : 0) + config.placedMinLevel * 7 + Math.round(config.placedReach * 20.0F) * 131 + (config.placedLights ? 3 : 0) + (config.clusterLights ? 977 : 0) + config.clusterSize * 4099 + config.joinBeyond * 8191;
 		double fx = LightCull.forwardX();
 		double fy = LightCull.forwardY();
 		double fz = LightCull.forwardZ();
@@ -396,7 +395,8 @@ public final class PlacedLights {
 			if (!LightCull.sees(camera.x + mx, camera.y + my, camera.z + mz, SECTION_RADIUS + 15.0)) {
 				continue;
 			}
-			boolean dense = section.count > (config.mergeFarLights ? DENSE : DENSE_HARD);
+			int crowd = config.clusterLights ? config.clusterSize : Integer.MAX_VALUE;
+			boolean dense = section.count > (config.mergeFarLights ? crowd : Math.max(crowd, DENSE_HARD));
 			for (int i = 0; i < section.count; i++) {
 				double dx = section.x[i] - camera.x;
 				double dy = section.y[i] - camera.y;
@@ -406,7 +406,7 @@ public final class PlacedLights {
 				if (distance > range || Math.abs(dy) > LightGrid.REACH_Y + level) {
 					continue;
 				}
-				int tier = settle(section, i, distance, config.mergeFarLights, dense);
+				int tier = settle(section, i, distance, config.mergeFarLights, dense, config.joinBeyond);
 				if (tier == 0 && !LightCull.sees(section.x[i], section.y[i], section.z[i], level)) {
 					continue;
 				}
@@ -477,10 +477,10 @@ public final class PlacedLights {
 		return result;
 	}
 
-	private static int wanted(double distance, boolean merge, boolean dense) {
+	private static int wanted(double distance, boolean merge, boolean dense, double near) {
 		int tier = 0;
 		if (merge) {
-			tier = distance <= NEAR ? 0 : distance <= FAR ? 2 : 3;
+			tier = distance <= near ? 0 : distance <= near * 2.0 ? 2 : 3;
 		}
 		if (dense) {
 			tier = Math.max(tier, distance <= CLOSE ? 1 : 2);
@@ -488,9 +488,9 @@ public final class PlacedLights {
 		return tier;
 	}
 
-	private static int settle(Section section, int i, double distance, boolean merge, boolean dense) {
-		int low = wanted(distance - SETTLE, merge, dense);
-		int high = wanted(distance + SETTLE, merge, dense);
+	private static int settle(Section section, int i, double distance, boolean merge, boolean dense, double near) {
+		int low = wanted(distance - SETTLE, merge, dense, near);
+		int high = wanted(distance + SETTLE, merge, dense, near);
 		int tier = section.tier[i];
 		if (tier < low) {
 			tier = low;

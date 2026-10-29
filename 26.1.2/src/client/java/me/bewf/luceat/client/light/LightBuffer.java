@@ -58,7 +58,7 @@ public final class LightBuffer {
 		for (int i = 0; i < MAX_LIGHTS; i++) {
 			if (i < count) {
 				LightSource light = lights.get(i);
-				this.scratch.putFloat(light.red()).putFloat(light.green()).putFloat(light.blue()).putFloat((light.placed() ? 1.0F : 0.0F) + (light.noShadow() ? 2.0F : 0.0F) + 4.0F * Math.min(15, Math.max(0, light.vanilla())));
+				this.scratch.putFloat(light.red()).putFloat(light.green()).putFloat(light.blue()).putFloat((light.placed() ? 1.0F : 0.0F) + (light.noShadow() ? 2.0F : 0.0F) + (config.hideBehindBlocks ? 4.0F * Math.min(15, Math.max(0, light.vanilla())) : 0.0F));
 			} else {
 				this.scratch.putFloat(0.0F).putFloat(0.0F).putFloat(0.0F).putFloat(0.0F);
 			}

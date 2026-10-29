@@ -85,7 +85,7 @@ public final class LightEngine {
 			ShaderVariant variant = TerrainShaderPatch.built();
 			if (variant != null && variant.spread()) {
 				long spreadStart = System.nanoTime();
-				LightSpread.update(BUFFER);
+				LightSpread.update(BUFFER, lights, camera);
 				Stats.record(Stats.SPREAD, System.nanoTime() - spreadStart);
 			}
 		}

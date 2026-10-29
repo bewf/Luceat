@@ -98,6 +98,9 @@ public final class Presets {
 				c.placedLights = true;
 				c.placedMinLevel = 3;
 				c.directionalShading = 0.7F;
+				c.spreadSteps = 1;
+				c.scanBudget = 0.4F;
+				c.clusterSize = 6;
 			}),
 		new Preset("Phenomenal",
 			"Every torch thinks it’s the main character.",
@@ -173,6 +176,11 @@ public final class Presets {
 				c.placedLights = true;
 				c.placedMinLevel = 1;
 				c.directionalShading = 1.0F;
+				c.clusterSize = 32;
+				c.joinBeyond = 64;
+				c.spreadSteps = 3;
+				c.shadowUpdates = 6;
+				c.scanBudget = 1.2F;
 			})
 	);
 

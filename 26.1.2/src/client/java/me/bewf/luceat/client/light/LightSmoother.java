@@ -52,9 +52,11 @@ public final class LightSmoother {
 		frame++;
 		float flicker = LuceatConfig.get().flicker;
 		float seconds = (float) ((now / 1_000_000L) % 1_000_000L / 1000.0);
-		float easeRadius = 1.0F - (float) Math.exp(-dt / RADIUS_SECONDS);
-		float fadeIn = dt / FADE_IN_SECONDS;
-		float fadeOut = dt / FADE_OUT_SECONDS;
+		float ease = LuceatConfig.get().lightEase;
+		boolean instant = ease < 0.02F;
+		float easeRadius = instant ? 1.0F : 1.0F - (float) Math.exp(-dt / (RADIUS_SECONDS * ease));
+		float fadeIn = instant ? 1.0F : dt / (FADE_IN_SECONDS * ease);
+		float fadeOut = instant ? 1.0F : dt / (FADE_OUT_SECONDS * ease);
 
 		List<Long> order = new ArrayList<>(lights.size() + 4);
 		for (LightSource light : lights) {

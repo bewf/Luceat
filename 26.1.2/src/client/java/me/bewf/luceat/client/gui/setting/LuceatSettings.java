@@ -16,12 +16,13 @@ public final class LuceatSettings {
 	public static final String SOURCES = "Light sources";
 	public static final String PERFORMANCE = "Performance";
 	public static final String GENERAL = "General";
+	public static final String ADVANCED = "Advanced";
 
 	private LuceatSettings() {
 	}
 
 	public static List<String> sections() {
-		return List.of(LIGHTING, SHADOWS, PLACED, SOURCES, PERFORMANCE, GENERAL);
+		return List.of(LIGHTING, SHADOWS, PLACED, SOURCES, PERFORMANCE, GENERAL, ADVANCED);
 	}
 
 	public static List<Setting> create() {
@@ -197,6 +198,52 @@ public final class LuceatSettings {
 		all.add(new ToggleSetting(GENERAL, "Update notices",
 			"Checks Modrinth when the game starts and tells you in chat if a new version is out.",
 			Cost.NONE, false, () -> c.updateChecker, value -> c.updateChecker = value));
+
+		all.add(new ToggleSetting(ADVANCED, "Skip buried lights",
+			"Ignores light blocks with no open side, like the inside of a lava lake. Big saving in the Nether.",
+			Cost.NONE, false, () -> c.skipBuried, value -> {
+				c.skipBuried = value;
+				ShadowVolume.reset();
+			}));
+		all.add(new ToggleSetting(ADVANCED, "Hide lights behind blocks",
+			"A placed light only shows where the game's own light reaches too. Stops lava glowing up through the ground.",
+			Cost.NONE, false, () -> c.hideBehindBlocks, value -> c.hideBehindBlocks = value));
+		all.add(new ToggleSetting(ADVANCED, "Join crowded lights",
+			"Lava lakes and walls of torches turn into a few strong lights instead of hundreds.",
+			Cost.NONE, false, () -> c.clusterLights, value -> c.clusterLights = value));
+		all.add(new SliderSetting(ADVANCED, "Crowd size",
+			"How many lights one 16 block chunk can hold before they start joining.",
+			Cost.LOW, false, 4.0F, 32.0F, 1.0F, "", () -> c.clusterSize, value -> c.clusterSize = Math.round(value)));
+		all.add(new SliderSetting(ADVANCED, "Join lights past",
+			"Distance where far lights start joining. Needs Join faraway lights.",
+			Cost.LOW, false, 16.0F, 64.0F, 4.0F, " blocks", () -> c.joinBeyond, value -> c.joinBeyond = Math.round(value)));
+		all.add(new SliderSetting(ADVANCED, "Search time",
+			"Time per frame spent looking for new light blocks. Lower is smoother, new lights show up later.",
+			Cost.LOW, false, 0.1F, 3.0F, 0.1F, " ms", () -> c.scanBudget, value -> c.scanBudget = value));
+		all.add(new SliderSetting(ADVANCED, "Light easing",
+			"How slowly lights fade in, fade out and change size. Zero is instant and can look jumpy.",
+			Cost.NONE, false, 0.0F, 2.0F, 0.1F, "x", () -> c.lightEase, value -> c.lightEase = value));
+		all.add(new SliderSetting(ADVANCED, "Corner light steps",
+			"How far corner light travels each frame. Lower is cheaper, higher fills rooms faster.",
+			Cost.LOW, false, 1.0F, 4.0F, 1.0F, "", () -> c.spreadSteps, value -> c.spreadSteps = Math.round(value)));
+		all.add(new ToggleSetting(ADVANCED, "Rest corner light",
+			"Stops updating corner light while nothing moves.",
+			Cost.NONE, false, () -> c.spreadRests, value -> c.spreadRests = value));
+		all.add(new SliderSetting(ADVANCED, "Shadow map updates",
+			"How many 16 block pieces of the shadow map are rebuilt per frame. Higher catches up faster after you build.",
+			Cost.LOW, false, 1.0F, 8.0F, 1.0F, "", () -> c.shadowUpdates, value -> c.shadowUpdates = Math.round(value)));
+		all.add(new SliderSetting(ADVANCED, "Lower quality below",
+			"If the frame rate stays under this, adaptive quality eases shadows and bounce down.",
+			Cost.NONE, false, 20.0F, 90.0F, 1.0F, " fps", () -> c.slowBelowFps, value -> c.slowBelowFps = Math.round(value)));
+		all.add(new SliderSetting(ADVANCED, "Raise quality above",
+			"If the frame rate stays over this, quality comes back.",
+			Cost.NONE, false, 30.0F, 144.0F, 1.0F, " fps", () -> c.fastAboveFps, value -> c.fastAboveFps = Math.round(value)));
+		all.add(new SliderSetting(ADVANCED, "Lowest quality",
+			"The floor for adaptive quality. At 1 it never goes down.",
+			Cost.NONE, false, 0.3F, 1.0F, 0.05F, "", () -> c.lowestQuality, value -> c.lowestQuality = value));
+		all.add(new ToggleSetting(ADVANCED, "Pause when it freezes",
+			"If lights drag the game to a crawl for 3 seconds, Luceat pauses them and says so. /luceat resume turns them back on.",
+			Cost.NONE, false, () -> c.autoPause, value -> c.autoPause = value));
 		return all;
 	}
 }

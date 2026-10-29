@@ -74,6 +74,21 @@ public final class LuceatConfig {
 	public boolean entityShadows = true;
 	public float entityShadowStrength = 0.5F;
 
+	public boolean skipBuried = true;
+	public boolean hideBehindBlocks = true;
+	public boolean clusterLights = true;
+	public int clusterSize = 8;
+	public int joinBeyond = 28;
+	public float scanBudget = 0.6F;
+	public float lightEase = 1.0F;
+	public int spreadSteps = 2;
+	public boolean spreadRests = true;
+	public int shadowUpdates = 3;
+	public int slowBelowFps = 42;
+	public int fastAboveFps = 62;
+	public float lowestQuality = 0.35F;
+	public boolean autoPause = true;
+
 	public boolean updateChecker = true;
 	public ShaderPackMode shaderPacks = ShaderPackMode.COMPATIBLE;
 	public boolean fancyNames = true;
@@ -177,6 +192,15 @@ public final class LuceatConfig {
 		flicker = Math.max(0.0F, Math.min(flicker, 1.0F));
 		heldHeight = Math.max(0.3F, Math.min(heldHeight, 1.0F));
 		entityShadowStrength = Math.max(0.0F, Math.min(entityShadowStrength, 1.0F));
+		clusterSize = Math.max(4, Math.min(clusterSize, 32));
+		joinBeyond = Math.max(16, Math.min(joinBeyond, 64));
+		scanBudget = Math.max(0.1F, Math.min(scanBudget, 3.0F));
+		lightEase = Math.max(0.0F, Math.min(lightEase, 2.0F));
+		spreadSteps = Math.max(1, Math.min(spreadSteps, 4));
+		shadowUpdates = Math.max(1, Math.min(shadowUpdates, 8));
+		slowBelowFps = Math.max(20, Math.min(slowBelowFps, 90));
+		fastAboveFps = Math.max(slowBelowFps + 6, Math.min(fastAboveFps, 144));
+		lowestQuality = Math.max(0.3F, Math.min(lowestQuality, 1.0F));
 		if (preset == null) {
 			preset = "";
 		}

@@ -1,6 +1,7 @@
 package me.bewf.luceat.client.light;
 
 import java.nio.ByteBuffer;
+import java.util.List;
 
 import org.lwjgl.BufferUtils;
 import org.lwjgl.opengl.GL;
@@ -13,7 +14,10 @@ import org.lwjgl.opengl.GL42;
 import org.lwjgl.opengl.GL43;
 
 import me.bewf.luceat.Luceat;
+import me.bewf.luceat.client.config.LuceatConfig;
 import me.bewf.luceat.client.shadow.ShadowVolume;
+
+import net.minecraft.world.phys.Vec3;
 
 public final class LightSpread {
 	public static final int SIZE = 64;
@@ -21,7 +25,7 @@ public final class LightSpread {
 	public static final int UNIT = 9;
 
 	private static final int VOXEL_UNIT = ShadowVolume.UNIT;
-	private static final int PASSES = 2;
+	private static final int REACH_STEPS = 24;
 
 	private static final String BLOCK = """
 			layout(std140) uniform LuceatLights {
@@ -109,6 +113,8 @@ public final class LightSpread {
 	private static int inject;
 	private static int current;
 	private static boolean failed;
+	private static long lastSignature = Long.MIN_VALUE;
+	private static int restFrames;
 	private static Boolean capable;
 
 	private LightSpread() {
@@ -132,9 +138,41 @@ public final class LightSpread {
 		return textures[0] == 0 ? 0L : 2L * SIZE * SIZE * SIZE * 4L;
 	}
 
-	public static void update(LightBuffer buffer) {
+	private static long signature(List<LightSource> lights, Vec3 camera) {
+		long h = 1469598103934665603L;
+		h = (h ^ (long) Math.floor(camera.x)) * 1099511628211L;
+		h = (h ^ (long) Math.floor(camera.y)) * 1099511628211L;
+		h = (h ^ (long) Math.floor(camera.z)) * 1099511628211L;
+		h = (h ^ ShadowVolume.revision()) * 1099511628211L;
+		int count = Math.min(lights.size(), LightBuffer.MAX_LIGHTS);
+		h = (h ^ count) * 1099511628211L;
+		for (int i = 0; i < count; i++) {
+			LightSource light = lights.get(i);
+			h = (h ^ (long) Math.floor(light.x() * 2.0)) * 1099511628211L;
+			h = (h ^ (long) Math.floor(light.y() * 2.0)) * 1099511628211L;
+			h = (h ^ (long) Math.floor(light.z() * 2.0)) * 1099511628211L;
+			h = (h ^ (long) (light.radius() * 0.2F)) * 1099511628211L;
+			h = (h ^ (long) (light.red() * 7.0F) ^ (long) (light.green() * 7.0F) << 3 ^ (long) (light.blue() * 7.0F) << 6) * 1099511628211L;
+		}
+		return h;
+	}
+
+	public static void update(LightBuffer buffer, List<LightSource> lights, Vec3 camera) {
 		if (!supported()) {
 			return;
+		}
+		LuceatConfig config = LuceatConfig.get();
+		int steps = config.spreadSteps;
+		if (config.spreadRests) {
+			long now = signature(lights, camera);
+			if (now != lastSignature) {
+				lastSignature = now;
+				restFrames = (REACH_STEPS + steps - 1) / steps + 2;
+			}
+			if (restFrames <= 0) {
+				return;
+			}
+			restFrames--;
 		}
 		int previousProgram = GL11.glGetInteger(GL20.GL_CURRENT_PROGRAM);
 		int previousUnit = GL11.glGetInteger(GL13.GL_ACTIVE_TEXTURE);
@@ -143,7 +181,7 @@ public final class LightSpread {
 			programs();
 			GL13.glActiveTexture(GL13.GL_TEXTURE0 + VOXEL_UNIT);
 			GL11.glBindTexture(GL12.GL_TEXTURE_3D, ShadowVolume.texture());
-			for (int pass = 0; pass < PASSES; pass++) {
+			for (int pass = 0; pass < steps; pass++) {
 				int source = current;
 				int target = 1 - current;
 				GL20.glUseProgram(propagate);

@@ -43,6 +43,8 @@ public final class LuceatScreen extends Screen {
 	private static final String ABOUT = "About";
 	private static final Identifier LOGO = Identifier.fromNamespaceAndPath("luceat", "textures/gui/logo.png");
 	private static final Identifier LOGO_SMALL = Identifier.fromNamespaceAndPath("luceat", "textures/gui/logo_small.png");
+	private static final Object NOTICE = new Object();
+	private static final int NOTICE_HEIGHT = 46;
 	private static final int CHOICE_HEIGHT = 48;
 	private static final int HEAD_HEIGHT = 26;
 	private static final int SIDE_ITEM = 21;
@@ -459,6 +461,9 @@ public final class LuceatScreen extends Screen {
 				out.add(master);
 			}
 			for (String name : LuceatSettings.sections()) {
+				if (name.equals(LuceatSettings.ADVANCED)) {
+					continue;
+				}
 				out.add(name);
 				for (Setting setting : settings) {
 					if (setting.section().equals(name) && setting != master) {
@@ -468,6 +473,9 @@ public final class LuceatScreen extends Screen {
 			}
 			return out;
 		}
+		if (LuceatSettings.ADVANCED.equals(section)) {
+			out.add(NOTICE);
+		}
 		out.addAll(sectionSettings());
 		return out;
 	}
@@ -475,6 +483,9 @@ public final class LuceatScreen extends Screen {
 	private int itemHeight(Object item) {
 		if (item instanceof String) {
 			return HEAD_HEIGHT;
+		}
+		if (item == NOTICE) {
+			return NOTICE_HEIGHT;
 		}
 		return item instanceof ChoiceSetting<?> ? CHOICE_HEIGHT : ROW_HEIGHT;
 	}
@@ -614,6 +625,10 @@ public final class LuceatScreen extends Screen {
 				if (inView) {
 					drawSectionHead(graphics, name, y, mouseX, mouseY, areaTop);
 				}
+			} else if (item == NOTICE) {
+				if (inView) {
+					drawNotice(graphics, y);
+				}
 			} else if (item instanceof Setting setting) {
 				boolean hover = inView && !search.focused() && LuceatLook.inside(mouseX, mouseY, listLeft, y, listRight, y + height) && mouseY >= areaTop && mouseY < listBottom();
 				if (hover) {
@@ -636,6 +651,17 @@ public final class LuceatScreen extends Screen {
 			int thumb = Math.max(16, trackHeight * trackHeight / (trackHeight + max));
 			int thumbTop = trackTop + Math.round((trackHeight - thumb) * (scroll / max));
 			graphics.fill(listRight + 4, thumbTop, listRight + 6, thumbTop + thumb, LuceatLook.TRACK);
+		}
+	}
+
+	private void drawNotice(GuiGraphicsExtractor graphics, int y) {
+		LuceatLook.round(graphics, listLeft, y, listRight, y + NOTICE_HEIGHT, LuceatLook.mix(LuceatLook.CARD, LuceatLook.WARN, 0.07F));
+		graphics.fill(listLeft, y + 5, listLeft + 2, y + NOTICE_HEIGHT - 5, LuceatLook.WARN);
+		graphics.text(this.font, "Heads up", listLeft + 10, y + 6, LuceatLook.WARN, false);
+		int ty = y + 18;
+		for (var line : this.font.split(Component.literal("This page is the complicated one. The defaults are already good, so most people never need to touch it. If something goes odd, hit the reset arrow at the top."), listRight - listLeft - 20)) {
+			graphics.text(this.font, line, listLeft + 10, ty, LuceatLook.SOFT, false);
+			ty += 10;
 		}
 	}
 

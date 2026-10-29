@@ -6,9 +6,6 @@ import net.minecraft.client.Minecraft;
 
 // eases the heavy shader work off while the frame rate is low and brings it back when there is room
 public final class Governor {
-	private static final float FLOOR = 0.35F;
-	private static final double SLOW_MS = 24.0;
-	private static final double FAST_MS = 16.0;
 	private static final double SKIP_MS = 120.0;
 	private static final float STEPS = 8.0F;
 
@@ -44,9 +41,9 @@ public final class Governor {
 			return;
 		}
 		smooth += (ms - smooth) * 0.04;
-		if (smooth > SLOW_MS) {
-			quality = Math.max(FLOOR, quality - 0.003F);
-		} else if (smooth < FAST_MS) {
+		if (smooth > 1000.0 / config.slowBelowFps) {
+			quality = Math.max(config.lowestQuality, quality - 0.003F);
+		} else if (smooth < 1000.0 / config.fastAboveFps) {
 			quality = Math.min(1.0F, quality + 0.0008F);
 		}
 		float next = Math.round(quality * STEPS) / STEPS;
