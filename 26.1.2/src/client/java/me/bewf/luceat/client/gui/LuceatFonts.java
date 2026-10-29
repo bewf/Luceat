@@ -11,6 +11,10 @@ public final class LuceatFonts {
 	private static final Style TITLE = styled("title");
 	private static final Style BODY = styled("body");
 	private static final Style QUOTE = styled("quote");
+	private static final Style POTATO = styled("preset_potato");
+	private static final Style BALANCED = styled("preset_balanced");
+	private static final Style PHENOMENAL = styled("preset_phenomenal");
+	private static final Style HARDCORE = styled("preset_hardcore");
 
 	private LuceatFonts() {
 	}
@@ -21,6 +25,17 @@ public final class LuceatFonts {
 
 	public static Component title(String text) {
 		return Component.literal(text).withStyle(TITLE);
+	}
+
+	public static Component preset(String preset, String text) {
+		Style style = switch (preset.toLowerCase(java.util.Locale.ROOT)) {
+			case "potato" -> POTATO;
+			case "balanced" -> BALANCED;
+			case "phenomenal" -> PHENOMENAL;
+			case "hardcore" -> HARDCORE;
+			default -> TITLE;
+		};
+		return Component.literal(text).withStyle(style);
 	}
 
 	public static Component body(String text) {

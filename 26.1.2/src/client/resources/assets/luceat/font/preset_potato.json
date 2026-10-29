@@ -1,0 +1,5 @@
+{
+  "providers": [
+    {"type": "ttf", "file": "luceat:jersey25.ttf", "size": 12.5, "oversample": 4.0, "shift": [0.0, 0.0]}
+  ]
+}

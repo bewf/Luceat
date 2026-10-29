@@ -321,7 +321,7 @@ public final class PresetPicker extends Screen {
 			particles(graphics, i, imgX, imgY, imgX + imgW, imgY + imgH, colour, now);
 			outline(graphics, imgX - 1, imgY - 1, imgX + imgW + 1, imgY + imgH + 1, alpha(colour, 60 + Math.round(h * 120.0F)));
 			int y = imgY + imgH + 10;
-			LuceatFonts.draw(graphics, this.font, LuceatFonts.title(title(preset.name())), x0 + pad, y, hot ? FIRE : LuceatLook.mix(LuceatLook.TEXT, colour, h * 0.6F), true);
+			LuceatFonts.draw(graphics, this.font, LuceatFonts.preset(preset.name(), title(preset.name())), x0 + pad, y, hot ? FIRE : LuceatLook.mix(LuceatLook.TEXT, colour, h * 0.6F), true);
 			Component cost = LuceatFonts.body(preset.cost());
 			LuceatFonts.draw(graphics, this.font, cost, x0 + w - pad - LuceatFonts.width(this.font, cost), y, LuceatLook.SOFT, false);
 			y += 15;

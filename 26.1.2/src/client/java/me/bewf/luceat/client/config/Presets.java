@@ -140,7 +140,7 @@ public final class Presets {
 				c.directionalShading = 0.85F;
 			}),
 		new Preset("HARDCORE",
-			"HARDCORE TO THE MEGA - Egg Head",
+			"Hardcore to the Mega - Egg Head",
 			"Max",
 			c -> {
 				c.placedReach = 1.35F;
