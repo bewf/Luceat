@@ -10,8 +10,10 @@ public final class Governor {
 	private static final double SLOW_MS = 24.0;
 	private static final double FAST_MS = 16.0;
 	private static final double SKIP_MS = 120.0;
+	private static final float STEPS = 8.0F;
 
 	private static float quality = 1.0F;
+	private static float stepped = 1.0F;
 	private static double smooth = 16.0;
 	private static long last;
 
@@ -19,11 +21,12 @@ public final class Governor {
 	}
 
 	public static float quality() {
-		return quality;
+		return stepped;
 	}
 
 	public static void reset() {
 		quality = 1.0F;
+		stepped = 1.0F;
 		last = 0L;
 	}
 
@@ -34,6 +37,7 @@ public final class Governor {
 		last = now;
 		if (!config.adaptiveQuality) {
 			quality = 1.0F;
+			stepped = 1.0F;
 			return;
 		}
 		if (minecraft.screen != null || ms > SKIP_MS) {
@@ -41,9 +45,13 @@ public final class Governor {
 		}
 		smooth += (ms - smooth) * 0.04;
 		if (smooth > SLOW_MS) {
-			quality = Math.max(FLOOR, quality - 0.006F);
+			quality = Math.max(FLOOR, quality - 0.003F);
 		} else if (smooth < FAST_MS) {
-			quality = Math.min(1.0F, quality + 0.0015F);
+			quality = Math.min(1.0F, quality + 0.0008F);
+		}
+		float next = Math.round(quality * STEPS) / STEPS;
+		if (Math.abs(next - stepped) > 0.001F && Math.abs(quality - stepped) > 0.6F / STEPS) {
+			stepped = next;
 		}
 	}
 }

@@ -95,6 +95,11 @@ public final class LuceatScreen extends Screen {
 		this.parent = parent;
 	}
 
+	public LuceatScreen showSpeedTest() {
+		this.section = SPEED;
+		return this;
+	}
+
 	@Override
 	protected void init() {
 		int windowWidth = Math.min(this.width - 20, 940);

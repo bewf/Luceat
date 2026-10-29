@@ -23,6 +23,7 @@ public final class LuceatMenu {
 	));
 
 	private static boolean requested;
+	private static boolean requestedSpeed;
 
 	private LuceatMenu() {
 	}
@@ -65,9 +66,8 @@ public final class LuceatMenu {
 				return 1;
 			}))
 			.then(ClientCommands.literal("perf").executes(context -> {
-				for (String line : SpeedTestPage.chatReport()) {
-					context.getSource().sendFeedback(prefix().append(Component.literal(line)));
-				}
+				requested = true;
+				requestedSpeed = true;
 				return 1;
 			})));
 	}
@@ -80,7 +80,12 @@ public final class LuceatMenu {
 		}
 		if (requested) {
 			requested = false;
-			minecraft.setScreen(new LuceatScreen(minecraft.screen));
+			LuceatScreen screen = new LuceatScreen(minecraft.screen);
+			if (requestedSpeed) {
+				requestedSpeed = false;
+				screen.showSpeedTest();
+			}
+			minecraft.setScreen(screen);
 		}
 	}
 

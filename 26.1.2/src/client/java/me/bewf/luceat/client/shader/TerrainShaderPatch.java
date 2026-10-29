@@ -414,6 +414,8 @@ public final class TerrainShaderPatch {
 			        }
 			    }
 #endif
+			    vec3 blockPart = max(vertexColor.rgb - baseColor.rgb, vec3(0.0));
+			    float vanillaOpen = smoothstep(0.004, 0.035, dot(blockPart, vec3(0.299, 0.587, 0.114)));
 			    vec3 viewDir = normalize(-pos);
 			    for (int g = 0; g < luceatTexels; g++) {
 			        uvec4 slots = texelFetch(@GRID@, ivec3(gc.x * @TEXELS@ + g, gc.y, gc.z), 0);
@@ -439,6 +441,12 @@ public final class TerrainShaderPatch {
 			            bool noShadow = (flags & 2) != 0;
 			            vec3 tint = u_LuceatColor[i].rgb;
 			            float strength = placed ? u_LuceatExtra.x : 1.0;
+			            int vanillaReach = flags >> 2;
+			            if (placed && vanillaReach > 0) {
+			                vec3 gap = abs(toLight);
+			                float expected = float(vanillaReach) - (gap.x + gap.y + gap.z) - 1.0;
+			                strength *= mix(1.0, vanillaOpen, smoothstep(0.0, 2.0, expected));
+			            }
 			            float curved = level / (4.0 - 3.0 * level);
 			            float share = curved * max(tint.r, max(tint.g, tint.b)) / sumPower;
 #ifdef LUCEAT_RAYS
@@ -496,7 +504,6 @@ public final class TerrainShaderPatch {
 			    }
 #endif
 			    luceatSpec = min(shiny, vec3(1.0)) * fade;
-			    vec3 blockPart = max(vertexColor.rgb - baseColor.rgb, vec3(0.0));
 			    float coverage = clamp(placedCover * fade / max(dot(blockPart, vec3(0.299, 0.587, 0.114)), 0.02), 0.0, 1.0);
 			    return luceatSoft(total, u_LuceatState.w) * fade - blockPart * (u_LuceatOptions.w * coverage);
 			}

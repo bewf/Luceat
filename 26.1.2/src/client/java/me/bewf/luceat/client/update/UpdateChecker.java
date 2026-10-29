@@ -31,7 +31,7 @@ import net.minecraft.network.chat.MutableComponent;
 import net.minecraft.network.chat.Style;
 
 public final class UpdateChecker {
-	private static final String PROJECT = "luceat";
+	private static final String PROJECT = "lOnBRs67";
 	private static final Pattern NUMBERS = Pattern.compile("\\d+(\\.\\d+)*");
 
 	private static volatile String latestNumber;
@@ -83,7 +83,7 @@ public final class UpdateChecker {
 			return;
 		}
 		announced = true;
-		String url = "https://modrinth.com/mod/" + PROJECT + "/version/" + latestId;
+		String url = "https://modrinth.com/mod/luceat/version/" + latestId;
 		MutableComponent message = Component.literal("[Luceat] ").withStyle(Style.EMPTY.withColor(LuceatLook.ACCENT & 0xFFFFFF))
 			.append(Component.literal("Update available: " + latestNumber + " ").withStyle(Style.EMPTY.withColor(0xFFFFFF)))
 			.append(Component.literal("[Open on Modrinth]").withStyle(Style.EMPTY

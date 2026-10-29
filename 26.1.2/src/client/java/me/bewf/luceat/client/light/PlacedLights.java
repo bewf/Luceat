@@ -36,6 +36,11 @@ public final class PlacedLights {
 	private static final int TABLE = 8192;
 	private static final double NEAR = 28.0;
 	private static final double FAR = 56.0;
+	private static final double CLOSE = 7.0;
+	private static final double SETTLE = 3.0;
+	private static final int[] SIZES = {0, 2, 4, 8};
+	private static final int DENSE = 8;
+	private static final int DENSE_HARD = 24;
 	private static final double SECTION_RADIUS = 14.0;
 	private static final float[] DEFAULT_COLOUR = {1.0F, 0.7F, 0.35F};
 	private static final Direction[] SIDES = Direction.values();
@@ -51,8 +56,10 @@ public final class PlacedLights {
 		float[] level = new float[4];
 		boolean[] fire = new boolean[4];
 		boolean[] noShadow = new boolean[4];
+		byte[] vanilla = new byte[4];
+		byte[] tier = new byte[4];
 
-		void add(float px, float py, float pz, float[] colour, float power, boolean flame, boolean skipShadow) {
+		void add(float px, float py, float pz, float[] colour, float power, boolean flame, boolean skipShadow, int natural) {
 			if (count == x.length) {
 				int size = count * 2;
 				x = Arrays.copyOf(x, size);
@@ -64,6 +71,8 @@ public final class PlacedLights {
 				level = Arrays.copyOf(level, size);
 				fire = Arrays.copyOf(fire, size);
 				noShadow = Arrays.copyOf(noShadow, size);
+				vanilla = Arrays.copyOf(vanilla, size);
+				tier = Arrays.copyOf(tier, size);
 			}
 			x[count] = px;
 			y[count] = py;
@@ -74,6 +83,7 @@ public final class PlacedLights {
 			level[count] = power;
 			fire[count] = flame;
 			noShadow[count] = skipShadow;
+			vanilla[count] = (byte) Math.min(15, Math.max(0, natural));
 			count++;
 		}
 	}
@@ -96,6 +106,7 @@ public final class PlacedLights {
 	private static final float[] cl = new float[MAX_CANDIDATES];
 	private static final boolean[] cf = new boolean[MAX_CANDIDATES];
 	private static final boolean[] cn = new boolean[MAX_CANDIDATES];
+	private static final int[] cv = new int[MAX_CANDIDATES];
 	private static final long[] cid = new long[MAX_CANDIDATES];
 	private static final float[] cs = new float[MAX_CANDIDATES];
 	private static final long[] order = new long[MAX_CANDIDATES];
@@ -111,6 +122,9 @@ public final class PlacedLights {
 	private static final float[] sumB = new float[TABLE];
 	private static final float[] maxLevel = new float[TABLE];
 	private static final int[] members = new int[TABLE];
+	private static final int[] natural = new int[TABLE];
+	private static final boolean[] open = new boolean[TABLE];
+	private static final int[] spans = new int[TABLE];
 	private static final boolean[] flame = new boolean[TABLE];
 	private static final int[] touched = new int[TABLE];
 
@@ -317,7 +331,7 @@ public final class PlacedLights {
 			}
 			skip = rule.shadows == 0;
 		}
-		into.add((float) px, (float) py, (float) pz, colourOf(state), power, flames, skip);
+		into.add((float) px, (float) py, (float) pz, colourOf(state), power, flames, skip, state.getLightEmission());
 	}
 
 	private static float[] colourOf(BlockState state) {
@@ -382,6 +396,7 @@ public final class PlacedLights {
 			if (!LightCull.sees(camera.x + mx, camera.y + my, camera.z + mz, SECTION_RADIUS + 15.0)) {
 				continue;
 			}
+			boolean dense = section.count > (config.mergeFarLights ? DENSE : DENSE_HARD);
 			for (int i = 0; i < section.count; i++) {
 				double dx = section.x[i] - camera.x;
 				double dy = section.y[i] - camera.y;
@@ -391,10 +406,11 @@ public final class PlacedLights {
 				if (distance > range || Math.abs(dy) > LightGrid.REACH_Y + level) {
 					continue;
 				}
-				if (!LightCull.sees(section.x[i], section.y[i], section.z[i], level)) {
+				int tier = settle(section, i, distance, config.mergeFarLights, dense);
+				if (tier == 0 && !LightCull.sees(section.x[i], section.y[i], section.z[i], level)) {
 					continue;
 				}
-				if (!config.mergeFarLights || distance <= NEAR) {
+				if (tier == 0) {
 					if (total < MAX_CANDIDATES) {
 						cx[total] = section.x[i];
 						cy[total] = section.y[i];
@@ -405,12 +421,13 @@ public final class PlacedLights {
 						cl[total] = level;
 						cf[total] = section.fire[i];
 						cn[total] = section.noShadow[i];
+						cv[total] = section.vanilla[i];
 						cid[total] = 0L;
 						cs[total] = score(level, distance);
 						total++;
 					}
 				} else {
-					groups = join(groups, section, i, distance > FAR ? 2 : 1);
+					groups = join(groups, section, i, tier);
 				}
 			}
 		}
@@ -424,7 +441,7 @@ public final class PlacedLights {
 			double dy = py - camera.y;
 			double dz = pz - camera.z;
 			double distance = Math.sqrt(dx * dx + dy * dy + dz * dz);
-			float level = Math.min(15.0F, maxLevel[slot] + Math.min(3.5F, 1.2F * (float) (Math.log(members[slot]) / Math.log(2.0))));
+			float level = Math.min(Math.max(15.0F, maxLevel[slot]), maxLevel[slot] + Math.min(4.5F, 1.2F * (float) (Math.log(members[slot]) / Math.log(2.0))));
 			cx[total] = (float) px;
 			cy[total] = (float) py;
 			cz[total] = (float) pz;
@@ -434,6 +451,7 @@ public final class PlacedLights {
 			cl[total] = level;
 			cf[total] = flame[slot];
 			cn[total] = true;
+			cv[total] = open[slot] ? 0 : Math.max(0, natural[slot] - spans[slot]);
 			cid[total] = LightSmoother.key(6, (int) (tableKey[slot] ^ (tableKey[slot] >>> 32)), (int) (tableKey[slot] >>> 62));
 			cs[total] = score(level, distance);
 			total++;
@@ -453,10 +471,34 @@ public final class PlacedLights {
 		List<LightSource> result = new ArrayList<>(take);
 		for (int i = 0; i < total; i++) {
 			if (picked[i]) {
-				result.add(new LightSource(cx[i], cy[i], cz[i], cr[i], cg[i], cb[i], cl[i], true, cf[i], cid[i], cn[i]));
+				result.add(new LightSource(cx[i], cy[i], cz[i], cr[i], cg[i], cb[i], cl[i], true, cf[i], cid[i], cn[i], cv[i]));
 			}
 		}
 		return result;
+	}
+
+	private static int wanted(double distance, boolean merge, boolean dense) {
+		int tier = 0;
+		if (merge) {
+			tier = distance <= NEAR ? 0 : distance <= FAR ? 2 : 3;
+		}
+		if (dense) {
+			tier = Math.max(tier, distance <= CLOSE ? 1 : 2);
+		}
+		return tier;
+	}
+
+	private static int settle(Section section, int i, double distance, boolean merge, boolean dense) {
+		int low = wanted(distance - SETTLE, merge, dense);
+		int high = wanted(distance + SETTLE, merge, dense);
+		int tier = section.tier[i];
+		if (tier < low) {
+			tier = low;
+		} else if (tier > high) {
+			tier = high;
+		}
+		section.tier[i] = (byte) tier;
+		return tier;
 	}
 
 	private static float score(float level, double distance) {
@@ -464,7 +506,7 @@ public final class PlacedLights {
 	}
 
 	private static int join(int groups, Section section, int i, int tier) {
-		int size = tier == 1 ? 4 : 8;
+		int size = SIZES[tier];
 		long key = ((long) tier << 62)
 			^ ((long) (Math.floorDiv((int) Math.floor(section.x[i]), size) & 0xFFFFF) << 40)
 			^ ((long) (Math.floorDiv((int) Math.floor(section.y[i]), size) & 0xFFFFF) << 20)
@@ -486,6 +528,9 @@ public final class PlacedLights {
 				sumB[slot] = 0.0F;
 				maxLevel[slot] = 0.0F;
 				members[slot] = 0;
+				natural[slot] = 0;
+				open[slot] = false;
+				spans[slot] = size;
 				flame[slot] = false;
 				touched[groups++] = slot;
 				break;
@@ -505,6 +550,8 @@ public final class PlacedLights {
 		sumB[slot] += section.blue[i] * weight;
 		maxLevel[slot] = Math.max(maxLevel[slot], section.level[i]);
 		members[slot]++;
+		natural[slot] = Math.max(natural[slot], section.vanilla[i]);
+		open[slot] |= section.vanilla[i] == 0;
 		flame[slot] |= section.fire[i];
 		return groups;
 	}

@@ -52,7 +52,8 @@ public final class PresetPicker extends Screen {
 				normal.add(preset);
 			}
 		}
-		unlocked = LuceatConfig.get().hardcoreUnlocked && hardcore != null;
+		LuceatConfig.get().hardcoreUnlocked = false;
+		unlocked = false;
 	}
 
 	@Override
@@ -381,9 +382,6 @@ public final class PresetPicker extends Screen {
 		holding = false;
 		unlocked = true;
 		revealStart = System.nanoTime();
-		LuceatConfig config = LuceatConfig.get();
-		config.hardcoreUnlocked = true;
-		LuceatConfig.save();
 		PresetFilmstrips.of(hardcore);
 	}
 

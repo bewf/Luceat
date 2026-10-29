@@ -149,7 +149,7 @@ public final class Presets {
 				c.foliageShadows = ShadowQuality.FANCY;
 				c.glassTint = true;
 				c.flicker = 0.5F;
-				c.shadowedLights = 8;
+				c.shadowedLights = 12;
 				c.lightBounce = 1.0F;
 				c.lightSpread = true;
 				c.spillStrength = 0.85F;
