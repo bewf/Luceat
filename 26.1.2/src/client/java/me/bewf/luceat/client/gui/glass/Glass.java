@@ -149,4 +149,42 @@ public final class Glass {
 	public static void right(Surface s, Surface.Role role, String text, int rx, int y, int colour) {
 		s.text(role, text, rx - s.width(role, text), y, colour);
 	}
+
+	public static java.util.List<String> wrap(Surface s, Surface.Role role, String text, int width, int maxLines) {
+		java.util.List<String> lines = new java.util.ArrayList<>();
+		StringBuilder line = new StringBuilder();
+		String[] words = text.split(" ");
+		for (int i = 0; i < words.length; i++) {
+			String trial = line.length() == 0 ? words[i] : line + " " + words[i];
+			if (s.width(role, trial) > width && line.length() > 0) {
+				lines.add(line.toString());
+				line = new StringBuilder(words[i]);
+				if (lines.size() == maxLines) {
+					break;
+				}
+			} else {
+				line = new StringBuilder(trial);
+			}
+		}
+		if (lines.size() < maxLines && line.length() > 0) {
+			lines.add(line.toString());
+		} else if (lines.size() == maxLines && line.length() > 0 && maxLines > 0) {
+			String last = lines.get(maxLines - 1);
+			if (!last.endsWith("...")) {
+				lines.set(maxLines - 1, fit(s, role, last + "...", width));
+			}
+		}
+		return lines;
+	}
+
+	public static String fit(Surface s, Surface.Role role, String text, int width) {
+		if (s.width(role, text) <= width) {
+			return text;
+		}
+		String cut = text;
+		while (cut.length() > 1 && s.width(role, cut + "...") > width) {
+			cut = cut.substring(0, cut.length() - 1);
+		}
+		return cut + "...";
+	}
 }

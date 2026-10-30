@@ -7,6 +7,8 @@ import java.util.Objects;
 import me.bewf.luceat.Luceat;
 import me.bewf.luceat.client.config.LuceatConfig;
 import me.bewf.luceat.client.gui.LuceatLook;
+import me.bewf.luceat.client.gui.glass.Glass;
+import me.bewf.luceat.client.gui.glass.Surface;
 
 import com.mojang.blaze3d.platform.NativeImage;
 
@@ -109,19 +111,30 @@ public final class PreviewPanel {
 		return imageY + imageH;
 	}
 
-	public void draw(GuiGraphicsExtractor graphics, int x, int y, int w, int h, int mouseX, int mouseY, boolean frozen, String note) {
-		LuceatLook.round(graphics, x, y, x + w, y + h, LuceatLook.SIDEBAR);
-		Scene scene = spec.scene();
-		graphics.text(font, "Live preview", x + 10, y + 8, LuceatLook.TEXT, false);
-		String name = scene.title;
-		graphics.text(font, name, x + w - 10 - font.width(name), y + 8, LuceatLook.MUTED, false);
-		imageX = x + 10;
-		imageY = y + 24;
-		imageW = w - 20;
-		imageH = Math.min(h - 130, Math.round(imageW * 0.95F));
-		if (imageH < 60) {
+	private int trackX0;
+	private int trackX1;
+	private int overlayHash;
+
+	public void place(int x, int y, int w, int h) {
+		imageX = x;
+		imageY = y;
+		imageW = w;
+		imageH = h;
+	}
+
+	public String sceneTitle() {
+		return spec.scene().title;
+	}
+
+	public int overlayHash() {
+		return Objects.hash(spec.caption(), spec.scene().id, Math.round(time * 200.0F), draggingLight, draggingTime, imageX, imageY, imageW, imageH);
+	}
+
+	public void drawImage(GuiGraphicsExtractor graphics, boolean frozen) {
+		if (imageH < 60 || imageW < 60) {
 			return;
 		}
+		Scene scene = spec.scene();
 		LuceatConfig live = override != null ? override : LuceatConfig.get();
 		if (!frozen) {
 			render(scene, live);
@@ -129,13 +142,12 @@ public final class PreviewPanel {
 		if (shown != null) {
 			graphics.blit(shown.id, imageX, imageY, imageX + imageW, imageY + imageH, 0.0F, 1.0F, 0.0F, 1.0F);
 		}
-		graphics.outline(imageX - 1, imageY - 1, imageW + 2, imageH + 2, LuceatLook.BORDER);
 		if (spec.compares()) {
 			int split = imageX + imageW / 2;
-			graphics.fill(split, imageY, split + 1, imageY + imageH, 0xCCFFFFFF);
-			tag(graphics, spec.leftLabel(), imageX + 4, imageY + 4, 0xFFFFC857);
+			graphics.fill(split, imageY + 6, split + 1, imageY + imageH - 6, 0x99FFFFFF);
+			tag(graphics, spec.leftLabel(), imageX + 14, imageY + 62, 0xFFFFC857);
 			String right = spec.rightLabel();
-			tag(graphics, right, imageX + imageW - 4 - font.width(right) - 6, imageY + 4, LuceatLook.GOOD);
+			tag(graphics, right, imageX + imageW - 14 - font.width(right) - 6, imageY + 62, LuceatLook.GOOD);
 		}
 		if (lastTracer != null) {
 			double aspect = (double) imageW / imageH;
@@ -156,39 +168,70 @@ public final class PreviewPanel {
 				graphics.text(font, light.label(), lx - tw / 2, ly - 9, 0xFFFFFFFF, true);
 			}
 		}
-		int cursor = imageBottom() + 8;
-		List<FormattedCharSequence> lines = font.split(Component.literal(spec.caption()).withStyle(Style.EMPTY.withColor(0xDDDDE6)), imageW);
-		int shownLines = 0;
-		for (FormattedCharSequence line : lines) {
-			if (shownLines++ >= 3) {
-				break;
-			}
-			graphics.text(font, line, imageX, cursor, 0xFFDDDDE6, false);
-			cursor += 10;
+	}
+
+	public void drawOverlay(Surface s, String note, boolean hoverTime) {
+		if (imageH < 60 || imageW < 60) {
+			return;
 		}
-		cursor += 4;
-		if (scene.movable) {
-			graphics.text(font, "Drag in the picture to move the light. Scroll to lift it.", imageX, cursor, LuceatLook.MUTED, false);
-			cursor += 14;
-		}
-		graphics.text(font, "Time of day", imageX, cursor, LuceatLook.SOFT, false);
+		Scene scene = spec.scene();
+		String title = scene.title;
+		int tw = s.width(Surface.Role.BODY, title) + 20;
+		Glass.chip(s, imageX + 12, imageY + 10, imageX + 12 + tw, imageY + 28, 0.0F);
+		s.text(Surface.Role.BODY, title, imageX + 22, imageY + 15, Glass.TEXT);
+		int bottom = imageY + imageH - 12;
+		boolean stacked = imageW < 340;
+		int timeW = stacked ? imageW - 24 : 150;
+		int timeX1 = stacked ? imageX + 12 + timeW : imageX + imageW - 12;
+		int timeX0 = timeX1 - timeW;
+		int timeY1 = bottom;
+		int timeY0 = timeY1 - 22;
+		boolean drag = draggingTime;
+		Glass.chip(s, timeX0, timeY0, timeX1, timeY1, hoverTime || drag ? 1.0F : 0.0F);
 		String clock = time < 0.34F ? "Night" : time < 0.67F ? "Evening" : "Day";
-		graphics.text(font, clock, imageX + imageW - font.width(clock), cursor, LuceatLook.SOFT, false);
-		trackY = cursor + 16;
-		graphics.fill(imageX, trackY, imageX + imageW, trackY + 2, LuceatLook.TRACK);
-		int filled = Math.round(imageW * time);
-		graphics.fill(imageX, trackY, imageX + filled, trackY + 2, LuceatLook.ACCENT);
-		LuceatLook.round(graphics, imageX + filled - 4, trackY - 4, imageX + filled + 4, trackY + 6, 0xFFE6C9FF);
-		if (note != null && !note.isEmpty()) {
-			int ny = trackY + 14;
-			for (FormattedCharSequence line : font.split(Component.literal(note).withStyle(Style.EMPTY.withColor(LuceatLook.WARN & 0xFFFFFF)), imageW)) {
-				if (ny + 10 > y + h) {
-					break;
-				}
-				graphics.text(font, line, imageX, ny, 0xFFFFFFFF, false);
-				ny += 10;
+		int clockW = s.width(Surface.Role.BODY, clock);
+		s.text(Surface.Role.BODY, "Time", timeX0 + 10, timeY0 + 7, Glass.SOFT);
+		trackX0 = timeX0 + 10 + s.width(Surface.Role.BODY, "Time") + 8;
+		trackX1 = timeX1 - 10 - clockW - 8;
+		trackY = timeY0 + 11;
+		s.text(Surface.Role.BODY, clock, timeX1 - 10 - clockW, timeY0 + 7, Glass.TEXT);
+		if (trackX1 > trackX0 + 20) {
+			Glass.slider(s, trackX0, trackY, trackX1, time, hoverTime ? 1.0F : 0.0F, drag ? 1.0F : 0.0F);
+		}
+		int capBottom = stacked ? timeY0 - 6 : bottom;
+		int capRight = stacked ? imageX + imageW - 12 : timeX0 - 8;
+		List<String> lines = Glass.wrap(s, Surface.Role.BODY, spec.caption(), capRight - (imageX + 12) - 20, 2);
+		if (!lines.isEmpty()) {
+			int widest = 0;
+			for (String line : lines) {
+				widest = Math.max(widest, s.width(Surface.Role.BODY, line));
+			}
+			int boxH = 12 + lines.size() * 11;
+			int boxX1 = imageX + 12 + widest + 20;
+			Glass.chip(s, imageX + 12, capBottom - boxH, boxX1, capBottom, 0.0F);
+			int ty = capBottom - boxH + 6;
+			for (String line : lines) {
+				s.text(Surface.Role.BODY, line, imageX + 22, ty, Glass.TEXT);
+				ty += 11;
 			}
 		}
+		if (scene.movable) {
+			String hint = "Drag to move the light. Scroll to lift it.";
+			int hw = s.width(Surface.Role.BODY, hint) + 20;
+			Glass.chip(s, imageX + 12, imageY + 34, imageX + 12 + hw, imageY + 52, 0.0F);
+			s.text(Surface.Role.BODY, hint, imageX + 22, imageY + 39, Glass.SOFT);
+		}
+		if (note != null && !note.isEmpty()) {
+			String text = note.length() > 60 ? note.substring(0, 57) + "..." : note;
+			int nw = s.width(Surface.Role.BODY, text) + 20;
+			int nx = imageX + imageW - 12 - nw;
+			Glass.chip(s, nx, imageY + 34, nx + nw, imageY + 52, 0.0F);
+			s.text(Surface.Role.BODY, text, nx + 10, imageY + 39, Glass.WARN);
+		}
+	}
+
+	public boolean overTime(double mx, double my) {
+		return LuceatLook.inside(mx, my, trackX0 - 8, trackY - 10, trackX1 + 8, trackY + 10);
 	}
 
 	private void tag(GuiGraphicsExtractor graphics, String text, int x, int y, int colour) {
@@ -347,15 +390,15 @@ public final class PreviewPanel {
 		if (imageH < 60) {
 			return false;
 		}
-		if (spec.scene().movable && LuceatLook.inside(mx, my, imageX, imageY, imageX + imageW, imageY + imageH)) {
-			draggingLight = true;
-			moveLight(mx, my);
-			return true;
-		}
-		if (LuceatLook.inside(mx, my, imageX - 4, trackY - 6, imageX + imageW + 4, trackY + 12)) {
+		if (overTime(mx, my)) {
 			draggingTime = true;
 			userTime = true;
 			moveTime(mx);
+			return true;
+		}
+		if (spec.scene().movable && LuceatLook.inside(mx, my, imageX, imageY, imageX + imageW, imageY + imageH)) {
+			draggingLight = true;
+			moveLight(mx, my);
 			return true;
 		}
 		return false;
@@ -396,7 +439,7 @@ public final class PreviewPanel {
 	}
 
 	private void moveTime(double mx) {
-		time = (float) Math.max(0.0, Math.min(1.0, (mx - imageX) / imageW));
+		time = (float) Math.max(0.0, Math.min(1.0, (mx - trackX0) / Math.max(1, trackX1 - trackX0)));
 	}
 
 	private void moveLight(double mx, double my) {

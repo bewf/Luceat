@@ -37,6 +37,10 @@ public final class Pane implements Surface {
 	private boolean ready;
 	private final List<Cmd> texts = new ArrayList<>();
 	private int[] hide;
+	private int minRow;
+	private int maxRow;
+	private int prevMin;
+	private int prevMax;
 
 	public boolean ready() {
 		return ready;
@@ -65,6 +69,10 @@ public final class Pane implements Surface {
 		} else {
 			java.util.Arrays.fill(pixels, 0);
 		}
+		prevMin = resized ? 0 : minRow;
+		prevMax = resized ? ph - 1 : maxRow;
+		minRow = ph;
+		maxRow = -1;
 		texts.clear();
 		clipped = false;
 		clipX0 = 0;
@@ -76,7 +84,9 @@ public final class Pane implements Surface {
 
 	public void finish() {
 		NativeImage image = texture.getPixels();
-		for (int y = 0; y < ph; y++) {
+		int from = Math.max(0, Math.min(prevMin, minRow));
+		int to = Math.min(ph - 1, Math.max(prevMax, maxRow));
+		for (int y = from; y <= to; y++) {
 			int row = y * pw;
 			for (int x = 0; x < pw; x++) {
 				image.setPixel(x, y, pixels[row + x]);
@@ -146,6 +156,8 @@ public final class Pane implements Surface {
 		if (ax1 <= ax0 || ay1 <= ay0) {
 			return;
 		}
+		minRow = Math.min(minRow, ay0);
+		maxRow = Math.max(maxRow, ay1 - 1);
 		int sr = (argb >> 16) & 255;
 		int sg = (argb >> 8) & 255;
 		int sb = argb & 255;
