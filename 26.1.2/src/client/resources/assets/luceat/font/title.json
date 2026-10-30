@@ -1,5 +1,5 @@
 {
   "providers": [
-    {"type": "ttf", "file": "luceat:huninn.ttf", "size": 11.0, "oversample": 8.0, "shift": [0.0, 0.0]}
+    {"type": "ttf", "file": "luceat:bricolage_bold.ttf", "size": 10.5, "oversample": 8.0, "shift": [0.0, 0.0]}
   ]
 }
