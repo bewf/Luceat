@@ -56,7 +56,7 @@ public final class LuceatMenu {
 			}))
 			.then(ClientCommands.literal("stats").executes(context -> {
 				var variant = me.bewf.luceat.client.shader.TerrainShaderPatch.built();
-				context.getSource().sendFeedback(prefix().append(Component.literal("Shader " + (variant == null ? "not built yet" : variant.name().toLowerCase(java.util.Locale.ROOT)) + ", " + me.bewf.luceat.client.light.Stats.lights() + " lights, " + me.bewf.luceat.client.light.LightGrid.cellsUsed() + " grid cells, frame " + Math.round(me.bewf.luceat.client.light.Stats.frameMillis()) + " ms" + (me.bewf.luceat.client.light.Panic.paused() ? ", lights paused" : "") + ".")));
+				context.getSource().sendFeedback(prefix().append(Component.literal("Shader " + (variant == null ? "not built yet" : variant.name().toLowerCase(java.util.Locale.ROOT)) + ", " + me.bewf.luceat.client.light.Stats.lights() + " lights, " + me.bewf.luceat.client.light.LightGrid.cellsUsed() + " grid cells, shadows " + (me.bewf.luceat.client.config.LuceatConfig.get().shadows ? me.bewf.luceat.client.config.LuceatConfig.get().shadowedLights + " lights, " + me.bewf.luceat.client.shadow.ShadowVolume.cellsFilled() + " map cells" : "off") + ", quality " + Math.round(me.bewf.luceat.client.light.Governor.quality() * 100.0F) + "%, frame " + Math.round(me.bewf.luceat.client.light.Stats.frameMillis()) + " ms" + (me.bewf.luceat.client.light.Panic.paused() ? ", lights paused" : "") + ".")));
 				StringBuilder line = new StringBuilder();
 				for (int i = 0; i < me.bewf.luceat.client.light.Stats.NAMES.length; i++) {
 					line.append(me.bewf.luceat.client.light.Stats.NAMES[i]).append(' ').append(String.format(java.util.Locale.ROOT, "%.2f", me.bewf.luceat.client.light.Stats.stage(i))).append(" ms");

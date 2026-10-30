@@ -100,6 +100,16 @@ public final class ShadowVolume {
 		return centreZ;
 	}
 
+	public static int cellsFilled() {
+		int n = 0;
+		for (boolean v : valid) {
+			if (v) {
+				n++;
+			}
+		}
+		return n;
+	}
+
 	public static long bytes() {
 		return texture == 0 ? 0L : (long) DIMENSION * DIMENSION * DIMENSION * 3L + (long) BRICK_DIM * BRICK_DIM * BRICK_DIM;
 	}

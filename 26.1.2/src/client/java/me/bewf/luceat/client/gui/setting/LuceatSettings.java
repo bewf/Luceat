@@ -187,7 +187,7 @@ public final class LuceatSettings {
 			Cost.LOW, false, 16.0F, 128.0F, 8.0F, " blocks", () -> c.lightRange, value -> c.lightRange = Math.round(value)));
 		all.add(new SliderSetting(PERFORMANCE, "Lights with shadows",
 			"Every pixel traces shadows for this many of the strongest lights near it. The other lights still shine, they just do not cast shadows.",
-			Cost.HIGH, false, 0.0F, 8.0F, 1.0F, "", () -> c.shadowedLights, value -> c.shadowedLights = Math.round(value)));
+			Cost.HIGH, false, 0.0F, 12.0F, 1.0F, "", () -> c.shadowedLights, value -> c.shadowedLights = Math.round(value)));
 		all.add(new SliderSetting(PERFORMANCE, "Shadow distance",
 			"Shadows fade out on things farther from you than this. Lower is faster.",
 			Cost.MEDIUM, false, 8.0F, 128.0F, 8.0F, " blocks", () -> c.shadowDistance, value -> c.shadowDistance = Math.round(value)));

@@ -178,7 +178,7 @@ public final class LuceatConfig {
 		shadowStrength = Math.max(0.0F, Math.min(shadowStrength, 1.0F));
 		cutoutOpacity = Math.max(0.0F, Math.min(cutoutOpacity, 1.0F));
 		maxLights = Math.max(1, Math.min(maxLights, 256));
-		shadowedLights = Math.max(0, Math.min(shadowedLights, 8));
+		shadowedLights = Math.max(0, Math.min(shadowedLights, 12));
 		lightBounce = Math.max(0.0F, Math.min(lightBounce, 1.0F));
 		shine = Math.max(0.0F, Math.min(shine, 1.0F));
 		spillStrength = Math.max(0.0F, Math.min(spillStrength, 1.0F));
