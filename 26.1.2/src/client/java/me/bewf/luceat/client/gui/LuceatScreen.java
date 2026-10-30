@@ -1176,6 +1176,11 @@ public final class LuceatScreen extends Screen {
 			}
 			y += 5;
 		}
+		for (String line : Glass.wrap(s, BODY, "Fonts: Bricolage Grotesque, Instrument Serif, Huninn, Jersey 25, Birthstone and UnifrakturMaguntia, used under the SIL Open Font License. The licences are in the mod file.", width, 3)) {
+			s.text(BODY, line, x, y, Glass.MUTED);
+			y += 11;
+		}
+		y += 5;
 		s.text(BODY, "Renderer: " + RenderBackend.kind().label(), x, y, Glass.LAVENDER);
 		y += 12;
 		String note = RenderBackend.note();
