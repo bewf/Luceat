@@ -43,7 +43,7 @@ public final class HardwareHint {
 		} else if (middle) {
 			name = "Balanced";
 		} else if (weak) {
-			name = cores >= 8 ? "Balanced" : "Potato";
+			name = "Potato";
 		} else {
 			name = "Balanced";
 		}
