@@ -3,24 +3,24 @@ package me.bewf.luceat.client.gui;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 
 public final class LuceatLook {
-	public static final int ACCENT = 0xFFBE3FFF;
-	public static final int ACCENT_SOFT = 0x33BE3FFF;
-	public static final int ACCENT_DIM = 0xFF7A2A9E;
+	public static final int ACCENT = 0xFFA78BFF;
+	public static final int ACCENT_SOFT = 0x33A78BFF;
+	public static final int ACCENT_DIM = 0xFF5B46C8;
 	public static final int BACKDROP = 0xA0000000;
-	public static final int WINDOW = 0xFF16161B;
-	public static final int HEADER = 0xFF1D1D24;
-	public static final int SIDEBAR = 0xFF191920;
-	public static final int CARD = 0xFF22222B;
-	public static final int CARD_HOVER = 0xFF2A2A35;
-	public static final int BORDER = 0xFF33333F;
-	public static final int TEXT = 0xFFEDEDF3;
-	public static final int SOFT = 0xFFA2A2B2;
-	public static final int MUTED = 0xFF6C6C7C;
+	public static final int WINDOW = 0xFF140F24;
+	public static final int HEADER = 0xFF1A1330;
+	public static final int SIDEBAR = 0xFF120D20;
+	public static final int CARD = 0xFF1D1633;
+	public static final int CARD_HOVER = 0xFF271E44;
+	public static final int BORDER = 0xFF372C5C;
+	public static final int TEXT = 0xFFF1EEFA;
+	public static final int SOFT = 0xFFBDB6D6;
+	public static final int MUTED = 0xFF8A84A6;
 	public static final int GOOD = 0xFF5BE38A;
 	public static final int WARN = 0xFFFFC857;
 	public static final int ORANGE = 0xFFFF9A4D;
 	public static final int BAD = 0xFFFF6B6B;
-	public static final int TRACK = 0xFF3A3A47;
+	public static final int TRACK = 0xFF2D2548;
 
 	private LuceatLook() {
 	}

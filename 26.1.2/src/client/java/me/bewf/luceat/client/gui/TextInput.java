@@ -23,6 +23,7 @@ public final class TextInput {
 	private final List<String> undo = new ArrayList<>();
 	private final List<String> redo = new ArrayList<>();
 	private Font lastFont;
+	private boolean glass;
 	private int lastX0;
 	private int lastX1;
 	private int lastY0;
@@ -245,13 +246,13 @@ public final class TextInput {
 		if (lastFont == null) {
 			return text.length();
 		}
-		double local = mx - (lastX0 + 7 + lastOffset);
+		double local = mx - (lastX0 + (glass ? 8 : 7) + lastOffset);
 		int best = 0;
 		for (int i = 0; i <= text.length(); i++) {
-			double width = lastFont.width(text.substring(0, i));
+			double width = measure(lastFont, text.substring(0, i));
 			if (width > local) {
 				if (i > 0) {
-					double prev = lastFont.width(text.substring(0, i - 1));
+					double prev = measure(lastFont, text.substring(0, i - 1));
 					return local - prev < width - local ? i - 1 : i;
 				}
 				return 0;
@@ -286,7 +287,43 @@ public final class TextInput {
 		return was;
 	}
 
+	private int measure(Font font, String value) {
+		return glass ? LuceatFonts.width(font, LuceatFonts.body(value)) : font.width(value);
+	}
+
+	public void drawGlass(GuiGraphicsExtractor graphics, Font font, int x0, int y0, int x1, int y1, String placeholder) {
+		glass = true;
+		lastFont = font;
+		lastX0 = x0;
+		lastX1 = x1;
+		lastY0 = y0;
+		lastY1 = y1;
+		int textY = y0 + (y1 - y0 - 9) / 2;
+		graphics.enableScissor(x0 + 4, y0, x1 - 4, y1);
+		if (text.isEmpty() && !focused) {
+			lastOffset = 0;
+			LuceatFonts.draw(graphics, font, LuceatFonts.body(placeholder), x0 + 8, textY, 0xFF7C7596, false);
+		} else {
+			int caretX = measure(font, text.substring(0, Math.min(caret, text.length())));
+			int visible = x1 - x0 - 16;
+			int offset = Math.min(0, visible - caretX - 2);
+			lastOffset = offset;
+			int baseX = x0 + 8 + offset;
+			if (focused && hasSelection()) {
+				int a = baseX + measure(font, text.substring(0, selStart()));
+				int b = baseX + measure(font, text.substring(0, selEnd()));
+				graphics.fill(a, y0 + 4, b, y1 - 4, 0x805B46C8);
+			}
+			LuceatFonts.draw(graphics, font, LuceatFonts.body(text), baseX, textY, 0xFFF1EEFA, false);
+			if (focused && (System.currentTimeMillis() / 530) % 2 == 0) {
+				graphics.fill(baseX + caretX, y0 + 4, baseX + caretX + 1, y1 - 4, 0xFFE4D6FF);
+			}
+		}
+		graphics.disableScissor();
+	}
+
 	public void draw(GuiGraphicsExtractor graphics, Font font, int x0, int y0, int x1, int y1, String placeholder) {
+		glass = false;
 		lastFont = font;
 		lastX0 = x0;
 		lastX1 = x1;
