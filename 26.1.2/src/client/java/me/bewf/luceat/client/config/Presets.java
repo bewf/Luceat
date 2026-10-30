@@ -28,7 +28,7 @@ public final class Presets {
 
 	private static final List<Preset> ALL = List.of(
 		new Preset("Potato",
-			"But I wasn’t farming potatoes for profit, I was farming them for honor, for glory.",
+			"But I wasn’t farming potatoes for profit, I was farming them for honor, for glory. - Technoblade",
 			"Very light",
 			c -> {
 				c.shadows = false;
@@ -103,7 +103,7 @@ public final class Presets {
 				c.clusterSize = 6;
 			}),
 		new Preset("Phenomenal",
-			"Every torch thinks it’s the main character.",
+			"Phenomenal cosmic power! - Genie",
 			"Heavy",
 			c -> {
 				c.placedReach = 1.2F;
