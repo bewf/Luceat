@@ -63,7 +63,7 @@ public final class Presets {
 				c.directionalShading = 0.4F;
 			}),
 		new Preset("Balanced",
-			"Perfectly balanced, as all things should be",
+			"Perfectly balanced, as all things should be - Thanos",
 			"Medium",
 			c -> {
 				c.placedReach = 1.1F;

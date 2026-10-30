@@ -41,6 +41,7 @@ public final class PresetPicker extends Screen {
 	private Presets.Preset chosen;
 	private int chosenIndex;
 	private long chosenAt;
+	private final long openAt = System.nanoTime();
 
 	public PresetPicker(Screen parent) {
 		super(Component.literal("Choose a preset"));
@@ -214,6 +215,17 @@ public final class PresetPicker extends Screen {
 		return out;
 	}
 
+	private static float ease(float t) {
+		float c = Math.max(0.0F, Math.min(1.0F, t));
+		float k = 1.0F - c;
+		return 1.0F - k * k * k;
+	}
+
+	private static String[] split(String blurb) {
+		int cut = blurb.lastIndexOf(" - ");
+		return cut < 0 ? new String[]{blurb, ""} : new String[]{blurb.substring(0, cut), blurb.substring(cut + 3)};
+	}
+
 	private static String title(String name) {
 		return name.substring(0, 1).toUpperCase(Locale.ROOT) + name.substring(1).toLowerCase(Locale.ROOT);
 	}
@@ -266,8 +278,16 @@ public final class PresetPicker extends Screen {
 			return;
 		}
 		Component heading = LuceatFonts.title("How much light do you want?");
-		LuceatFonts.centred(graphics, this.font, heading, this.width / 2, 24, LuceatLook.TEXT, true);
-		LuceatFonts.centred(graphics, this.font, LuceatFonts.body("You can change this any time in the settings"), this.width / 2, 42, LuceatLook.SOFT, true);
+		float headIn = ease((now - openAt) / 500_000_000.0F);
+		float subIn = ease((now - openAt - 180_000_000L) / 500_000_000.0F);
+		int headAlpha = Math.round(255.0F * headIn);
+		int subAlpha = Math.round(255.0F * subIn);
+		if (headAlpha > 8) {
+			LuceatFonts.centred(graphics, this.font, heading, this.width / 2, 24 - Math.round((1.0F - headIn) * 8.0F), alpha(LuceatLook.TEXT, headAlpha), true);
+		}
+		if (subAlpha > 8) {
+			LuceatFonts.centred(graphics, this.font, LuceatFonts.body("You can change this any time in the settings"), this.width / 2, 42 - Math.round((1.0F - subIn) * 8.0F), alpha(LuceatLook.SOFT, subAlpha), true);
+		}
 
 		int[] layout = layout();
 		int count = reveal() > 0.0F && hardcore != null ? 4 : 3;
@@ -321,17 +341,43 @@ public final class PresetPicker extends Screen {
 			particles(graphics, i, imgX, imgY, imgX + imgW, imgY + imgH, colour, now);
 			outline(graphics, imgX - 1, imgY - 1, imgX + imgW + 1, imgY + imgH + 1, alpha(colour, 60 + Math.round(h * 120.0F)));
 			int y = imgY + imgH + 10;
-			LuceatFonts.draw(graphics, this.font, LuceatFonts.preset(preset.name(), title(preset.name())), x0 + pad, y, hot ? FIRE : LuceatLook.mix(LuceatLook.TEXT, colour, h * 0.6F), true);
-			Component cost = LuceatFonts.body(preset.cost());
-			LuceatFonts.draw(graphics, this.font, cost, x0 + w - pad - LuceatFonts.width(this.font, cost), y, LuceatLook.SOFT, false);
+			long age = now - (i == 3 ? revealStart + 450_000_000L : openAt + 350_000_000L + i * 140_000_000L);
+			float inName = ease(age / 600_000_000.0F);
+			float inQuote = ease((age - 150_000_000L) / 750_000_000.0F);
+			float inAuthor = ease((age - 650_000_000L) / 700_000_000.0F);
+			float out = chosen == null ? 0.0F : Math.min(1.0F, (now - chosenAt) / 300_000_000.0F);
+			out = out * out * out;
+			int nameAlpha = Math.round(255.0F * inName * (1.0F - out));
+			int nameLift = Math.round((1.0F - inName) * 6.0F);
+			int nameColour = hot ? FIRE : LuceatLook.mix(LuceatLook.TEXT, colour, h * 0.6F);
+			graphics.enableScissor(x0 + 2, top + lift, x0 + w - 2, bottom + lift);
+			if (nameAlpha > 8) {
+				LuceatFonts.draw(graphics, this.font, LuceatFonts.preset(preset.name(), title(preset.name())), x0 + pad, y + nameLift, alpha(nameColour, nameAlpha), true);
+				Component cost = LuceatFonts.body(preset.cost());
+				LuceatFonts.draw(graphics, this.font, cost, x0 + w - pad - LuceatFonts.width(this.font, cost), y + nameLift, alpha(LuceatLook.SOFT, nameAlpha), false);
+			}
 			y += 15;
-			for (String line : wrap("“" + preset.blurb() + "”", w - pad * 2)) {
+			String[] parts = split(preset.blurb());
+			int quoteAlpha = Math.round(255.0F * inQuote * (1.0F - out));
+			int quoteShift = -Math.round((1.0F - inQuote) * w * 0.7F + out * w);
+			int quoteColour = LuceatLook.mix(LuceatLook.SOFT, LuceatLook.TEXT, h * 0.55F);
+			for (String line : wrap("“" + parts[0] + "”", w - pad * 2)) {
 				if (y + 9 > bottom - 22) {
 					break;
 				}
-				LuceatFonts.draw(graphics, this.font, LuceatFonts.quote(line), x0 + pad, y, LuceatLook.SOFT, false);
+				if (quoteAlpha > 8) {
+					LuceatFonts.draw(graphics, this.font, LuceatFonts.quote(line), x0 + pad + quoteShift, y, alpha(quoteColour, quoteAlpha), false);
+				}
 				y += 12;
 			}
+			if (!parts[1].isEmpty() && y + 9 <= bottom - 22) {
+				int authorAlpha = Math.round(255.0F * inAuthor * (1.0F - out));
+				int authorShift = Math.round((1.0F - inAuthor) * w * 0.7F + out * w);
+				if (authorAlpha > 8) {
+					LuceatFonts.draw(graphics, this.font, LuceatFonts.quote(parts[1]), x0 + pad + 18 + authorShift, y + 2, alpha(LuceatLook.mix(LuceatLook.MUTED, colour, 0.5F), authorAlpha), false);
+				}
+			}
+			graphics.disableScissor();
 			if (gold) {
 				Component tag = LuceatFonts.body("Recommended for you");
 				int tw = LuceatFonts.width(this.font, tag) + 12;
@@ -407,11 +453,9 @@ public final class PresetPicker extends Screen {
 			int x0 = layout[i * 2];
 			int w = layout[i * 2 + 1];
 			if (LuceatLook.inside(mx, my, x0, cardTop(), x0 + w, cardTop() + cardHeight())) {
-				Presets.Preset preset = i < 3 ? normal.get(Math.min(i, normal.size() - 1)) : hardcore;
-				LuceatConfig config = LuceatConfig.get();
-				preset.applyTo(config);
-				LuceatConfig.save();
-				onClose();
+				chosen = i < 3 ? normal.get(Math.min(i, normal.size() - 1)) : hardcore;
+				chosenIndex = i;
+				chosenAt = System.nanoTime();
 				return true;
 			}
 		}
