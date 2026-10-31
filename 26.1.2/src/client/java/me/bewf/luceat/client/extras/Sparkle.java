@@ -1,12 +1,16 @@
 package me.bewf.luceat.client.extras;
 
+import java.io.IOException;
 import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Matcher;
@@ -14,8 +18,13 @@ import java.util.regex.Pattern;
 
 import com.google.gson.JsonParser;
 
-import me.bewf.luceat.client.config.LuceatConfig;
+import me.bewf.luceat.Luceat;
+import me.bewf.luceat.client.gui.Say;
 
+import net.fabricmc.loader.api.FabricLoader;
+import net.minecraft.ChatFormatting;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.multiplayer.PlayerInfo;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.MutableComponent;
 import net.minecraft.network.chat.Style;
@@ -43,7 +52,17 @@ public final class Sparkle {
 			"stalbet", SCOOP
 	));
 
+	private static final Set<UUID> OWNERS = Set.of(
+			uuid("2913ac77e515490a96eb5183963f6169"),
+			uuid("f299854cd6954a3cbaae6ab0e4b62dc8")
+	);
+
 	private static final Map<String, Cached> CACHE = new HashMap<>();
+	private static final StackWalker WALKER = StackWalker.getInstance();
+	private static final Path MET_MARKER = FabricLoader.getInstance().getConfigDir().resolve("luceat-met-owner");
+
+	private static boolean met = Files.exists(MET_MARKER);
+	private static long metCheckAt;
 
 	private static final long CACHE_MS = 50L;
 	private static final long PERIOD_MS = 2400L;
@@ -69,21 +88,95 @@ public final class Sparkle {
 				"$1-$2-$3-$4-$5"));
 	}
 
-	private static boolean on() {
-		LuceatConfig config = LuceatConfig.get();
-		return config.enabled && config.fancyNames;
-	}
-
 	public static boolean wants(UUID uuid) {
-		return uuid != null && PLAYERS.containsKey(uuid) && on();
+		return uuid != null && PLAYERS.containsKey(uuid);
 	}
 
-	public static Component name(UUID uuid, String playerName) {
+	public static Component name(UUID uuid, String playerName, String hookedMethod) {
 		Look look = PLAYERS.get(uuid);
 		if (look == null) {
 			return Component.literal(playerName);
 		}
-		return render(look, playerName);
+		return calledByVanilla(hookedMethod) ? render(look, playerName) : legacyName(look, playerName);
+	}
+
+	public static Component tabName(Component message) {
+		return replaceNames(message, true, false, !calledByVanilla("getNameForDisplay"));
+	}
+
+	private static boolean calledByVanilla(String hookedMethod) {
+		try {
+			return WALKER.walk(frames -> {
+				boolean seen = false;
+				for (StackWalker.StackFrame frame : (Iterable<StackWalker.StackFrame>) frames.limit(12)::iterator) {
+					boolean hooked = frame.getMethodName().equals(hookedMethod);
+					if (!seen) {
+						seen = hooked;
+						continue;
+					}
+					if (hooked) {
+						continue;
+					}
+					return frame.getClassName().startsWith("net.minecraft.");
+				}
+				return true;
+			});
+		} catch (Throwable error) {
+			return true;
+		}
+	}
+
+	private static Component legacyName(Look look, String playerName) {
+		ChatFormatting best = ChatFormatting.WHITE;
+		long bestDistance = Long.MAX_VALUE;
+		for (ChatFormatting format : ChatFormatting.values()) {
+			TextColor legacy = TextColor.fromLegacyFormat(format);
+			if (legacy == null) {
+				continue;
+			}
+			int colour = legacy.getValue();
+			long dr = ((colour >> 16) & 255) - ((look.base() >> 16) & 255);
+			long dg = ((colour >> 8) & 255) - ((look.base() >> 8) & 255);
+			long db = (colour & 255) - (look.base() & 255);
+			long distance = dr * dr + dg * dg + db * db;
+			if (distance < bestDistance) {
+				bestDistance = distance;
+				best = format;
+			}
+		}
+		return Component.literal(look.prefix() + playerName).withStyle(best);
+	}
+
+	public static void meetOwner(Minecraft minecraft) {
+		long now = System.currentTimeMillis();
+		if (met || minecraft.player == null || minecraft.getConnection() == null || now - metCheckAt < 2000L) {
+			return;
+		}
+		metCheckAt = now;
+		if (OWNERS.contains(minecraft.player.getUUID())) {
+			remember();
+			return;
+		}
+		for (PlayerInfo info : minecraft.getConnection().getOnlinePlayers()) {
+			if (OWNERS.contains(info.getProfile().id())) {
+				Say.chat(Say.line(
+						Say.text("Congrats, you've met "),
+						Component.empty().append(staticName(PLAYERS.get(info.getProfile().id()), info.getProfile().name())),
+						Say.text(", the owner of this mod!")
+				));
+				remember();
+				return;
+			}
+		}
+	}
+
+	private static void remember() {
+		met = true;
+		try {
+			Files.writeString(MET_MARKER, "");
+		} catch (IOException error) {
+			Luceat.LOGGER.warn("Could not write {}", MET_MARKER, error);
+		}
 	}
 
 	public static Component decorateChat(Component message) {
@@ -110,6 +203,8 @@ public final class Sparkle {
 		float progress = shining ? phase / (float) SHINE_MS : 0.0F;
 		float center = -SHINE_RADIUS + progress * (length + SHINE_RADIUS * 2.0F + trail);
 
+		int runStart = 0;
+		int runColour = look.base();
 		for (int i = 0; i < length; i++) {
 			int color = look.base();
 
@@ -120,11 +215,15 @@ public final class Sparkle {
 				}
 			}
 
-			out.append(
-					Component.literal(String.valueOf(text.charAt(i)))
-							.setStyle(Style.EMPTY.withColor(TextColor.fromRgb(color)))
-			);
+			if (i == 0) {
+				runColour = color;
+			} else if (color != runColour) {
+				out.append(Component.literal(text.substring(runStart, i)).setStyle(Style.EMPTY.withColor(TextColor.fromRgb(runColour))));
+				runStart = i;
+				runColour = color;
+			}
 		}
+		out.append(Component.literal(text.substring(runStart)).setStyle(Style.EMPTY.withColor(TextColor.fromRgb(runColour))));
 
 		CACHE.put(key, new Cached(playerName, now, out));
 
@@ -153,9 +252,6 @@ public final class Sparkle {
 	}
 
 	public static void startNameLookup() {
-		if (!on()) {
-			return;
-		}
 		Thread thread = new Thread(() -> {
 			for (Map.Entry<UUID, Look> entry : PLAYERS.entrySet()) {
 				try {
@@ -183,8 +279,12 @@ public final class Sparkle {
 	}
 
 	public static Component replaceNames(Component message, boolean animated, boolean senderOnly) {
+		return replaceNames(message, animated, senderOnly, false);
+	}
+
+	public static Component replaceNames(Component message, boolean animated, boolean senderOnly, boolean legacyColours) {
 		try {
-			if (message == null || !on()) {
+			if (message == null) {
 				return message;
 			}
 
@@ -219,7 +319,7 @@ public final class Sparkle {
 					if (m.start() > last) {
 						out.append(Component.literal(text.substring(last, m.start())).setStyle(style));
 					}
-					out.append(animated ? render(look, m.group(1)) : staticName(look, m.group(1)));
+					out.append(legacyColours ? legacyName(look, m.group(1)) : animated ? render(look, m.group(1)) : staticName(look, m.group(1)));
 					changed[0] = true;
 					last = m.end();
 				}

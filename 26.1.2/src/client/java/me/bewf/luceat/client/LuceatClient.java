@@ -30,6 +30,7 @@ public class LuceatClient implements ClientModInitializer {
 			me.bewf.luceat.client.shader.VariantWatcher.tick(client);
 			me.bewf.luceat.client.light.LightEngine.tickCompatible(client);
 			UpdateChecker.tick(client);
+			me.bewf.luceat.client.extras.Sparkle.meetOwner(client);
 			me.bewf.luceat.client.gui.presets.PresetFilmstrips.warmUp();
 		});
 		UpdateChecker.check();

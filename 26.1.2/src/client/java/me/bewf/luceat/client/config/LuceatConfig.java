@@ -91,7 +91,6 @@ public final class LuceatConfig {
 
 	public boolean updateChecker = true;
 	public ShaderPackMode shaderPacks = ShaderPackMode.COMPATIBLE;
-	public boolean fancyNames = true;
 
 	private static int revision;
 

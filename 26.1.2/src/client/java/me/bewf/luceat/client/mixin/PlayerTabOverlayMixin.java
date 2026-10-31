@@ -15,6 +15,6 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 public abstract class PlayerTabOverlayMixin {
 	@Inject(method = "getNameForDisplay", at = @At("RETURN"), cancellable = true, require = 0)
 	private void luceat$names(PlayerInfo info, CallbackInfoReturnable<Component> cir) {
-		cir.setReturnValue(Sparkle.replaceNames(cir.getReturnValue(), true, false));
+		cir.setReturnValue(Sparkle.tabName(cir.getReturnValue()));
 	}
 }
