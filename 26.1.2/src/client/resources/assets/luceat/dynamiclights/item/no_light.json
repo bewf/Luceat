@@ -1,7 +1,6 @@
 {
 	"match": {
 		"items": [
-			"minecraft:light",
 			"minecraft:brewing_stand",
 			"minecraft:end_portal_frame",
 			"minecraft:brown_mushroom",

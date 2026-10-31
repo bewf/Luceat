@@ -63,7 +63,7 @@ public final class LightSpecs {
 			}
 		}
 		if (rules.isEmpty() && stack.getItem() instanceof BlockItem blockItem) {
-			level = ItemLightRule.emission(blockItem.getBlock());
+			level = ItemLightRule.emission(stack, blockItem.getBlock());
 		}
 		if (custom != null && custom.level >= 0) {
 			level = custom.level;
@@ -78,7 +78,8 @@ public final class LightSpecs {
 			level = Math.max(1, Math.min(24, Math.round(level * custom.radius)));
 		}
 		float[] colour = custom != null && custom.colour >= 0 ? custom.rgb() : best != null && best.colour() != null ? best.colour() : colourOf(stack, config.textureColours);
-		return new LightSpec(level, colour[0], colour[1], colour[2]);
+		boolean hidden = BlockRules.noShadow(stack.getItem() instanceof BlockItem blockItem ? blockItem.getBlock() : null, custom);
+		return new LightSpec(level, colour[0], colour[1], colour[2], hidden);
 	}
 
 	private static float[] colourOf(ItemStack stack, boolean fromTexture) {

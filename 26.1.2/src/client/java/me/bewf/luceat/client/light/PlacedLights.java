@@ -322,14 +322,13 @@ public final class PlacedLights {
 		}
 		float power = Math.min(24.0F, BlockRules.emission(state) * LuceatConfig.get().placedReach);
 		boolean flames = LightSource.warm(colourOf(state)[0], colourOf(state)[2], power);
-		boolean skip = false;
 		if (rule != null) {
 			power = Math.min(24.0F, power * rule.radius);
 			if (rule.flicker >= 0) {
 				flames = rule.flicker > 0;
 			}
-			skip = rule.shadows == 0;
 		}
+		boolean skip = BlockRules.noShadow(state.getBlock(), rule);
 		into.add((float) px, (float) py, (float) pz, colourOf(state), power, flames, skip, state.getLightEmission());
 	}
 

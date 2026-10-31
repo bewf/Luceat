@@ -100,7 +100,7 @@ public final class EntityLights {
 			centre.x + facing.getStepX() * 0.4,
 			centre.y + facing.getStepY() * 0.4,
 			centre.z + facing.getStepZ() * 0.4,
-			spec.red(), spec.green(), spec.blue(), spec.level(), false, spec.fire(), LightSmoother.key(4, frame.getId(), 0)
+			spec.red(), spec.green(), spec.blue(), spec.level(), false, spec.fire(), LightSmoother.key(4, frame.getId(), 0), spec.noShadow()
 		));
 	}
 
@@ -109,7 +109,7 @@ public final class EntityLights {
 		if (spec.level() > 0) {
 			counts.add(Math.max(1, entity.getItem().getCount()));
 			Vec3 position = entity.getPosition(partialTick);
-			out.add(new LightSource(position.x, position.y + 0.25, position.z, spec.red(), spec.green(), spec.blue(), spec.level(), false, spec.fire(), LightSmoother.key(2, entity.getId(), 0)));
+			out.add(new LightSource(position.x, position.y + 0.25, position.z, spec.red(), spec.green(), spec.blue(), spec.level(), false, spec.fire(), LightSmoother.key(2, entity.getId(), 0), spec.noShadow()));
 		}
 	}
 

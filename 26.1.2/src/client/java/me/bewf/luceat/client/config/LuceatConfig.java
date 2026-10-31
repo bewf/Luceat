@@ -23,7 +23,7 @@ public final class LuceatConfig {
 	public boolean hardcoreUnlocked = false;
 
 	public float brightness = 1.2F;
-	public float maxBrightness = 1.0F;
+	public float maxBrightness = 0.7F;
 	public float daylightFade = 0.85F;
 	public float directionalShading = 0.7F;
 	public float lightBounce = 0.25F;

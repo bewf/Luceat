@@ -2,13 +2,16 @@ package me.bewf.luceat.client.light.item;
 
 import java.util.List;
 
+import net.minecraft.core.component.DataComponents;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.Identifier;
 import net.minecraft.tags.TagKey;
 import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.component.BlockItemStateProperties;
 import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.state.BlockState;
 
 public record ItemLightRule(List<Item> items, List<TagKey<Item>> tags, Luminance luminance, boolean waterSensitive, float[] colour) {
 	public boolean matches(ItemStack stack) {
@@ -41,7 +44,7 @@ public record ItemLightRule(List<Item> items, List<TagKey<Item>> tags, Luminance
 	public record BlockSelf() implements Luminance {
 		@Override
 		public int of(ItemStack stack) {
-			return stack.getItem() instanceof BlockItem blockItem ? emission(blockItem.getBlock()) : 0;
+			return stack.getItem() instanceof BlockItem blockItem ? emission(stack, blockItem.getBlock()) : 0;
 		}
 	}
 
@@ -54,6 +57,18 @@ public record ItemLightRule(List<Item> items, List<TagKey<Item>> tags, Luminance
 
 	public static int emission(Block block) {
 		return block == null ? 0 : block.defaultBlockState().getLightEmission();
+	}
+
+	public static int emission(ItemStack stack, Block block) {
+		if (block == null) {
+			return 0;
+		}
+		BlockState state = block.defaultBlockState();
+		BlockItemStateProperties properties = stack.get(DataComponents.BLOCK_STATE);
+		if (properties != null) {
+			state = properties.apply(state);
+		}
+		return state.getLightEmission();
 	}
 
 	static Block blockById(String id) {

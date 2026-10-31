@@ -23,6 +23,7 @@ import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.Identifier;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
 
 public final class BlockRules {
@@ -204,6 +205,13 @@ public final class BlockRules {
 			return null;
 		}
 		return COLOURS.computeIfAbsent(state.getBlock(), key -> rule.rgb());
+	}
+
+	public static boolean noShadow(Block block, BlockRule rule) {
+		if (rule != null && rule.shadows >= 0) {
+			return rule.shadows == 0;
+		}
+		return block == Blocks.LIGHT;
 	}
 
 	public static BlockRule forItem(Item item) {

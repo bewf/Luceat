@@ -75,7 +75,7 @@ public final class HeldLights {
 		if (spec.level() > 0) {
 			BlockRule rule = BlockRules.forItem(stack.getItem());
 			Vec3 hand = handPosition(level, entity, partialTick, rightSide, rule != null ? rule.heldHeight : -1.0F);
-			out.add(new LightSource(hand.x, hand.y, hand.z, spec.red(), spec.green(), spec.blue(), spec.level(), false, spec.fire(), LightSmoother.key(1, entity.getId(), rightSide ? 1 : 0)));
+			out.add(new LightSource(hand.x, hand.y, hand.z, spec.red(), spec.green(), spec.blue(), spec.level(), false, spec.fire(), LightSmoother.key(1, entity.getId(), rightSide ? 1 : 0), spec.noShadow()));
 		}
 	}
 
