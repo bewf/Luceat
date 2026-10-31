@@ -22,22 +22,25 @@ import net.minecraft.network.chat.Style;
 import net.minecraft.network.chat.TextColor;
 
 public final class Sparkle {
-	private record Look(String prefix, int base, int shine) {
+	private record Look(String prefix, int base, int shine, int shine2) {
 	}
 
 	private record Cached(String name, long builtAt, Component component) {
 	}
 
-	private static final Look LORD = new Look("your lord and saviour ", 0xBE3FFF, 0xFFF5FF);
+	private static final Look LORD = new Look("Lord and Saviour ", 0xBE3FFF, 0xFFF5FF, -1);
+	private static final Look SCOOP = new Look("Scoop Master ", 0x9932CC, 0xFFF5FF, -1);
 
 	private static final Map<UUID, Look> PLAYERS = Map.of(
 			uuid("2913ac77e515490a96eb5183963f6169"), LORD,
-			uuid("f299854cd6954a3cbaae6ab0e4b62dc8"), LORD
+			uuid("f299854cd6954a3cbaae6ab0e4b62dc8"), LORD,
+			uuid("e02ca8dea5d740ffaa85d29a83a2eefb"), SCOOP
 	);
 
 	private static final Map<String, Look> NAMES = new ConcurrentHashMap<>(Map.of(
 			"biwf", LORD,
-			"bewf", LORD
+			"bewf", LORD,
+			"stalbet", SCOOP
 	));
 
 	private static final Map<String, Cached> CACHE = new HashMap<>();
@@ -103,14 +106,18 @@ public final class Sparkle {
 		long phase = now % PERIOD_MS;
 		boolean shining = phase < SHINE_MS;
 
+		float trail = look.shine2() >= 0 ? 4.0F : 0.0F;
 		float progress = shining ? phase / (float) SHINE_MS : 0.0F;
-		float center = -SHINE_RADIUS + progress * (length + SHINE_RADIUS * 2.0F);
+		float center = -SHINE_RADIUS + progress * (length + SHINE_RADIUS * 2.0F + trail);
 
 		for (int i = 0; i < length; i++) {
 			int color = look.base();
 
 			if (shining) {
 				color = blend(color, look.shine(), sweep(i, center));
+				if (look.shine2() >= 0) {
+					color = blend(color, look.shine2(), sweep(i, center - trail));
+				}
 			}
 
 			out.append(
