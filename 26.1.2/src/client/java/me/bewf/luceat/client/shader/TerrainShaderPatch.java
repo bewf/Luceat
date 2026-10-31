@@ -371,6 +371,7 @@ public final class TerrainShaderPatch {
 			    float quality = clamp(u_LuceatMore.w, 0.3, 1.0);
 			    float shadowReach = u_LuceatExtra.y * mix(0.6, 1.0, quality);
 			    float shadowFade = u_LuceatState.y > 0.5 ? 1.0 - smoothstep(0.6 * shadowReach, shadowReach, length(pos)) : 0.0;
+			    float dayCut = (1.0 - fade) * 8.0;
 			    float budget = u_LuceatMore.z * quality;
 			    float full = budget > 0.5 ? 0.5 / budget : 2.0;
 			    float cheap = full * 0.25;
@@ -385,10 +386,10 @@ public final class TerrainShaderPatch {
 			            }
 			            vec4 light = u_LuceatPosRadius[int(id) - 1];
 			            float away = length(light.xyz - pos);
-			            if (light.w * 1.2 > away) {
+			            if ((light.w - dayCut) * 1.2 > away) {
 			                reached = true;
 			            }
-			            float level = clamp((light.w - away) / 15.0, 0.0, 1.0);
+			            float level = clamp((light.w - dayCut - away) / 15.0, 0.0, 1.0);
 			            if (level <= 0.0) {
 			                continue;
 			            }
@@ -428,8 +429,8 @@ public final class TerrainShaderPatch {
 			            vec4 light = u_LuceatPosRadius[i];
 			            vec3 toLight = light.xyz - pos;
 			            float dist = length(toLight);
-			            float level = clamp((light.w - dist) / 15.0, 0.0, 1.0);
-			            float bounceLevel = bounce > 0.001 ? clamp((light.w * 1.2 - dist) / 18.0, 0.0, 1.0) : 0.0;
+			            float level = clamp((light.w - dayCut - dist) / 15.0, 0.0, 1.0);
+			            float bounceLevel = bounce > 0.001 ? clamp(((light.w - dayCut) * 1.2 - dist) / 18.0, 0.0, 1.0) : 0.0;
 			            if (level <= 0.0 && bounceLevel <= 0.0) {
 			                continue;
 			            }

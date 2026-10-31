@@ -126,7 +126,9 @@ public final class LightSpread {
 		}
 		if (capable == null) {
 			try {
-				capable = GL.getCapabilities().OpenGL43;
+				org.lwjgl.opengl.GLCapabilities caps = GL.getCapabilities();
+				capable = caps.OpenGL43 || (caps.GL_ARB_compute_shader && caps.GL_ARB_shader_image_load_store);
+				Luceat.LOGGER.info("Luceat light spreading: OpenGL 4.3 {}, compute extension {}, image extension {}, so it is {}", caps.OpenGL43, caps.GL_ARB_compute_shader, caps.GL_ARB_shader_image_load_store, capable ? "available" : "not available");
 			} catch (RuntimeException error) {
 				capable = false;
 			}
@@ -248,6 +250,22 @@ public final class LightSpread {
 	}
 
 	private static int program(String source) {
+		try {
+			return build(source);
+		} catch (IllegalStateException first) {
+			String alternative = source.replaceFirst("#version 430 core\n", "#version 330 core\n#extension GL_ARB_compute_shader : require\n#extension GL_ARB_shader_image_load_store : require\n#extension GL_ARB_shading_language_420pack : require\n");
+			if (alternative.equals(source)) {
+				throw first;
+			}
+			try {
+				return build(alternative);
+			} catch (IllegalStateException second) {
+				throw new IllegalStateException(first.getMessage() + " | extension fallback: " + second.getMessage());
+			}
+		}
+	}
+
+	private static int build(String source) {
 		String text = source
 			.replace("@DIM@", Integer.toString(ShadowVolume.DIMENSION))
 			.replace("@HALF@", Integer.toString(SIZE / 2))

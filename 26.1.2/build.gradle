@@ -67,6 +67,7 @@ dependencies {
 
 	clientImplementation "maven.modrinth:sodium:${project.sodium_version}"
 	clientCompileOnly "org.polyfrost.oneconfig:mod-toggles:${project.oneconfig_toggles_version}"
+	clientCompileOnly "maven.modrinth:modmenu:${project.modmenu_version}"
 }
 
 processResources {

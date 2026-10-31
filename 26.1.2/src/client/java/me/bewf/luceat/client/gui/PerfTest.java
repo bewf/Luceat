@@ -31,7 +31,7 @@ public final class PerfTest {
 	}
 
 	private enum Phase {
-		IDLE, WARM, SAMPLE
+		IDLE, PREPARE, WARM, SAMPLE
 	}
 
 	private final Map<Setting, Result> results = new HashMap<>();
@@ -44,6 +44,9 @@ public final class PerfTest {
 	private double totalA;
 	private double totalB;
 	private long phaseStart;
+	private long prepareStart;
+	private boolean prepRays;
+	private boolean prepSpread;
 	private int seenCount;
 	private long lastCall;
 	private String note = "";
@@ -83,23 +86,32 @@ public final class PerfTest {
 		}
 		String label = setting.label().toLowerCase(Locale.ROOT);
 		boolean needsRays = setting.rebuildsShadows() || label.contains("shadow") || label.contains("bounce") || label.contains("shin") || label.contains("sun") || label.contains("water");
-		me.bewf.luceat.client.shader.ShaderVariant variant = me.bewf.luceat.client.shader.TerrainShaderPatch.built();
+		me.bewf.luceat.client.shader.ShaderVariant wanted = me.bewf.luceat.client.shader.ShaderVariant.wanted();
 		boolean needsSpread = label.contains("corner");
-		if (needsSpread && (variant == null || !variant.spread())) {
-			note = "Turn on light around corners first, so the shader has that code to test.";
+		if (wanted == me.bewf.luceat.client.shader.ShaderVariant.OFF) {
+			note = "Luceat is not lighting the world right now, so there is nothing to test. A shader pack may be on, or Luceat is off.";
 			return;
 		}
-		if (needsRays && (variant == null || !variant.rays())) {
-			note = "Turn on shadows, bounce or shine first, so the shader has that code to test.";
+		if (needsSpread && !me.bewf.luceat.client.light.LightSpread.supported()) {
+			note = "This graphics driver reports OpenGL " + me.bewf.luceat.client.gui.presets.HardwareHint.glVersion() + ". Light around corners needs 4.3.";
 			return;
 		}
-		note = "";
+		if (needsSpread && !wanted.spread()) {
+			note = "Turn light around corners on first. The test switches it on and off, so its code has to be in the shader.";
+			return;
+		}
+		if (needsRays && !wanted.rays()) {
+			note = "Turn on shadows, bounce, shine or sun shadows first. The test switches them on and off, so their code has to be in the shader.";
+			return;
+		}
+		prepRays = needsRays;
+		prepSpread = needsSpread;
 		target = setting;
-		snapshot = setting.snapshot();
-		setting.useTestState(false);
-		applied(setting);
-		TestLoad.set(true);
-		phase = Phase.WARM;
+		snapshot = null;
+		phase = Phase.PREPARE;
+		prepareStart = System.nanoTime();
+		me.bewf.luceat.client.shader.VariantWatcher.rebuildNow(minecraft);
+		note = "Preparing the shader.";
 		step = 0;
 		frames = 0;
 		sum = 0.0;
@@ -110,10 +122,27 @@ public final class PerfTest {
 		lastCall = 0L;
 	}
 
+	private void begin(long now) {
+		note = "";
+		snapshot = target.snapshot();
+		target.useTestState(false);
+		applied(target);
+		TestLoad.set(true);
+		phase = Phase.WARM;
+		frames = 0;
+		sum = 0.0;
+		phaseStart = now;
+		lastCall = 0L;
+		seenCount = FrameClock.count();
+	}
+
 	public void cancel() {
 		if (running()) {
-			target.restore(snapshot);
-			applied(target);
+			if (snapshot != null) {
+				target.restore(snapshot);
+				applied(target);
+			}
+			snapshot = null;
 			phase = Phase.IDLE;
 			TestLoad.set(false);
 		}
@@ -124,6 +153,15 @@ public final class PerfTest {
 			return;
 		}
 		long now = System.nanoTime();
+		if (phase == Phase.PREPARE) {
+			if (me.bewf.luceat.client.shader.VariantWatcher.satisfies(prepRays, prepSpread)) {
+				begin(now);
+			} else if (now - prepareStart > 30_000_000_000L) {
+				note = "The shader did not rebuild in time. Close this screen for a moment and try again.";
+				cancel();
+			}
+			return;
+		}
 		double millis = -1.0;
 		int count = FrameClock.count();
 		if (count != seenCount) {

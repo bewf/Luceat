@@ -24,6 +24,18 @@ public final class HardwareHint {
 		return gpu;
 	}
 
+	public static String glVersion() {
+		try {
+			String version = GL11.glGetString(GL11.GL_VERSION);
+			if (version != null) {
+				int space = version.indexOf(' ');
+				return space > 0 ? version.substring(0, space) : version;
+			}
+		} catch (Throwable ignored) {
+		}
+		return "unknown";
+	}
+
 	public static String recommended() {
 		if (name != null) {
 			return name;

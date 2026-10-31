@@ -84,8 +84,9 @@ public final class UpdateChecker {
 		}
 		announced = true;
 		String url = "https://modrinth.com/mod/luceat/version/" + latestId;
-		MutableComponent message = Component.literal("[Luceat] ").withStyle(Style.EMPTY.withColor(LuceatLook.ACCENT & 0xFFFFFF))
-			.append(Component.literal("Update available: " + latestNumber + " ").withStyle(Style.EMPTY.withColor(0xFFFFFF)))
+		MutableComponent message = me.bewf.luceat.client.gui.Say.prefix()
+			.append(me.bewf.luceat.client.gui.Say.text("Update available: "))
+			.append(me.bewf.luceat.client.gui.Say.colour(latestNumber + " ", me.bewf.luceat.client.gui.Say.VALUE))
 			.append(Component.literal("[Open on Modrinth]").withStyle(Style.EMPTY
 				.withColor(0x7AE0FF)
 				.withClickEvent(new ClickEvent.OpenUrl(URI.create(url)))

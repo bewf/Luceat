@@ -22,7 +22,7 @@ public final class LuceatSettings {
 	}
 
 	public static List<String> sections() {
-		return List.of(LIGHTING, SHADOWS, PLACED, SOURCES, PERFORMANCE, GENERAL, ADVANCED);
+		return List.of(GENERAL, LIGHTING, SHADOWS, PLACED, SOURCES, PERFORMANCE, ADVANCED);
 	}
 
 	public static List<Setting> create() {
@@ -242,8 +242,8 @@ public final class LuceatSettings {
 			"Sets the lowest quality adaptive quality can reach. At 1 it never drops.",
 			Cost.NONE, false, 0.3F, 1.0F, 0.05F, "", () -> c.lowestQuality, value -> c.lowestQuality = value));
 		all.add(new ToggleSetting(ADVANCED, "Pause when it freezes",
-			"Pauses lights if they drag the game to a crawl for 3 seconds, and says so. /luceat resume turns them back on.",
-			Cost.NONE, false, () -> c.autoPause, value -> c.autoPause = value));
+			"Pauses lights if the game stays under 4 fps for several seconds. /luceat resume turns them back on. Off by default.",
+			Cost.NONE, false, () -> c.pauseOnFreeze, value -> c.pauseOnFreeze = value));
 		return all;
 	}
 }

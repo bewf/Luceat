@@ -19,6 +19,12 @@
     ],
     "oneconfig:toggle": [
       "me.bewf.luceat.client.compat.oneconfig.LuceatModToggle"
+    ],
+    "modmenu": [
+      "me.bewf.luceat.client.compat.LuceatModMenu"
+    ],
+    "sodium:config_api_user": [
+      "me.bewf.luceat.client.compat.LuceatSodiumConfig"
     ]
   },
   "suggests": {

@@ -87,7 +87,7 @@ public final class LuceatConfig {
 	public int slowBelowFps = 42;
 	public int fastAboveFps = 62;
 	public float lowestQuality = 0.35F;
-	public boolean autoPause = true;
+	public boolean pauseOnFreeze = false;
 
 	public boolean updateChecker = true;
 	public ShaderPackMode shaderPacks = ShaderPackMode.COMPATIBLE;
