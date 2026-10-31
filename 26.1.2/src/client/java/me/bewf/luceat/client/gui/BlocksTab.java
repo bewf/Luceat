@@ -10,6 +10,7 @@ import me.bewf.luceat.client.light.block.BlockRules;
 import me.bewf.luceat.client.light.item.ItemLightRule;
 import me.bewf.luceat.client.light.item.ItemLightRules;
 
+import me.bewf.luceat.client.gui.glass.Icons;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.input.CharacterEvent;
@@ -614,12 +615,7 @@ public final class BlocksTab {
 		int y = trashY0;
 		int colour = over ? LuceatLook.BAD : LuceatLook.SOFT;
 		int lift = over ? 2 : 0;
-		graphics.fill(x + 4, y - lift, x + 8, y + 1 - lift, colour);
-		graphics.fill(x - 1 + (over ? -1 : 0), y + 1 - lift, x + 13 + (over ? -1 : 0), y + 3 - lift, colour);
-		graphics.fill(x + 1, y + 4, x + 11, y + 14, colour);
-		graphics.fill(x + 3, y + 6, x + 4, y + 12, 0xFF1D1D24);
-		graphics.fill(x + 5, y + 6, x + 6, y + 12, 0xFF1D1D24);
-		graphics.fill(x + 7, y + 6, x + 8, y + 12, 0xFF1D1D24);
+		Icons.sprite(graphics, x - 1, y - lift, 16, Icons.TRASH, colour);
 		if (over) {
 			graphics.setTooltipForNextFrame(font, font.split(Component.literal("Delete this rule"), 120), mx, my);
 		}

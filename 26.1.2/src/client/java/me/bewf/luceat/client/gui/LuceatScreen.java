@@ -47,6 +47,7 @@ public final class LuceatScreen extends Screen {
 	private static final String PRESETS = "Presets";
 	private static final String BLOCKS = "Blocks";
 	private static final String ABOUT = "About";
+	private static final String DEBUG = "Debug";
 	private static final Identifier LOGO = Identifier.fromNamespaceAndPath("luceat", "textures/gui/logo.png");
 	private static final Identifier LOGO_SMALL = Identifier.fromNamespaceAndPath("luceat", "textures/gui/logo_small.png");
 	private static final Object NOTICE = new Object();
@@ -92,6 +93,7 @@ public final class LuceatScreen extends Screen {
 	private Presets.Preset cachedPreset;
 	private String cachedJson = "";
 
+	private long debugAt;
 	private final Pane chrome = new Pane();
 	private final Pane content = new Pane();
 	private final Pane popup = new Pane();
@@ -193,6 +195,7 @@ public final class LuceatScreen extends Screen {
 		if (panel != null) {
 			panel.close();
 		}
+		Icons.release();
 		chrome.release();
 		content.release();
 		popup.release();
@@ -226,7 +229,7 @@ public final class LuceatScreen extends Screen {
 	}
 
 	private boolean specialPage() {
-		return PRESETS.equals(section) || BLOCKS.equals(section) || ABOUT.equals(section) || SPEED.equals(section);
+		return PRESETS.equals(section) || BLOCKS.equals(section) || ABOUT.equals(section) || SPEED.equals(section) || DEBUG.equals(section);
 	}
 
 	private boolean settingsPage() {
@@ -311,6 +314,10 @@ public final class LuceatScreen extends Screen {
 		String nowHover = over == null ? "" : over.key;
 		if (!nowHover.equals(hoverKey)) {
 			hoverKey = nowHover;
+			dirty = true;
+		}
+		if (DEBUG.equals(section) && System.currentTimeMillis() - debugAt > 500L) {
+			debugAt = System.currentTimeMillis();
 			dirty = true;
 		}
 		hovered = search.focused() ? null : settingAt(mouseX, mouseY);
@@ -439,6 +446,8 @@ public final class LuceatScreen extends Screen {
 			drawPresets(s);
 		} else if (ABOUT.equals(section)) {
 			drawAbout(s);
+		} else if (DEBUG.equals(section)) {
+			drawDebug(s);
 		}
 		if (previewPage()) {
 			boolean timeHover = panel.overTime(mouseX, mouseY);
@@ -528,12 +537,13 @@ public final class LuceatScreen extends Screen {
 		names.add("~Tools");
 		names.add(BLOCKS);
 		names.add(SPEED);
+		names.add(DEBUG);
 		names.add("-");
 		names.add(ABOUT);
 		return names;
 	}
 
-	private static String[] iconFor(String name) {
+	private static Icons.Icon iconFor(String name) {
 		return switch (name) {
 			case ALL -> Icons.EXPAND;
 			case PRESETS -> Icons.STAR;
@@ -546,6 +556,7 @@ public final class LuceatScreen extends Screen {
 			case LuceatSettings.ADVANCED -> Icons.SLIDERS;
 			case BLOCKS -> Icons.CUBE;
 			case SPEED -> Icons.BOLT;
+			case DEBUG -> Icons.BUG;
 			case ABOUT -> Icons.INFO;
 			default -> Icons.CUBE;
 		};
@@ -976,7 +987,8 @@ public final class LuceatScreen extends Screen {
 		int x1 = listRight + 4;
 		Paint.round(s, x0, y + 4, x1, y + NOTICE_HEIGHT - 4, 10, Paint.argb(40, 255, 200, 87));
 		Paint.outline(s, x0, y + 4, x1, y + NOTICE_HEIGHT - 4, 10, Paint.argb(70, 255, 200, 87));
-		s.text(TITLE, "Heads up", x0 + 10, y + 10, Glass.WARN);
+		Icons.draw(s, x0 + 12, y + 12, Icons.ALERT, Glass.WARN);
+		s.text(TITLE, "Heads up", x0 + 28, y + 10, Glass.WARN);
 		List<String> lines = Glass.wrap(s, BODY, "This page is the complicated one. The defaults are already good, so most people never need to touch it. If something goes odd, hit the reset arrow at the top.", x1 - x0 - 20, 3);
 		int ty = y + 23;
 		for (String line : lines) {
@@ -1207,6 +1219,85 @@ public final class LuceatScreen extends Screen {
 		}
 	}
 
+	private int drawDebugColumn(Surface s, List<DebugReport.Group> groups, int x, int y, int width) {
+		int labelWidth = Math.min(122, width / 2);
+		for (DebugReport.Group group : groups) {
+			s.text(TITLE, group.title(), x, y + 2, Glass.LAVENDER);
+			int lineX = x + s.width(TITLE, group.title()) + 10;
+			Paint.horizontal(s, lineX, y + 7, x + width, y + 8, Paint.argb(40, 205, 187, 255), Paint.argb(0, 205, 187, 255), 6);
+			y += 20;
+			for (DebugReport.Row row : group.rows()) {
+				s.text(BODY, Glass.fit(s, BODY, row.label(), labelWidth - 6), x, y, Glass.MUTED);
+				int used = 0;
+				for (String line : Glass.wrap(s, BODY, row.value(), width - labelWidth, 2)) {
+					s.text(BODY, line, x + labelWidth, y + used, row.colour());
+					used += 11;
+				}
+				y += Math.max(12, used + 1);
+			}
+			y += 10;
+		}
+		return y;
+	}
+
+	private void drawDebug(Surface s) {
+		int x = panelX0 + 4;
+		int gap = 24;
+		int columnWidth = (contentX1 - x - 16 - gap) / 2;
+		int leftEnd = drawDebugColumn(s, DebugReport.left(), x, bodyTop + 6, columnWidth);
+		int rightEnd = drawDebugColumn(s, DebugReport.right(), x + columnWidth + gap, bodyTop + 6, columnWidth);
+		int y = Math.max(leftEnd, rightEnd);
+		if (DebugReport.doubleLighting()) {
+			int x1 = contentX1 - 12;
+			Paint.round(s, x - 4, y, x1, y + 34, 10, Paint.argb(40, 255, 200, 87));
+			Paint.outline(s, x - 4, y, x1, y + 34, 10, Paint.argb(70, 255, 200, 87));
+			Icons.draw(s, x + 6, y + 12, Icons.ALERT, Glass.WARN);
+			int ty = y + 6;
+			for (String line : Glass.wrap(s, BODY, "LambDynamicLights is installed. Both mods light the world, so lights add up twice. Turn one of them off.", x1 - x - 40, 2)) {
+				s.text(BODY, line, x + 24, ty, Glass.SOFT);
+				ty += 11;
+			}
+			y += 42;
+		}
+		y = Math.min(y + 4, bodyBottom - 34);
+		String[] labels = {"Copy report", "Rebuild shader", "Rescan lights", "Resume lights"};
+		int bx = x;
+		for (int i = 0; i < labels.length; i++) {
+			int bw = s.width(BODY, labels[i]) + 28;
+			String key = "dbg:" + i;
+			float over = hoverOf(key);
+			Glass.button(s, bx, y, bx + bw, y + 24, i == 0, over, 0.0F);
+			Glass.centred(s, BODY, labels[i], bx + bw / 2, y + 7, i == 0 ? 0xFFFFFFFF : Glass.TEXT);
+			hit(bx, y, bx + bw, y + 24, key, null);
+			bx += bw + 8;
+		}
+		if (copiedNote != null && System.currentTimeMillis() < copiedUntil) {
+			s.text(BODY, copiedNote, x, y + 32, Glass.GOOD);
+		}
+	}
+
+	private void clickDebug(int index) {
+		String note = null;
+		if (index == 0) {
+			this.minecraft.keyboardHandler.setClipboard(DebugReport.text());
+			note = "Report copied. Paste it into a bug report.";
+		} else if (index == 1 && this.minecraft.level != null) {
+			this.minecraft.levelRenderer.allChanged();
+			note = "Rebuilding the world meshes and the shader.";
+		} else if (index == 2) {
+			me.bewf.luceat.client.light.PlacedLights.clear();
+			note = "Scanning for placed lights again.";
+		} else if (index == 3) {
+			me.bewf.luceat.client.light.Panic.resume();
+			note = "Lights are back on.";
+		}
+		if (note != null) {
+			copiedNote = note;
+			copiedUntil = System.currentTimeMillis() + 3000L;
+		}
+		dirty = true;
+	}
+
 	private void drawAboutLogo(GuiGraphicsExtractor graphics) {
 		graphics.blit(RenderPipelines.GUI_TEXTURED, LOGO, panelX0 + 4, bodyTop + 6, 0.0F, 0.0F, 80, 80, 256, 256, 256, 256);
 	}
@@ -1344,6 +1435,10 @@ public final class LuceatScreen extends Screen {
 		}
 		if (ABOUT.equals(section) && top != null && top.key.startsWith("link:")) {
 			clickLink(top.key.charAt(5) - '0');
+			return true;
+		}
+		if (DEBUG.equals(section) && top != null && top.key.startsWith("dbg:")) {
+			clickDebug(top.key.charAt(4) - '0');
 			return true;
 		}
 		if (SPEED.equals(section)) {

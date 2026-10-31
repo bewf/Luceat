@@ -111,6 +111,12 @@ public final class Pane implements Surface {
 		drawTexts(graphics);
 	}
 
+	public void blitAt(GuiGraphicsExtractor graphics, int x, int y) {
+		if (ready) {
+			graphics.blit(id, x, y, x + w, y + h, 0.0F, 1.0F, 0.0F, 1.0F);
+		}
+	}
+
 	public void drawTexts(GuiGraphicsExtractor graphics) {
 		net.minecraft.client.gui.Font font = Minecraft.getInstance().font;
 		for (Cmd cmd : texts) {

@@ -44,28 +44,11 @@ public final class LuceatLook {
 		return a << 24 | r << 16 | g << 8 | b;
 	}
 
-	private static final String[] RESET_ICON = {
-		"..####.#.",
-		".#....###",
-		"#......#.",
-		"#........",
-		"#.......#",
-		".#.....#.",
-		"..#####.."
-	};
-
 	public static final int ICON_W = 9;
-	public static final int ICON_H = 7;
+	public static final int ICON_H = 9;
 
 	public static void resetIcon(GuiGraphicsExtractor graphics, int x, int y, int colour) {
-		for (int row = 0; row < RESET_ICON.length; row++) {
-			String line = RESET_ICON[row];
-			for (int col = 0; col < line.length(); col++) {
-				if (line.charAt(col) == '#') {
-					graphics.fill(x + col, y + row, x + col + 1, y + row + 1, colour);
-				}
-			}
-		}
+		me.bewf.luceat.client.gui.glass.Icons.sprite(graphics, x - 1, y - 1, 11, me.bewf.luceat.client.gui.glass.Icons.RESET, colour);
 	}
 
 	public static void drawSwitch(GuiGraphicsExtractor graphics, int x, int y, boolean on) {
