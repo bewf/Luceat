@@ -5,38 +5,8 @@ import me.bewf.luceat.client.config.LuceatConfig;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.world.level.Level;
 
-import java.lang.reflect.Method;
-
 public final class SunLight {
-	private static final String[] CLOCK_NAMES = {"getDayTime", "getDefaultClockTime", "getOverworldClockTime", "getClockTime", "getGameTime"};
-	private static Method clock;
-	private static boolean searched;
-
 	private SunLight() {
-	}
-
-	private static long time(ClientLevel level) {
-		if (!searched) {
-			searched = true;
-			for (String name : CLOCK_NAMES) {
-				try {
-					Method method = level.getClass().getMethod(name);
-					if (method.getReturnType() == long.class) {
-						clock = method;
-						break;
-					}
-				} catch (ReflectiveOperationException | RuntimeException ignored) {
-				}
-			}
-		}
-		if (clock != null) {
-			try {
-				return (Long) clock.invoke(level);
-			} catch (ReflectiveOperationException | RuntimeException ignored) {
-				clock = null;
-			}
-		}
-		return 6000L;
 	}
 
 	public static float[] values(ClientLevel level, float partialTick, LuceatConfig config) {
@@ -44,7 +14,7 @@ public final class SunLight {
 		if (level == null || level.dimension() != Level.OVERWORLD) {
 			return out;
 		}
-		double day = time(level) / 24000.0 - 0.25;
+		double day = level.getOverworldClockTime() / 24000.0 - 0.25;
 		day -= Math.floor(day);
 		double eased = 0.5 - Math.cos(day * Math.PI) / 2.0;
 		double angle = (day + (eased - day) / 3.0) * 2.0 * Math.PI;
