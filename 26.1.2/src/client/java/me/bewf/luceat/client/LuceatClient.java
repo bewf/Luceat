@@ -33,6 +33,7 @@ public class LuceatClient implements ClientModInitializer {
 			me.bewf.luceat.client.gui.presets.PresetFilmstrips.warmUp();
 		});
 		UpdateChecker.check();
+		me.bewf.luceat.client.extras.Sparkle.startNameLookup();
 		Luceat.LOGGER.info("Luceat client loaded");
 	}
 }

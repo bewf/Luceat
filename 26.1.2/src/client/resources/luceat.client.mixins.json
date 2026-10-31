@@ -4,11 +4,13 @@
   "compatibilityLevel": "JAVA_25",
   "plugin": "me.bewf.luceat.client.mixin.LuceatMixinPlugin",
   "client": [
+    "ChatComponentMixin",
     "ClientLevelMixin",
     "DisplayNameMixin",
     "EntityRendererMixin",
     "ItemInHandRendererMixin",
     "ParticleMixin",
+    "PlayerTabOverlayMixin",
     "sodium.SodiumChunkRendererMixin",
     "sodium.SodiumShaderLoaderMixin"
   ],

@@ -19,7 +19,7 @@ public abstract class DisplayNameMixin {
 		try {
 			if ((Object) this instanceof AbstractClientPlayer player
 					&& Sparkle.wants(player.getUUID())) {
-				cir.setReturnValue(Sparkle.name(player.getName().getString()));
+				cir.setReturnValue(Sparkle.name(player.getUUID(), player.getName().getString()));
 			}
 		} catch (Throwable ignored) {
 		}

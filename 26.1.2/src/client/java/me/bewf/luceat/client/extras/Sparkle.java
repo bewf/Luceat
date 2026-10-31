@@ -1,7 +1,18 @@
-
 package me.bewf.luceat.client.extras;
 
+import java.io.InputStreamReader;
+import java.net.HttpURLConnection;
+import java.net.URI;
+import java.nio.charset.StandardCharsets;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
+import com.google.gson.JsonParser;
 
 import me.bewf.luceat.client.config.LuceatConfig;
 
@@ -11,12 +22,25 @@ import net.minecraft.network.chat.Style;
 import net.minecraft.network.chat.TextColor;
 
 public final class Sparkle {
-	private static final UUID PLAYER_UUID = UUID.fromString("f299854c-d695-4a3c-baae-6ab0e4b62dc8");
+	private record Look(String prefix, int base, int shine) {
+	}
 
-	private static final String PREFIX = "your lord and saviour ";
+	private record Cached(String name, long builtAt, Component component) {
+	}
 
-	private static final int BASE_COLOR = 0xBE3FFF;
-	private static final int SHINE_COLOR = 0xFFF5FF;
+	private static final Look LORD = new Look("your lord and saviour ", 0xBE3FFF, 0xFFF5FF);
+
+	private static final Map<UUID, Look> PLAYERS = Map.of(
+			uuid("2913ac77e515490a96eb5183963f6169"), LORD,
+			uuid("f299854cd6954a3cbaae6ab0e4b62dc8"), LORD
+	);
+
+	private static final Map<String, Look> NAMES = new ConcurrentHashMap<>(Map.of(
+			"biwf", LORD,
+			"bewf", LORD
+	));
+
+	private static final Map<String, Cached> CACHE = new HashMap<>();
 
 	private static final long CACHE_MS = 50L;
 	private static final long PERIOD_MS = 2400L;
@@ -24,57 +48,69 @@ public final class Sparkle {
 
 	private static final float SHINE_RADIUS = 1.5F;
 
-	private static Component cached;
-	private static String cachedName;
-	private static long builtAt;
+	private static final Pattern LIST_HEADER = Pattern.compile(
+			"(party (leader|members|moderators)|partying with)\\s*$", Pattern.CASE_INSENSITIVE);
+
+	private static volatile Pattern namePattern;
+
+	static {
+		rebuildPattern();
+	}
 
 	private Sparkle() {
 	}
 
-	public static boolean wants(UUID uuid) {
-		if (!PLAYER_UUID.equals(uuid)) {
-			return false;
-		}
+	private static UUID uuid(String hex) {
+		return UUID.fromString(hex.replaceFirst(
+				"(\\p{XDigit}{8})(\\p{XDigit}{4})(\\p{XDigit}{4})(\\p{XDigit}{4})(\\p{XDigit}+)",
+				"$1-$2-$3-$4-$5"));
+	}
 
+	private static boolean on() {
 		LuceatConfig config = LuceatConfig.get();
 		return config.enabled && config.fancyNames;
 	}
 
-	public static Component name(String playerName) {
+	public static boolean wants(UUID uuid) {
+		return uuid != null && PLAYERS.containsKey(uuid) && on();
+	}
+
+	public static Component name(UUID uuid, String playerName) {
+		Look look = PLAYERS.get(uuid);
+		if (look == null) {
+			return Component.literal(playerName);
+		}
+		return render(look, playerName);
+	}
+
+	public static Component decorateChat(Component message) {
+		return replaceNames(message, false, true);
+	}
+
+	private static synchronized Component render(Look look, String playerName) {
 		long now = System.currentTimeMillis();
 
-		if (cached != null
-				&& playerName.equals(cachedName)
-				&& now - builtAt < CACHE_MS) {
-			return cached;
+		String key = playerName.toLowerCase();
+		Cached hit = CACHE.get(key);
+		if (hit != null && playerName.equals(hit.name()) && now - hit.builtAt() < CACHE_MS) {
+			return hit.component();
 		}
 
-		String text = PREFIX + playerName;
+		String text = look.prefix() + playerName;
 		MutableComponent out = Component.empty();
 		int length = text.length();
 
 		long phase = now % PERIOD_MS;
 		boolean shining = phase < SHINE_MS;
 
-		float progress = shining
-				? phase / (float) SHINE_MS
-				: 0.0F;
-
-		float center = -SHINE_RADIUS
-				+ progress * (length + SHINE_RADIUS * 2.0F);
+		float progress = shining ? phase / (float) SHINE_MS : 0.0F;
+		float center = -SHINE_RADIUS + progress * (length + SHINE_RADIUS * 2.0F);
 
 		for (int i = 0; i < length; i++) {
-			int color = BASE_COLOR;
+			int color = look.base();
 
 			if (shining) {
-				float distance = Math.abs(i - center);
-				float strength = Math.max(
-						0.0F,
-						1.0F - distance / SHINE_RADIUS
-				);
-
-				strength = strength * strength * (3.0F - 2.0F * strength);
-				color = blend(BASE_COLOR, SHINE_COLOR, strength);
+				color = blend(color, look.shine(), sweep(i, center));
 			}
 
 			out.append(
@@ -83,11 +119,114 @@ public final class Sparkle {
 			);
 		}
 
-		cached = out;
-		cachedName = playerName;
-		builtAt = now;
+		CACHE.put(key, new Cached(playerName, now, out));
 
 		return out;
+	}
+
+	private static float sweep(int index, float center) {
+		float strength = Math.max(0.0F, 1.0F - Math.abs(index - center) / SHINE_RADIUS);
+		return strength * strength * (3.0F - 2.0F * strength);
+	}
+
+	private static Component staticName(Look look, String playerName) {
+		return Component.literal(look.prefix() + playerName)
+				.setStyle(Style.EMPTY.withColor(TextColor.fromRgb(look.base())));
+	}
+
+	private static void rebuildPattern() {
+		StringBuilder alt = new StringBuilder();
+		for (String n : NAMES.keySet()) {
+			if (alt.length() > 0) {
+				alt.append('|');
+			}
+			alt.append(Pattern.quote(n));
+		}
+		namePattern = Pattern.compile("(?<![A-Za-z0-9_])(" + alt + ")(?![A-Za-z0-9_])", Pattern.CASE_INSENSITIVE);
+	}
+
+	public static void startNameLookup() {
+		if (!on()) {
+			return;
+		}
+		Thread thread = new Thread(() -> {
+			for (Map.Entry<UUID, Look> entry : PLAYERS.entrySet()) {
+				try {
+					String id = entry.getKey().toString().replace("-", "");
+					HttpURLConnection connection = (HttpURLConnection) URI
+							.create("https://sessionserver.mojang.com/session/minecraft/profile/" + id)
+							.toURL().openConnection();
+					connection.setConnectTimeout(5000);
+					connection.setReadTimeout(5000);
+					connection.setRequestProperty("User-Agent", "Luceat");
+					if (connection.getResponseCode() != 200) {
+						continue;
+					}
+					try (InputStreamReader reader = new InputStreamReader(connection.getInputStream(), StandardCharsets.UTF_8)) {
+						String name = JsonParser.parseReader(reader).getAsJsonObject().get("name").getAsString();
+						NAMES.put(name.toLowerCase(), entry.getValue());
+					}
+				} catch (Throwable ignored) {
+				}
+			}
+			rebuildPattern();
+		}, "Luceat-NameLookup");
+		thread.setDaemon(true);
+		thread.start();
+	}
+
+	public static Component replaceNames(Component message, boolean animated, boolean senderOnly) {
+		try {
+			if (message == null || !on()) {
+				return message;
+			}
+
+			String flat = message.getString();
+			if (!namePattern.matcher(flat).find()) {
+				return message;
+			}
+
+			int limit = Integer.MAX_VALUE;
+			if (senderOnly) {
+				int colon = flat.indexOf(':');
+				if (colon >= 0 && !LIST_HEADER.matcher(flat.substring(0, colon)).find()) {
+					limit = colon;
+				}
+			}
+			final int senderEnd = limit;
+
+			MutableComponent out = Component.empty();
+			boolean[] changed = {false};
+			int[] offset = {0};
+			message.visit((style, text) -> {
+				Matcher m = namePattern.matcher(text);
+				int last = 0;
+				while (m.find()) {
+					if (offset[0] + m.start() >= senderEnd) {
+						break;
+					}
+					Look look = NAMES.get(m.group(1).toLowerCase());
+					if (look == null || text.substring(0, m.start()).endsWith(look.prefix())) {
+						continue;
+					}
+					if (m.start() > last) {
+						out.append(Component.literal(text.substring(last, m.start())).setStyle(style));
+					}
+					out.append(animated ? render(look, m.group(1)) : staticName(look, m.group(1)));
+					changed[0] = true;
+					last = m.end();
+				}
+				if (last < text.length()) {
+					out.append(Component.literal(text.substring(last)).setStyle(style));
+				}
+				offset[0] += text.length();
+				return Optional.empty();
+			}, Style.EMPTY);
+
+			return changed[0] ? out : message;
+		} catch (Throwable error) {
+			return message;
+		}
 	}
 
 	private static int blend(int base, int shine, float amount) {
