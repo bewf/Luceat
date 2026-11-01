@@ -377,13 +377,16 @@ public final class TerrainShaderPatch {
 			    float cheap = full * 0.25;
 			    float sumPower = 0.0;
 			    bool reached = false;
-			    for (int g = 0; g < luceatTexels; g++) {
+			    int slotCap = int(u_LuceatSun2.w + 0.5);
+			    int taken = 0;
+			    for (int g = 0; g < luceatTexels && taken < slotCap; g++) {
 			        uvec4 slots = texelFetch(@GRID@, ivec3(gc.x * @TEXELS@ + g, gc.y, gc.z), 0);
 			        for (int c = 0; c < luceatPer; c++) {
 			            uint id = slots[c];
-			            if (id == 0u) {
-			                continue;
+			            if (id == 0u || taken >= slotCap) {
+			                break;
 			            }
+			            taken++;
 			            vec4 light = u_LuceatPosRadius[int(id) - 1];
 			            float away = length(light.xyz - pos);
 			            if ((light.w - dayCut) * 1.2 > away) {
@@ -418,13 +421,15 @@ public final class TerrainShaderPatch {
 			    vec3 blockPart = max(vertexColor.rgb - baseColor.rgb, vec3(0.0));
 			    float vanillaOpen = smoothstep(0.004, 0.035, dot(blockPart, vec3(0.299, 0.587, 0.114)));
 			    vec3 viewDir = normalize(-pos);
-			    for (int g = 0; g < luceatTexels; g++) {
+			    taken = 0;
+			    for (int g = 0; g < luceatTexels && taken < slotCap; g++) {
 			        uvec4 slots = texelFetch(@GRID@, ivec3(gc.x * @TEXELS@ + g, gc.y, gc.z), 0);
 			        for (int c = 0; c < luceatPer; c++) {
 			            uint id = slots[c];
-			            if (id == 0u) {
-			                continue;
+			            if (id == 0u || taken >= slotCap) {
+			                break;
 			            }
+			            taken++;
 			            int i = int(id) - 1;
 			            vec4 light = u_LuceatPosRadius[i];
 			            vec3 toLight = light.xyz - pos;

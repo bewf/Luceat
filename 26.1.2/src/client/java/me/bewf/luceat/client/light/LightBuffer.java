@@ -42,7 +42,7 @@ public final class LightBuffer {
 		net.minecraft.client.Minecraft minecraft = net.minecraft.client.Minecraft.getInstance();
 		float[] sun = SunLight.values(minecraft.level, minecraft.getDeltaTracker().getGameTimeDeltaPartialTick(false), config);
 		for (int i = 0; i < 8; i++) {
-			this.scratch.putFloat(sun[i]);
+			this.scratch.putFloat(i == 7 ? slotCap(config) : sun[i]);
 		}
 		for (int i = 0; i < MAX_LIGHTS; i++) {
 			if (i < count) {
@@ -74,6 +74,11 @@ public final class LightBuffer {
 		}
 		GL15.glBufferSubData(GL31.GL_UNIFORM_BUFFER, 0L, this.scratch);
 		GL15.glBindBuffer(GL31.GL_UNIFORM_BUFFER, 0);
+	}
+
+	private static int slotCap(LuceatConfig config) {
+		int most = Math.max(6, Math.min(LightGrid.SLOTS, 4 + config.maxLights / 24));
+		return Math.max(3, Math.round(most * (0.45F + 0.55F * Governor.quality())));
 	}
 
 	public void bind(int program) {

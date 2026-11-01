@@ -37,6 +37,8 @@ public final class PlacedLights {
 	private static final double SETTLE = 3.0;
 	private static final int[] SIZES = {0, 2, 4, 8};
 	private static final int DENSE_HARD = 24;
+	private static final int MASSIVE = 40;
+	private static final float KEEP_BONUS = 1.3F;
 	private static final double SECTION_RADIUS = 14.0;
 	private static final float[] DEFAULT_COLOUR = {1.0F, 0.7F, 0.35F};
 	private static final Direction[] SIDES = Direction.values();
@@ -104,6 +106,8 @@ public final class PlacedLights {
 	private static final boolean[] cn = new boolean[MAX_CANDIDATES];
 	private static final int[] cv = new int[MAX_CANDIDATES];
 	private static final long[] cid = new long[MAX_CANDIDATES];
+	private static final long[] ck = new long[MAX_CANDIDATES];
+	private static long[] lastPicked = new long[0];
 	private static final float[] cs = new float[MAX_CANDIDATES];
 	private static final long[] order = new long[MAX_CANDIDATES];
 
@@ -396,6 +400,7 @@ public final class PlacedLights {
 			}
 			int crowd = config.clusterLights ? config.clusterSize : Integer.MAX_VALUE;
 			boolean dense = section.count > (config.mergeFarLights ? crowd : Math.max(crowd, DENSE_HARD));
+			boolean massive = dense && section.count > MASSIVE;
 			for (int i = 0; i < section.count; i++) {
 				double dx = section.x[i] - camera.x;
 				double dy = section.y[i] - camera.y;
@@ -405,7 +410,7 @@ public final class PlacedLights {
 				if (distance > range || Math.abs(dy) > LightGrid.REACH_Y + level) {
 					continue;
 				}
-				int tier = settle(section, i, distance, config.mergeFarLights, dense, config.joinBeyond);
+				int tier = settle(section, i, distance, config.mergeFarLights, dense, massive, config.joinBeyond);
 				if (tier == 0 && !LightCull.sees(section.x[i], section.y[i], section.z[i], level)) {
 					continue;
 				}
@@ -422,7 +427,8 @@ public final class PlacedLights {
 						cn[total] = section.noShadow[i];
 						cv[total] = section.vanilla[i];
 						cid[total] = 0L;
-						cs[total] = score(level, distance);
+						ck[total] = key((int) Math.floor(section.x[i]), (int) Math.floor(section.y[i]), (int) Math.floor(section.z[i]));
+						cs[total] = score(level, distance) * kept(ck[total]);
 						total++;
 					}
 				} else {
@@ -452,7 +458,8 @@ public final class PlacedLights {
 			cn[total] = true;
 			cv[total] = open[slot] ? 0 : Math.max(0, natural[slot] - spans[slot]);
 			cid[total] = LightSmoother.key(6, (int) (tableKey[slot] ^ (tableKey[slot] >>> 32)), (int) (tableKey[slot] >>> 62));
-			cs[total] = score(level, distance);
+			ck[total] = tableKey[slot];
+			cs[total] = score(level, distance) * kept(ck[total]);
 			total++;
 		}
 		for (int g = 0; g < groups; g++) {
@@ -468,28 +475,37 @@ public final class PlacedLights {
 			picked[(int) (order[total - 1 - k] & 0xFFFFFFFFL)] = true;
 		}
 		List<LightSource> result = new ArrayList<>(take);
+		long[] keys = new long[take];
+		int written = 0;
 		for (int i = 0; i < total; i++) {
 			if (picked[i]) {
 				result.add(new LightSource(cx[i], cy[i], cz[i], cr[i], cg[i], cb[i], cl[i], true, cf[i], cid[i], cn[i], cv[i]));
+				keys[written++] = ck[i];
 			}
 		}
+		Arrays.sort(keys, 0, written);
+		lastPicked = Arrays.copyOf(keys, written);
 		return result;
 	}
 
-	private static int wanted(double distance, boolean merge, boolean dense, double near) {
+	private static float kept(long candidate) {
+		return Arrays.binarySearch(lastPicked, candidate) >= 0 ? KEEP_BONUS : 1.0F;
+	}
+
+	private static int wanted(double distance, boolean merge, boolean dense, boolean massive, double near) {
 		int tier = 0;
 		if (merge) {
 			tier = distance <= near ? 0 : distance <= near * 2.0 ? 2 : 3;
 		}
 		if (dense) {
-			tier = Math.max(tier, distance <= CLOSE ? 1 : 2);
+			tier = Math.max(tier, massive ? (distance <= CLOSE ? 2 : 3) : (distance <= CLOSE ? 1 : 2));
 		}
 		return tier;
 	}
 
-	private static int settle(Section section, int i, double distance, boolean merge, boolean dense, double near) {
-		int low = wanted(distance - SETTLE, merge, dense, near);
-		int high = wanted(distance + SETTLE, merge, dense, near);
+	private static int settle(Section section, int i, double distance, boolean merge, boolean dense, boolean massive, double near) {
+		int low = wanted(distance - SETTLE, merge, dense, massive, near);
+		int high = wanted(distance + SETTLE, merge, dense, massive, near);
 		int tier = section.tier[i];
 		if (tier < low) {
 			tier = low;

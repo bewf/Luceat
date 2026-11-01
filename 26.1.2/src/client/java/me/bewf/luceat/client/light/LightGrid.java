@@ -110,6 +110,9 @@ public final class LightGrid {
 				used++;
 			}
 			int base = cell * SLOTS;
+			if (n > 1) {
+				rank(base, n);
+			}
 			for (int k = 0; k < SLOTS; k++) {
 				data.putShort((short) (k < n ? ids[base + k] : 0));
 			}
@@ -117,6 +120,21 @@ public final class LightGrid {
 		cellsUsed = used;
 		data.flip();
 		upload();
+	}
+
+	private static void rank(int base, int n) {
+		for (int i = 1; i < n; i++) {
+			int id = ids[base + i];
+			float score = scores[base + i];
+			int k = i - 1;
+			while (k >= 0 && scores[base + k] < score) {
+				ids[base + k + 1] = ids[base + k];
+				scores[base + k + 1] = scores[base + k];
+				k--;
+			}
+			ids[base + k + 1] = id;
+			scores[base + k + 1] = score;
+		}
 	}
 
 	private static void insert(int index, LightSource light) {
