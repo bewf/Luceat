@@ -279,28 +279,28 @@ public final class BlocksTab {
 		filterInput.draw(graphics, font, x0, y0, x1 - 70, y0 + 20, "Search blocks and items");
 		boolean addHover = LuceatLook.inside(mx, my, x1 - 64, y0, x1, y0 + 20);
 		LuceatLook.roundOutlined(graphics, x1 - 64, y0, x1, y0 + 20, adding ? LuceatLook.ACCENT_SOFT : addHover ? LuceatLook.CARD_HOVER : LuceatLook.CARD, adding ? LuceatLook.ACCENT : LuceatLook.BORDER);
-		graphics.text(font, "Add rule", x1 - 64 + (64 - font.width("Add rule")) / 2, y0 + 6, adding ? LuceatLook.ACCENT : LuceatLook.SOFT, false);
+		ink(graphics, "Add rule", x1 - 64 + (64 - inkWidth("Add rule")) / 2, y0 + 6, adding ? LuceatLook.ACCENT : LuceatLook.SOFT, false);
 		int cx = x0;
 		for (Filter filter : Filter.values()) {
-			int width = font.width(filter.label) + 14;
+			int width = inkWidth(filter.label) + 14;
 			boolean on = filter == mode;
 			boolean over = LuceatLook.inside(mx, my, cx, y0 + 24, cx + width, y0 + 42);
 			LuceatLook.round(graphics, cx, y0 + 24, cx + width, y0 + 42, on ? LuceatLook.ACCENT : over ? LuceatLook.CARD_HOVER : LuceatLook.CARD);
-			graphics.text(font, filter.label, cx + 7, y0 + 29, on ? 0xFFFFFFFF : LuceatLook.SOFT, false);
+			ink(graphics, filter.label, cx + 7, y0 + 29, on ? 0xFFFFFFFF : LuceatLook.SOFT, false);
 			cx += width + 4;
 		}
 		String sortText = sortLabel();
-		int sortW = font.width(sortText) + 14;
+		int sortW = inkWidth(sortText) + 14;
 		boolean sortOver = LuceatLook.inside(mx, my, x1 - sortW, y0 + 24, x1, y0 + 42);
 		LuceatLook.roundOutlined(graphics, x1 - sortW, y0 + 24, x1, y0 + 42, sortOver ? LuceatLook.CARD_HOVER : LuceatLook.CARD, LuceatLook.BORDER);
-		graphics.text(font, sortText, x1 - sortW + 7, y0 + 29, LuceatLook.SOFT, false);
+		ink(graphics, sortText, x1 - sortW + 7, y0 + 29, LuceatLook.SOFT, false);
 		String count = shown.size() + (shown.size() == 1 ? " entry" : " entries");
-		if (cx + font.width(count) + sortW + 16 < x1) {
-			graphics.text(font, count, x1 - sortW - 8 - font.width(count), y0 + 29, LuceatLook.MUTED, false);
+		if (cx + inkWidth(count) + sortW + 16 < x1) {
+			ink(graphics, count, x1 - sortW - 8 - inkWidth(count), y0 + 29, LuceatLook.MUTED, false);
 		}
 		int top = y0 + listTopOffset();
 		if (adding) {
-			graphics.text(font, "Find the block or item, click it, then press Make it glow.", x0, y0 + 48, LuceatLook.WARN, false);
+			ink(graphics, "Find the block or item, click it, then press Make it glow.", x0, y0 + 48, LuceatLook.WARN, false);
 		}
 		scroll = Math.max(0.0F, Math.min(scroll, maxScroll()));
 		graphics.enableScissor(x0, top, x1 + 2, y1);
@@ -316,16 +316,16 @@ public final class BlocksTab {
 					graphics.fakeItem(entry.stack, x0 + 6, y + 6);
 				}
 				graphics.enableScissor(x0 + 26, y, Math.max(x0 + 26, x1 - 150), y + ROW);
-				graphics.text(font, entry.name, x0 + 28, y + 5, LuceatLook.TEXT, false);
-				graphics.text(font, entry.key, x0 + 28, y + 16, LuceatLook.MUTED, false);
+				ink(graphics, entry.name, x0 + 28, y + 5, LuceatLook.TEXT, false);
+				ink(graphics, entry.key, x0 + 28, y + 16, LuceatLook.MUTED, false);
 				graphics.disableScissor();
 				int rx = x1 - 8;
 				int level = effectiveLevel(entry);
 				boolean added = rule != null && rule.added;
 				String status = level > 0 ? "Level " + level : rule != null && !rule.enabled ? "Off" : "No light";
 				int statusColour = level > 0 ? isSelected ? 0xFFFFFFFF : LuceatLook.TEXT : rule != null && !rule.enabled ? LuceatLook.BAD : isSelected ? 0xFFDCCBF5 : 0xFF8E8EA0;
-				rx -= font.width(status);
-				graphics.text(font, status, rx, y + 10, statusColour, false);
+				rx -= inkWidth(status);
+				ink(graphics, status, rx, y + 10, statusColour, false);
 				if (level > 0) {
 					rx -= 16;
 					LuceatLook.round(graphics, rx, y + 9, rx + 11, y + 20, pack(colour(entry)));
@@ -333,11 +333,11 @@ public final class BlocksTab {
 				}
 				if (builtIn(entry) || added) {
 					String badge = added ? "Yours" : "Built in";
-					int bw = font.width(badge) + 10;
+					int bw = inkWidth(badge) + 10;
 					rx -= bw + 6;
 					int colourBadge = added ? LuceatLook.ACCENT : BUILT_IN;
 					LuceatLook.roundOutlined(graphics, rx, y + 7, rx + bw, y + 21, 0xFF16161B, colourBadge);
-					graphics.text(font, badge, rx + 5, y + 11, isSelected && !added ? 0xFFB9D4FF : colourBadge, false);
+					ink(graphics, badge, rx + 5, y + 11, isSelected && !added ? 0xFFB9D4FF : colourBadge, false);
 					if (LuceatLook.inside(mx, my, rx, y + 7, rx + bw, y + 21) && my >= top) {
 						String text = added ? "A rule you made." : "Comes with the game or Luceat.";
 						tip = font.split(Component.literal(text).withStyle(Style.EMPTY.withColor(0xDDDDE6)), 200);
@@ -351,7 +351,7 @@ public final class BlocksTab {
 		}
 		graphics.disableScissor();
 		if (shown.isEmpty()) {
-			graphics.text(font, "Nothing matches.", x0 + 4, top + 6, LuceatLook.MUTED, false);
+			ink(graphics, "Nothing matches.", x0 + 4, top + 6, LuceatLook.MUTED, false);
 		}
 		int max = maxScroll();
 		if (max > 0) {
@@ -387,8 +387,8 @@ public final class BlocksTab {
 		boolean closed = collapsed.contains(name);
 		boolean over = LuceatLook.inside(mx, my, edX0, y, edX1, y + 16) && my >= edTop && my < edBottom;
 		LuceatLook.round(graphics, edX0, y, edX1, y + 16, over ? LuceatLook.CARD_HOVER : LuceatLook.CARD);
-		graphics.text(font, closed ? ">" : "v", edX0 + 6, y + 4, LuceatLook.ACCENT, false);
-		graphics.text(font, name, edX0 + 18, y + 4, LuceatLook.TEXT, false);
+		ink(graphics, closed ? ">" : "v", edX0 + 6, y + 4, LuceatLook.ACCENT, false);
+		ink(graphics, name, edX0 + 18, y + 4, LuceatLook.TEXT, false);
 		hit(edX0, y, edX1, y + 16, () -> {
 			if (!collapsed.remove(name)) {
 				collapsed.add(name);
@@ -398,7 +398,7 @@ public final class BlocksTab {
 	}
 
 	private int toggleRow(GuiGraphicsExtractor graphics, String label, boolean on, int y, Runnable flip) {
-		graphics.text(font, label, edX0, y + 5, LuceatLook.TEXT, false);
+		ink(graphics, label, edX0, y + 5, LuceatLook.TEXT, false);
 		int tx = edX1 - 30;
 		LuceatLook.round(graphics, tx, y + 2, tx + 30, y + 16, on ? LuceatLook.ACCENT : LuceatLook.TRACK);
 		int knob = on ? tx + 17 : tx + 3;
@@ -408,21 +408,21 @@ public final class BlocksTab {
 	}
 
 	private int cycleRow(GuiGraphicsExtractor graphics, String label, String value, boolean custom, int y, int mx, int my, Runnable next) {
-		graphics.text(font, label, edX0, y + 5, LuceatLook.TEXT, false);
-		int w = font.width(value) + 14;
+		ink(graphics, label, edX0, y + 5, LuceatLook.TEXT, false);
+		int w = inkWidth(value) + 14;
 		int bx0 = edX1 - w;
 		boolean over = LuceatLook.inside(mx, my, bx0, y, edX1, y + 18) && my >= edTop && my < edBottom;
 		LuceatLook.roundOutlined(graphics, bx0, y, edX1, y + 18, over ? LuceatLook.CARD_HOVER : LuceatLook.CARD, custom ? LuceatLook.WARN : LuceatLook.BORDER);
-		graphics.text(font, value, bx0 + 7, y + 5, custom ? LuceatLook.WARN : LuceatLook.SOFT, false);
+		ink(graphics, value, bx0 + 7, y + 5, custom ? LuceatLook.WARN : LuceatLook.SOFT, false);
 		hit(bx0, y, edX1, y + 18, next);
 		return y + 24;
 	}
 
 	private int sliderRow(GuiGraphicsExtractor graphics, String label, String value, boolean custom, float fraction, int y, int id, Runnable reset, java.util.function.DoubleConsumer set) {
-		graphics.text(font, label, edX0, y, LuceatLook.TEXT, false);
-		graphics.text(font, value, edX1 - font.width(value), y, custom ? LuceatLook.WARN : LuceatLook.SOFT, false);
+		ink(graphics, label, edX0, y, LuceatLook.TEXT, false);
+		ink(graphics, value, edX1 - inkWidth(value), y, custom ? LuceatLook.WARN : LuceatLook.SOFT, false);
 		if (reset != null) {
-			hit(edX0, y - 2, edX0 + font.width(label) + 4, y + 10, reset);
+			hit(edX0, y - 2, edX0 + inkWidth(label) + 4, y + 10, reset);
 		}
 		slider(graphics, edX0, edX1, y + 16, fraction, slider == id);
 		slideHit(id, edX0, y + 10, edX1, y + 28, set);
@@ -449,7 +449,7 @@ public final class BlocksTab {
 		edBottom = y1 - 4;
 		hits.clear();
 		LuceatLook.round(graphics, x0, y0, x1, y1, LuceatLook.SIDEBAR);
-		graphics.text(font, "Block settings", x0 + 10, y0 + 8, LuceatLook.TEXT, false);
+		ink(graphics, "Block settings", x0 + 10, y0 + 8, LuceatLook.TEXT, false);
 		Entry entry = selected;
 		if (entry == null) {
 			drawWrapped(graphics, "Pick a block or item on the left to see and change its light. Every block is in the list, with or without light.", x0 + 10, y0 + 28, x1 - x0 - 20, LuceatLook.MUTED);
@@ -466,16 +466,16 @@ public final class BlocksTab {
 		if (!entry.stack.isEmpty()) {
 			graphics.fakeItem(entry.stack, x0 + 10, y);
 		}
-		graphics.text(font, entry.name, x0 + 32, y, LuceatLook.TEXT, false);
-		graphics.text(font, entry.key, x0 + 32, y + 11, LuceatLook.SOFT, false);
+		ink(graphics, entry.name, x0 + 32, y, LuceatLook.TEXT, false);
+		ink(graphics, entry.key, x0 + 32, y + 11, LuceatLook.SOFT, false);
 		y += 26;
 		String kind = entry.block == null ? "Item only. It lights when you hold it, drop it or put it in a frame." : "Block. It lights when placed, held, dropped or in a frame.";
 		y = drawWrapped(graphics, kind, x0 + 10, y, x1 - x0 - 20, LuceatLook.SOFT) + 6;
 		if (builtIn(entry)) {
-			graphics.text(font, "Built in", x0 + 10, y, BUILT_IN, false);
+			ink(graphics, "Built in", x0 + 10, y, BUILT_IN, false);
 			y += 14;
 		} else if (added) {
-			graphics.text(font, "Made by you.", x0 + 10, y, LuceatLook.ACCENT, false);
+			ink(graphics, "Made by you.", x0 + 10, y, LuceatLook.ACCENT, false);
 			y += 14;
 		}
 		if (!lit) {
@@ -507,7 +507,7 @@ public final class BlocksTab {
 				});
 			float[] rgb = colour(entry);
 			boolean customColour = rule != null && rule.colour >= 0;
-			graphics.text(font, "Colour", edX0, y + 3, LuceatLook.TEXT, false);
+			ink(graphics, "Colour", edX0, y + 3, LuceatLook.TEXT, false);
 			int sx = edX0 + 50;
 			boolean swatchOver = LuceatLook.inside(mx, my, sx, y, sx + 34, y + 16) && my >= edTop && my < edBottom;
 			LuceatLook.round(graphics, sx, y, sx + 34, y + 16, pack(rgb));
@@ -519,12 +519,12 @@ public final class BlocksTab {
 					commit();
 				});
 			});
-			graphics.text(font, String.format(Locale.ROOT, "#%06X", pack(rgb) & 0xFFFFFF), sx + 40, y + 4, LuceatLook.SOFT, false);
+			ink(graphics, String.format(Locale.ROOT, "#%06X", pack(rgb) & 0xFFFFFF), sx + 40, y + 4, LuceatLook.SOFT, false);
 			String auto = customColour ? "Use automatic" : "Automatic";
-			int aw = font.width(auto) + 12;
+			int aw = inkWidth(auto) + 12;
 			boolean autoOver = LuceatLook.inside(mx, my, edX1 - aw, y + 20, edX1, y + 36) && my >= edTop && my < edBottom;
 			LuceatLook.roundOutlined(graphics, edX1 - aw, y + 20, edX1, y + 36, customColour ? autoOver ? LuceatLook.CARD_HOVER : LuceatLook.CARD : LuceatLook.ACCENT_SOFT, customColour ? LuceatLook.BORDER : LuceatLook.ACCENT_DIM);
-			graphics.text(font, auto, edX1 - aw + 6, y + 24, customColour ? LuceatLook.SOFT : LuceatLook.ACCENT, false);
+			ink(graphics, auto, edX1 - aw + 6, y + 24, customColour ? LuceatLook.SOFT : LuceatLook.ACCENT, false);
 			if (customColour) {
 				hit(edX1 - aw, y + 20, edX1, y + 36, () -> setRule(r -> r.colour = -1));
 			}
@@ -631,12 +631,24 @@ public final class BlocksTab {
 	private void button(GuiGraphicsExtractor graphics, int x0, int y0, int x1, int y1, String label, int mx, int my, boolean enabled) {
 		boolean over = enabled && LuceatLook.inside(mx, my, x0, y0, x1, y1) && my >= edTop && my < edBottom;
 		LuceatLook.roundOutlined(graphics, x0, y0, x1, y1, over ? LuceatLook.CARD_HOVER : LuceatLook.CARD, enabled ? LuceatLook.ACCENT_DIM : LuceatLook.BORDER);
-		graphics.text(font, label, x0 + (x1 - x0 - font.width(label)) / 2, y0 + (y1 - y0 - 8) / 2, enabled ? LuceatLook.TEXT : LuceatLook.MUTED, false);
+		ink(graphics, label, x0 + (x1 - x0 - inkWidth(label)) / 2, y0 + (y1 - y0 - 8) / 2, enabled ? LuceatLook.TEXT : LuceatLook.MUTED, false);
+	}
+
+	private void ink(GuiGraphicsExtractor graphics, String text, int x, int y, int colour, boolean shadow) {
+		LuceatFonts.draw(graphics, font, LuceatFonts.body(text), x, y, colour, shadow);
+	}
+
+	private void ink(GuiGraphicsExtractor graphics, FormattedCharSequence text, int x, int y, int colour, boolean shadow) {
+		graphics.text(font, text, x, y, colour, shadow);
+	}
+
+	private int inkWidth(String text) {
+		return LuceatFonts.width(font, LuceatFonts.body(text));
 	}
 
 	private int drawWrapped(GuiGraphicsExtractor graphics, String text, int x, int y, int width, int colour) {
-		for (FormattedCharSequence line : font.split(Component.literal(text), width)) {
-			graphics.text(font, line, x, y, colour, false);
+		for (FormattedCharSequence line : font.split(LuceatFonts.body(text), width)) {
+			ink(graphics, line, x, y, colour, false);
 			y += 10;
 		}
 		return y;
@@ -669,7 +681,7 @@ public final class BlocksTab {
 			scroll = 0.0F;
 			return true;
 		}
-		int sortW = font.width(sortLabel()) + 14;
+		int sortW = inkWidth(sortLabel()) + 14;
 		if (LuceatLook.inside(mx, my, listX1 - sortW, listY0 + 24, listX1, listY0 + 42)) {
 			sort = Sort.values()[(sort.ordinal() + 1) % Sort.values().length];
 			scroll = 0.0F;
@@ -677,7 +689,7 @@ public final class BlocksTab {
 		}
 		int cx = listX0;
 		for (Filter filter : Filter.values()) {
-			int width = font.width(filter.label) + 14;
+			int width = inkWidth(filter.label) + 14;
 			if (LuceatLook.inside(mx, my, cx, listY0 + 24, cx + width, listY0 + 42)) {
 				mode = filter;
 				scroll = 0.0F;
