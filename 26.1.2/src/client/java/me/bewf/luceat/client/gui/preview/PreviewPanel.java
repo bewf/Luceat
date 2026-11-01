@@ -325,11 +325,7 @@ public final class PreviewPanel {
 	}
 
 	private static int guiScale() {
-		try {
-			return Math.max(1, Math.min(3, (int) Math.round(Minecraft.getInstance().getWindow().getGuiScale())));
-		} catch (RuntimeException error) {
-			return 2;
-		}
+		return Math.min(4, me.bewf.luceat.client.gui.GuiFit.raster());
 	}
 
 	// bilinear so the picture stays soft instead of showing blocky pixels

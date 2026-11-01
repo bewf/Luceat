@@ -65,7 +65,7 @@ public final class Icons {
 	}
 
 	public static void sprite(GuiGraphicsExtractor graphics, int x, int y, int size, Icon icon, int argb) {
-		int scale = Math.max(1, (int) Math.round(Minecraft.getInstance().getWindow().getGuiScale()));
+		int scale = me.bewf.luceat.client.gui.GuiFit.raster();
 		long key = ((long) System.identityHashCode(icon) << 32) ^ ((long) size << 24) ^ ((long) scale << 20) ^ (argb & 0xFFFFFFL) ^ ((long) (argb >>> 24) << 16);
 		Pane pane = SPRITES.computeIfAbsent(key, k -> {
 			Pane made = new Pane();

@@ -361,7 +361,7 @@ public final class BlocksTab {
 			graphics.fill(x1 + 3, thumbTop, x1 + 5, thumbTop + thumb, LuceatLook.TRACK);
 		}
 		if (tip != null) {
-			graphics.setTooltipForNextFrame(font, tip, mx, my);
+			graphics.setTooltipForNextFrame(font, tip, Math.round(mx * factor), Math.round(my * factor));
 		}
 	}
 
@@ -617,7 +617,7 @@ public final class BlocksTab {
 		int lift = over ? 2 : 0;
 		Icons.sprite(graphics, x - 1, y - lift, 16, Icons.TRASH, colour);
 		if (over) {
-			graphics.setTooltipForNextFrame(font, font.split(Component.literal("Delete this rule"), 120), mx, my);
+			graphics.setTooltipForNextFrame(font, font.split(Component.literal("Delete this rule"), 120), Math.round(mx * factor), Math.round(my * factor));
 		}
 	}
 
@@ -632,6 +632,12 @@ public final class BlocksTab {
 		boolean over = enabled && LuceatLook.inside(mx, my, x0, y0, x1, y1) && my >= edTop && my < edBottom;
 		LuceatLook.roundOutlined(graphics, x0, y0, x1, y1, over ? LuceatLook.CARD_HOVER : LuceatLook.CARD, enabled ? LuceatLook.ACCENT_DIM : LuceatLook.BORDER);
 		ink(graphics, label, x0 + (x1 - x0 - inkWidth(label)) / 2, y0 + (y1 - y0 - 8) / 2, enabled ? LuceatLook.TEXT : LuceatLook.MUTED, false);
+	}
+
+	private float factor = 1.0F;
+
+	public void setFactor(float value) {
+		factor = value;
 	}
 
 	private void ink(GuiGraphicsExtractor graphics, String text, int x, int y, int colour, boolean shadow) {

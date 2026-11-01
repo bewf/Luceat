@@ -70,6 +70,7 @@ public final class LuceatScreen extends Screen {
 	}
 
 	private final Screen parent;
+	private final GuiFit fit = new GuiFit();
 	private final List<Setting> settings = LuceatSettings.create();
 	private Map<String, Object> baseline;
 	private String baselineKey;
@@ -141,8 +142,9 @@ public final class LuceatScreen extends Screen {
 
 	@Override
 	protected void init() {
-		int w = this.width;
-		int h = this.height;
+		fit.update(this.width, this.height);
+		int w = fit.width();
+		int h = fit.height();
 		int mx = Math.max(6, Math.round(w * 0.045F));
 		int my = Math.max(6, Math.round(h * 0.05F));
 		slabX0 = mx;
@@ -198,6 +200,7 @@ public final class LuceatScreen extends Screen {
 			panel.close();
 		}
 		Icons.release();
+		GuiFit.release();
 		chrome.release();
 		content.release();
 		popup.release();
@@ -255,11 +258,7 @@ public final class LuceatScreen extends Screen {
 	}
 
 	private int guiScale() {
-		try {
-			return Math.max(1, (int) Math.round(this.minecraft.getWindow().getGuiScale()));
-		} catch (RuntimeException error) {
-			return 2;
-		}
+		return fit.pixels();
 	}
 
 	private float anim(String key, float target, float halfLife) {
@@ -300,14 +299,17 @@ public final class LuceatScreen extends Screen {
 	}
 
 	@Override
-	public void extractRenderState(GuiGraphicsExtractor graphics, int mouseX, int mouseY, float partial) {
+	public void extractRenderState(GuiGraphicsExtractor graphics, int screenMouseX, int screenMouseY, float partial) {
+		int mouseX = (int) Math.floor(fit.toUnits(screenMouseX));
+		int mouseY = (int) Math.floor(fit.toUnits(screenMouseY));
+		fit.begin(graphics);
 		Motion.tick(System.nanoTime());
 		int gs = guiScale();
 		boolean panelNow = panelShown();
-		int ck = Objects.hash(this.width, this.height, gs, panelNow, showSide);
-		if (!chrome.matches(0, 0, this.width, this.height, gs) || ck != chromeKey) {
+		int ck = Objects.hash(fit.width(), fit.height(), gs, panelNow, showSide);
+		if (!chrome.matches(0, 0, fit.width(), fit.height(), gs) || ck != chromeKey) {
 			chromeKey = ck;
-			chrome.begin(0, 0, this.width, this.height, gs);
+			chrome.begin(0, 0, fit.width(), fit.height(), gs);
 			buildChrome(chrome, panelNow);
 			chrome.finish();
 			dirty = true;
@@ -357,6 +359,7 @@ public final class LuceatScreen extends Screen {
 		drawLogo(graphics);
 		search.drawGlass(graphics, this.font, searchX0() + 14, slabY0 + 11, searchX1() - 6, slabY0 + 33, "Search settings");
 		if (BLOCKS.equals(section) && !searching()) {
+			blocks.setFactor(fit.factor());
 			blocks.drawList(graphics, panelX0, bodyTop, panelX1Wide(), bodyBottom, mouseX, mouseY);
 			if (showSide) {
 				blocks.drawEditor(graphics, panelX1Wide() + 8, bodyTop, contentX1, bodyBottom, mouseX, mouseY);
@@ -373,6 +376,7 @@ public final class LuceatScreen extends Screen {
 			ShadowVolume.reset();
 		}
 		perf.frame();
+		fit.end(graphics);
 	}
 
 	private int panelX1Wide() {
@@ -384,7 +388,7 @@ public final class LuceatScreen extends Screen {
 	}
 
 	private void buildChrome(Surface s, boolean panelNow) {
-		Glass.backdrop(s, this.width, this.height);
+		Glass.backdrop(s, fit.width(), fit.height());
 		Glass.slab(s, slabX0, slabY0, slabX1, slabY1, 16);
 		Glass.divider(s, slabX0 + 18, slabX1 - 18, slabY0 + HEADER_HEIGHT);
 		if (panelNow) {
@@ -1407,8 +1411,8 @@ public final class LuceatScreen extends Screen {
 	@Override
 	public boolean mouseClicked(MouseButtonEvent event, boolean doubleClick) {
 		dirty = true;
-		double mx = event.x();
-		double my = event.y();
+		double mx = fit.toUnits(event.x());
+		double my = fit.toUnits(event.y());
 		if (event.button() != 0) {
 			return super.mouseClicked(event, doubleClick);
 		}
@@ -1572,16 +1576,16 @@ public final class LuceatScreen extends Screen {
 	public boolean mouseDragged(MouseButtonEvent event, double dx, double dy) {
 		dirty = true;
 		if (dragging instanceof SliderSetting slider) {
-			dragSlider(slider, event.x());
+			dragSlider(slider, fit.toUnits(event.x()));
 			return true;
 		}
-		if (search.mouseDragged(event.x())) {
+		if (search.mouseDragged(fit.toUnits(event.x()))) {
 			return true;
 		}
-		if (BLOCKS.equals(section) && blocks.mouseDragged(event.x(), event.y())) {
+		if (BLOCKS.equals(section) && blocks.mouseDragged(fit.toUnits(event.x()), fit.toUnits(event.y()))) {
 			return true;
 		}
-		if (panel != null && panel.mouseDragged(event.x(), event.y())) {
+		if (panel != null && panel.mouseDragged(fit.toUnits(event.x()), fit.toUnits(event.y()))) {
 			return true;
 		}
 		return super.mouseDragged(event, dx, dy);
@@ -1608,17 +1612,19 @@ public final class LuceatScreen extends Screen {
 	}
 
 	@Override
-	public boolean mouseScrolled(double x, double y, double scrollX, double scrollY) {
+	public boolean mouseScrolled(double screenX, double screenY, double scrollX, double scrollY) {
 		dirty = true;
+		double x = fit.toUnits(screenX);
+		double y = fit.toUnits(screenY);
 		if (search.focused()) {
 			dropdownScroll -= (int) Math.signum(scrollY);
 			return true;
 		}
 		if (BLOCKS.equals(section) && !searching()) {
-			return blocks.mouseScrolled(x, scrollY) || super.mouseScrolled(x, y, scrollX, scrollY);
+			return blocks.mouseScrolled(x, scrollY) || super.mouseScrolled(screenX, screenY, scrollX, scrollY);
 		}
 		if (SPEED.equals(section) && !searching()) {
-			return speed().scroll(x, y, scrollY) || super.mouseScrolled(x, y, scrollX, scrollY);
+			return speed().scroll(x, y, scrollY) || super.mouseScrolled(screenX, screenY, scrollX, scrollY);
 		}
 		if (previewPage() && x >= previewLeft()) {
 			panel.mouseScrolled(x, y, scrollY);
@@ -1628,7 +1634,7 @@ public final class LuceatScreen extends Screen {
 			scroll -= (float) scrollY * 24.0F;
 			return true;
 		}
-		return super.mouseScrolled(x, y, scrollX, scrollY);
+		return super.mouseScrolled(screenX, screenY, scrollX, scrollY);
 	}
 
 	@Override
