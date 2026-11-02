@@ -33,7 +33,7 @@ public final class BlocksTab {
 	private static final float[] FALLBACK = {1.0F, 0.7F, 0.35F};
 
 	private enum Filter {
-		ALL("All"), LIGHT("Lights up"), DARK("Doesn't light"), EDITED("Edited"), YOURS("Yours");
+		ALL("All"), LIGHT("Lights up"), EDITED("Edited"), YOURS("Yours");
 
 		final String label;
 
@@ -57,6 +57,7 @@ public final class BlocksTab {
 		String key;
 		String name;
 		String search;
+		String mod;
 		Block block;
 		Item item;
 		ItemStack stack = ItemStack.EMPTY;
@@ -73,6 +74,25 @@ public final class BlocksTab {
 	private float scroll;
 	private boolean dirty;
 	private boolean adding;
+	private String modFilter;
+	private String lastMod;
+	private boolean modOpen;
+	private float modScroll;
+	private List<String> mods = new ArrayList<>();
+	private final java.util.Map<String, String> modNames = new java.util.HashMap<>();
+	private final TextInput addInput = new TextInput(40);
+	private float addScroll;
+	private final List<Entry> addResults = new ArrayList<>();
+	private String lastAddQuery;
+	private boolean draggingBar;
+	private int barGrab;
+	private int barTrackTop;
+	private int barTrackH;
+	private int barThumbTop;
+	private int barThumb;
+	private int barMax;
+	private int modX0;
+	private int modX1;
 	private String lastQuery = null;
 	private Filter lastMode;
 	private int lastRules = -1;
@@ -100,7 +120,7 @@ public final class BlocksTab {
 	}
 
 	public boolean typing() {
-		return filterInput.focused();
+		return filterInput.focused() || adding || modOpen;
 	}
 
 	public void unfocus() {
@@ -124,6 +144,7 @@ public final class BlocksTab {
 			Entry entry = new Entry();
 			entry.id = id;
 			entry.key = id.toString();
+			entry.mod = id.getNamespace();
 			entry.block = block;
 			Item item = block.asItem();
 			if (item != Items.AIR) {
@@ -149,6 +170,7 @@ public final class BlocksTab {
 			Entry entry = new Entry();
 			entry.id = id;
 			entry.key = id.toString();
+			entry.mod = id.getNamespace();
 			entry.item = item;
 			entry.stack = new ItemStack(item);
 			entry.name = entry.stack.getHoverName().getString();
@@ -163,6 +185,26 @@ public final class BlocksTab {
 			entry.search = (entry.name + " " + entry.key).toLowerCase(Locale.ROOT);
 		}
 		all.sort((a, b) -> a.name.compareToIgnoreCase(b.name));
+		java.util.Set<String> seen = new java.util.HashSet<>();
+		for (Entry entry : all) {
+			seen.add(entry.mod);
+		}
+		mods = new ArrayList<>(seen);
+		mods.sort((a, b) -> {
+			if (a.equals("minecraft") != b.equals("minecraft")) {
+				return a.equals("minecraft") ? -1 : 1;
+			}
+			return modName(a).compareToIgnoreCase(modName(b));
+		});
+	}
+
+	private String modName(String namespace) {
+		return modNames.computeIfAbsent(namespace, key -> {
+			if (key.equals("minecraft")) {
+				return "Minecraft";
+			}
+			return net.fabricmc.loader.api.FabricLoader.getInstance().getModContainer(key).map(c -> c.getMetadata().getName()).orElse(key);
+		});
 	}
 
 	private void refilter() {
@@ -171,16 +213,20 @@ public final class BlocksTab {
 		}
 		String query = filterInput.text().toLowerCase(Locale.ROOT).trim();
 		int rules = BlockRules.all().size() * 31 + (int) BlockRules.all().stream().filter(BlockRule::edited).count();
-		if (query.equals(lastQuery) && mode == lastMode && sort == lastSort && rules == lastRules) {
+		if (query.equals(lastQuery) && mode == lastMode && sort == lastSort && rules == lastRules && java.util.Objects.equals(modFilter, lastMod)) {
 			return;
 		}
 		lastQuery = query;
 		lastMode = mode;
 		lastSort = sort;
 		lastRules = rules;
+		lastMod = modFilter;
 		shown.clear();
 		for (Entry entry : all) {
 			if (!query.isEmpty() && !entry.search.contains(query)) {
+				continue;
+			}
+			if (modFilter != null && !modFilter.equals(entry.mod)) {
 				continue;
 			}
 			BlockRule rule = BlockRules.get(entry.key);
@@ -188,7 +234,6 @@ public final class BlocksTab {
 			boolean pass = switch (mode) {
 				case ALL -> true;
 				case LIGHT -> lit;
-				case DARK -> !lit;
 				case EDITED -> rule != null && rule.edited();
 				case YOURS -> rule != null && rule.added;
 			};
@@ -263,7 +308,7 @@ public final class BlocksTab {
 	}
 
 	private int listTopOffset() {
-		return 48 + (adding ? 14 : 0);
+		return 72;
 	}
 
 	private int maxScroll() {
@@ -276,32 +321,40 @@ public final class BlocksTab {
 		listX1 = x1;
 		listY1 = y1;
 		refilter();
+		boolean free = !adding && !modOpen;
 		filterInput.draw(graphics, font, x0, y0, x1 - 70, y0 + 20, "Search blocks and items");
-		boolean addHover = LuceatLook.inside(mx, my, x1 - 64, y0, x1, y0 + 20);
+		boolean addHover = free && LuceatLook.inside(mx, my, x1 - 64, y0, x1, y0 + 20);
 		LuceatLook.roundOutlined(graphics, x1 - 64, y0, x1, y0 + 20, adding ? LuceatLook.ACCENT_SOFT : addHover ? LuceatLook.CARD_HOVER : LuceatLook.CARD, adding ? LuceatLook.ACCENT : LuceatLook.BORDER);
 		ink(graphics, "Add rule", x1 - 64 + (64 - inkWidth("Add rule")) / 2, y0 + 6, adding ? LuceatLook.ACCENT : LuceatLook.SOFT, false);
 		int cx = x0;
 		for (Filter filter : Filter.values()) {
 			int width = inkWidth(filter.label) + 14;
 			boolean on = filter == mode;
-			boolean over = LuceatLook.inside(mx, my, cx, y0 + 24, cx + width, y0 + 42);
+			boolean over = free && LuceatLook.inside(mx, my, cx, y0 + 24, cx + width, y0 + 42);
 			LuceatLook.round(graphics, cx, y0 + 24, cx + width, y0 + 42, on ? LuceatLook.ACCENT : over ? LuceatLook.CARD_HOVER : LuceatLook.CARD);
 			ink(graphics, filter.label, cx + 7, y0 + 29, on ? 0xFFFFFFFF : LuceatLook.SOFT, false);
 			cx += width + 4;
 		}
-		String sortText = sortLabel();
-		int sortW = inkWidth(sortText) + 14;
-		boolean sortOver = LuceatLook.inside(mx, my, x1 - sortW, y0 + 24, x1, y0 + 42);
-		LuceatLook.roundOutlined(graphics, x1 - sortW, y0 + 24, x1, y0 + 42, sortOver ? LuceatLook.CARD_HOVER : LuceatLook.CARD, LuceatLook.BORDER);
-		ink(graphics, sortText, x1 - sortW + 7, y0 + 29, LuceatLook.SOFT, false);
 		String count = shown.size() + (shown.size() == 1 ? " entry" : " entries");
-		if (cx + inkWidth(count) + sortW + 16 < x1) {
-			ink(graphics, count, x1 - sortW - 8 - inkWidth(count), y0 + 29, LuceatLook.MUTED, false);
+		int countW = inkWidth(count);
+		if (cx + countW + 12 < x1) {
+			ink(graphics, count, x1 - countW, y0 + 29, LuceatLook.MUTED, false);
 		}
+		String modText = "Mod: " + (modFilter == null ? "All" : modName(modFilter));
+		int sortW = inkWidth(sortLabel()) + 14;
+		int modMax = Math.max(80, x1 - x0 - sortW - 12);
+		modText = fitText(modText, Math.min(190, modMax) - 28);
+		modX0 = x0;
+		modX1 = x0 + inkWidth(modText) + 28;
+		boolean modOver = free && LuceatLook.inside(mx, my, modX0, y0 + 48, modX1, y0 + 66);
+		LuceatLook.roundOutlined(graphics, modX0, y0 + 48, modX1, y0 + 66, modOpen ? LuceatLook.ACCENT_SOFT : modOver ? LuceatLook.CARD_HOVER : LuceatLook.CARD, modOpen || modFilter != null ? LuceatLook.ACCENT_DIM : LuceatLook.BORDER);
+		ink(graphics, modText, modX0 + 7, y0 + 53, modFilter != null ? LuceatLook.TEXT : LuceatLook.SOFT, false);
+		Icons.sprite(graphics, modX1 - 16, y0 + 52, 10, Icons.CHEVRON, LuceatLook.SOFT);
+		String sortText = sortLabel();
+		boolean sortOver = free && LuceatLook.inside(mx, my, x1 - sortW, y0 + 48, x1, y0 + 66);
+		LuceatLook.roundOutlined(graphics, x1 - sortW, y0 + 48, x1, y0 + 66, sortOver ? LuceatLook.CARD_HOVER : LuceatLook.CARD, LuceatLook.BORDER);
+		ink(graphics, sortText, x1 - sortW + 7, y0 + 53, LuceatLook.SOFT, false);
 		int top = y0 + listTopOffset();
-		if (adding) {
-			ink(graphics, "Find the block or item, click it, then press Make it glow.", x0, y0 + 48, LuceatLook.WARN, false);
-		}
 		scroll = Math.max(0.0F, Math.min(scroll, maxScroll()));
 		graphics.enableScissor(x0, top, x1 + 2, y1);
 		int y = top - Math.round(scroll);
@@ -309,7 +362,7 @@ public final class BlocksTab {
 		for (Entry entry : shown) {
 			if (y + ROW > top && y < y1) {
 				BlockRule rule = BlockRules.get(entry.key);
-				boolean over = LuceatLook.inside(mx, my, x0, y, x1, y + ROW) && my >= top;
+				boolean over = free && LuceatLook.inside(mx, my, x0, y, x1, y + ROW) && my >= top;
 				boolean isSelected = entry == selected;
 				LuceatLook.roundOutlined(graphics, x0, y, x1, y + ROW, isSelected ? 0xFF3A2160 : over ? LuceatLook.CARD_HOVER : LuceatLook.CARD, isSelected ? LuceatLook.ACCENT : over ? LuceatLook.CARD_HOVER : LuceatLook.CARD);
 				if (!entry.stack.isEmpty()) {
@@ -338,7 +391,7 @@ public final class BlocksTab {
 					int colourBadge = added ? LuceatLook.ACCENT : BUILT_IN;
 					LuceatLook.roundOutlined(graphics, rx, y + 7, rx + bw, y + 21, 0xFF16161B, colourBadge);
 					ink(graphics, badge, rx + 5, y + 11, isSelected && !added ? 0xFFB9D4FF : colourBadge, false);
-					if (LuceatLook.inside(mx, my, rx, y + 7, rx + bw, y + 21) && my >= top) {
+					if (free && LuceatLook.inside(mx, my, rx, y + 7, rx + bw, y + 21) && my >= top) {
 						String text = added ? "A rule you made." : "Comes with the game or Luceat.";
 						tip = font.split(Component.literal(text).withStyle(Style.EMPTY.withColor(0xDDDDE6)), 200);
 					}
@@ -353,17 +406,208 @@ public final class BlocksTab {
 		if (shown.isEmpty()) {
 			ink(graphics, "Nothing matches.", x0 + 4, top + 6, LuceatLook.MUTED, false);
 		}
-		int max = maxScroll();
-		if (max > 0) {
-			int trackH = y1 - top;
-			int thumb = Math.max(16, trackH * trackH / (trackH + max));
-			int thumbTop = top + Math.round((trackH - thumb) * (scroll / max));
-			graphics.fill(x1 + 3, thumbTop, x1 + 5, thumbTop + thumb, LuceatLook.TRACK);
+		barMax = maxScroll();
+		barTrackTop = top;
+		barTrackH = y1 - top;
+		if (barMax > 0) {
+			barThumb = Math.max(24, barTrackH * barTrackH / (barTrackH + barMax));
+			barThumbTop = top + Math.round((barTrackH - barThumb) * (scroll / barMax));
+			boolean barOver = free && LuceatLook.inside(mx, my, x1 + 1, barThumbTop, x1 + 8, barThumbTop + barThumb);
+			LuceatLook.round(graphics, x1 + 3, top, x1 + 7, y1, 0x55120D20);
+			LuceatLook.round(graphics, x1 + 3, barThumbTop, x1 + 7, barThumbTop + barThumb, draggingBar ? LuceatLook.ACCENT : barOver ? 0xFF8F78E8 : LuceatLook.ACCENT_DIM);
 		}
 		if (tip != null) {
 			graphics.setTooltipForNextFrame(font, tip, Math.round(mx * factor), Math.round(my * factor));
 		}
 	}
+
+	private String fitText(String text, int width) {
+		if (inkWidth(text) <= width) {
+			return text;
+		}
+		String cut = text;
+		while (cut.length() > 1 && inkWidth(cut + "...") > width) {
+			cut = cut.substring(0, cut.length() - 1);
+		}
+		return cut + "...";
+	}
+
+	private int[] addBox(int ax0, int ay0, int ax1, int ay1) {
+		int w = Math.max(220, Math.min(380, ax1 - ax0 - 24));
+		int h = Math.max(160, Math.min(ay1 - ay0 - 16, 340));
+		int x0 = ax0 + (ax1 - ax0 - w) / 2;
+		int y0 = ay0 + (ay1 - ay0 - h) / 2;
+		return new int[] {x0, y0, x0 + w, y0 + h};
+	}
+
+	private int[] modBox() {
+		int rows = Math.min(8, mods.size() + 1);
+		int x0 = modX0;
+		int y0 = listY0 + 68;
+		return new int[] {x0, y0, x0 + 200, y0 + rows * 20 + 8};
+	}
+
+	private void refreshAddResults() {
+		String query = addInput.text().toLowerCase(Locale.ROOT).trim();
+		if (query.equals(lastAddQuery)) {
+			return;
+		}
+		lastAddQuery = query;
+		addResults.clear();
+		if (all == null) {
+			build();
+		}
+		for (Entry entry : all) {
+			if (entry.defaultLevel > 0) {
+				continue;
+			}
+			BlockRule rule = BlockRules.get(entry.key);
+			if (rule != null && rule.added) {
+				continue;
+			}
+			if (!query.isEmpty() && !entry.search.contains(query)) {
+				continue;
+			}
+			addResults.add(entry);
+		}
+	}
+
+	public void drawOverlays(GuiGraphicsExtractor graphics, int ax0, int ay0, int ax1, int ay1, int mx, int my) {
+		if (modOpen) {
+			int[] box = modBox();
+			LuceatLook.roundOutlined(graphics, box[0], box[1], box[2], box[3], LuceatLook.WINDOW, LuceatLook.ACCENT_DIM);
+			graphics.enableScissor(box[0] + 2, box[1] + 4, box[2] - 2, box[3] - 4);
+			int total = mods.size() + 1;
+			float max = Math.max(0, total * 20 - (box[3] - box[1] - 8));
+			modScroll = Math.max(0.0F, Math.min(modScroll, max));
+			int y = box[1] + 4 - Math.round(modScroll);
+			for (int i = 0; i < total; i++) {
+				String ns = i == 0 ? null : mods.get(i - 1);
+				boolean on = java.util.Objects.equals(ns, modFilter);
+				boolean over = LuceatLook.inside(mx, my, box[0] + 2, y, box[2] - 2, y + 20) && my >= box[1] + 4 && my < box[3] - 4;
+				if (on || over) {
+					LuceatLook.round(graphics, box[0] + 4, y + 1, box[2] - 4, y + 19, on ? LuceatLook.ACCENT : LuceatLook.CARD_HOVER);
+				}
+				ink(graphics, fitText(ns == null ? "All mods" : modName(ns), box[2] - box[0] - 24), box[0] + 12, y + 6, on ? 0xFFFFFFFF : LuceatLook.TEXT, false);
+				y += 20;
+			}
+			graphics.disableScissor();
+		}
+		if (!adding) {
+			return;
+		}
+		refreshAddResults();
+		graphics.fill(ax0, ay0, ax1, ay1, 0xC0080511);
+		int[] box = addBox(ax0, ay0, ax1, ay1);
+		LuceatLook.roundOutlined(graphics, box[0], box[1], box[2], box[3], LuceatLook.WINDOW, LuceatLook.ACCENT_DIM);
+		ink(graphics, "Add a light rule", box[0] + 14, box[1] + 12, LuceatLook.TEXT, false);
+		boolean closeOver = LuceatLook.inside(mx, my, box[2] - 30, box[1] + 6, box[2] - 8, box[1] + 28);
+		Icons.sprite(graphics, box[2] - 26, box[1] + 11, 12, Icons.CLOSE, closeOver ? LuceatLook.TEXT : LuceatLook.SOFT);
+		ink(graphics, fitText("Pick a block or item that gives no light yet.", box[2] - box[0] - 28), box[0] + 14, box[1] + 28, LuceatLook.MUTED, false);
+		addInput.draw(graphics, font, box[0] + 12, box[1] + 44, box[2] - 12, box[1] + 66, "Search blocks and items");
+		int listTop = box[1] + 74;
+		int listBottom = box[3] - 12;
+		int rowH = 26;
+		float max = Math.max(0, addResults.size() * rowH - (listBottom - listTop));
+		addScroll = Math.max(0.0F, Math.min(addScroll, max));
+		graphics.enableScissor(box[0] + 12, listTop, box[2] - 12, listBottom);
+		int y = listTop - Math.round(addScroll);
+		for (Entry entry : addResults) {
+			if (y + rowH > listTop && y < listBottom) {
+				boolean over = LuceatLook.inside(mx, my, box[0] + 12, y, box[2] - 12, y + rowH - 2) && my >= listTop && my < listBottom;
+				LuceatLook.round(graphics, box[0] + 12, y, box[2] - 12, y + rowH - 2, over ? LuceatLook.CARD_HOVER : LuceatLook.CARD);
+				if (!entry.stack.isEmpty()) {
+					graphics.fakeItem(entry.stack, box[0] + 18, y + 4);
+				}
+				int textRight = box[2] - 74;
+				graphics.enableScissor(box[0] + 38, y, textRight, y + rowH);
+				ink(graphics, entry.name, box[0] + 40, y + 4, LuceatLook.TEXT, false);
+				ink(graphics, entry.key, box[0] + 40, y + 14, LuceatLook.MUTED, false);
+				graphics.disableScissor();
+				if (over) {
+					LuceatLook.roundOutlined(graphics, box[2] - 66, y + 4, box[2] - 18, y + rowH - 6, LuceatLook.ACCENT, LuceatLook.ACCENT);
+					ink(graphics, "Add", box[2] - 42 - inkWidth("Add") / 2, y + 9, 0xFFFFFFFF, false);
+				}
+			}
+			y += rowH;
+		}
+		graphics.disableScissor();
+		if (addResults.isEmpty()) {
+			ink(graphics, "Nothing matches.", box[0] + 16, listTop + 6, LuceatLook.MUTED, false);
+		}
+	}
+
+	private void openAdd() {
+		adding = true;
+		modOpen = false;
+		addScroll = 0.0F;
+		lastAddQuery = null;
+		addInput.set("");
+		addInput.focus(true);
+		filterInput.focus(false);
+	}
+
+	private void addRule(Entry entry) {
+		BlockRule made = BlockRules.edit(entry.key);
+		made.added = true;
+		made.level = 10;
+		commit();
+		adding = false;
+		addInput.focus(false);
+		selected = entry;
+		editorScroll = 0.0F;
+		mode = Filter.YOURS;
+		modFilter = null;
+		scroll = 0.0F;
+	}
+
+	private boolean clickAdd(double mx, double my) {
+		int[] box = addBox(areaX0, areaY0, areaX1, areaY1);
+		if (!LuceatLook.inside(mx, my, box[0], box[1], box[2], box[3])) {
+			adding = false;
+			addInput.focus(false);
+			return true;
+		}
+		if (LuceatLook.inside(mx, my, box[2] - 30, box[1] + 6, box[2] - 8, box[1] + 28)) {
+			adding = false;
+			addInput.focus(false);
+			return true;
+		}
+		if (LuceatLook.inside(mx, my, box[0] + 12, box[1] + 44, box[2] - 12, box[1] + 66)) {
+			addInput.focus(true);
+			addInput.mouseClicked(mx, my);
+			return true;
+		}
+		int listTop = box[1] + 74;
+		int listBottom = box[3] - 12;
+		if (my >= listTop && my < listBottom) {
+			int index = (int) Math.floor((my - listTop + addScroll) / 26.0);
+			if (index >= 0 && index < addResults.size()) {
+				addRule(addResults.get(index));
+			}
+		}
+		return true;
+	}
+
+	private boolean clickMods(double mx, double my) {
+		int[] box = modBox();
+		if (LuceatLook.inside(mx, my, box[0], box[1], box[2], box[3])) {
+			int index = (int) Math.floor((my - box[1] - 4 + modScroll) / 20.0);
+			if (index >= 0 && index <= mods.size()) {
+				modFilter = index == 0 ? null : mods.get(index - 1);
+				scroll = 0.0F;
+				modOpen = false;
+			}
+			return true;
+		}
+		modOpen = false;
+		return LuceatLook.inside(mx, my, modX0, listY0 + 48, modX1, listY0 + 66);
+	}
+
+	private int areaX0;
+	private int areaY0;
+	private int areaX1;
+	private int areaY1;
 
 	private record Hit(int x0, int y0, int x1, int y1, Runnable click, Slide slide) {
 	}
@@ -640,6 +884,13 @@ public final class BlocksTab {
 		factor = value;
 	}
 
+	public void setArea(int x0, int y0, int x1, int y1) {
+		areaX0 = x0;
+		areaY0 = y0;
+		areaX1 = x1;
+		areaY1 = y1;
+	}
+
 	private void ink(GuiGraphicsExtractor graphics, String text, int x, int y, int colour, boolean shadow) {
 		LuceatFonts.draw(graphics, font, LuceatFonts.body(text), x, y, colour, shadow);
 	}
@@ -664,9 +915,16 @@ public final class BlocksTab {
 		BlockRules.changed();
 		dirty = true;
 		lastRules = -1;
+		lastAddQuery = null;
 	}
 
 	public boolean mouseClicked(double mx, double my) {
+		if (adding) {
+			return clickAdd(mx, my);
+		}
+		if (modOpen) {
+			return clickMods(mx, my);
+		}
 		if (picker.isOpen()) {
 			boolean inside = picker.contains(mx, my);
 			if (picker.mouseClicked(mx, my) || inside) {
@@ -679,16 +937,16 @@ public final class BlocksTab {
 			return true;
 		}
 		if (LuceatLook.inside(mx, my, listX1 - 64, listY0, listX1, listY0 + 20)) {
-			adding = !adding;
-			if (adding) {
-				mode = Filter.DARK;
-				filterInput.focus(true);
-			}
-			scroll = 0.0F;
+			openAdd();
+			return true;
+		}
+		if (LuceatLook.inside(mx, my, modX0, listY0 + 48, modX1, listY0 + 66)) {
+			modOpen = true;
+			modScroll = 0.0F;
 			return true;
 		}
 		int sortW = inkWidth(sortLabel()) + 14;
-		if (LuceatLook.inside(mx, my, listX1 - sortW, listY0 + 24, listX1, listY0 + 42)) {
+		if (LuceatLook.inside(mx, my, listX1 - sortW, listY0 + 48, listX1, listY0 + 66)) {
 			sort = Sort.values()[(sort.ordinal() + 1) % Sort.values().length];
 			scroll = 0.0F;
 			return true;
@@ -702,6 +960,13 @@ public final class BlocksTab {
 				return true;
 			}
 			cx += width + 4;
+		}
+		if (barMax > 0 && LuceatLook.inside(mx, my, listX1 + 1, barTrackTop, listX1 + 9, barTrackTop + barTrackH)) {
+			boolean onThumb = my >= barThumbTop && my < barThumbTop + barThumb;
+			barGrab = onThumb ? (int) (my - barThumbTop) : barThumb / 2;
+			draggingBar = true;
+			moveBar(my);
+			return true;
 		}
 		int top = listY0 + listTopOffset();
 		if (LuceatLook.inside(mx, my, listX0, top, listX1, listY1)) {
@@ -720,6 +985,12 @@ public final class BlocksTab {
 			return true;
 		}
 		return clickEditor(mx, my);
+	}
+
+	private void moveBar(double my) {
+		int range = Math.max(1, barTrackH - barThumb);
+		float fraction = (float) ((my - barGrab - barTrackTop) / range);
+		scroll = Math.max(0.0F, Math.min(1.0F, fraction)) * barMax;
 	}
 
 	private boolean clickEditor(double mx, double my) {
@@ -755,6 +1026,10 @@ public final class BlocksTab {
 	}
 
 	public boolean mouseDragged(double mx, double my) {
+		if (draggingBar) {
+			moveBar(my);
+			return true;
+		}
 		if (picker.isOpen() && picker.mouseDragged(mx, my)) {
 			return true;
 		}
@@ -766,6 +1041,10 @@ public final class BlocksTab {
 	}
 
 	public boolean mouseReleased() {
+		if (draggingBar) {
+			draggingBar = false;
+			return true;
+		}
 		boolean pickerUp = picker.isOpen() && picker.mouseReleased();
 		if (activeSlide != null) {
 			activeSlide = null;
@@ -777,6 +1056,14 @@ public final class BlocksTab {
 	}
 
 	public boolean mouseScrolled(double mx, double amount) {
+		if (adding) {
+			addScroll -= (float) amount * 30.0F;
+			return true;
+		}
+		if (modOpen) {
+			modScroll -= (float) amount * 30.0F;
+			return true;
+		}
 		if (selected != null && mx >= edX0 - 10 && mx > listX1 + 8) {
 			editorScroll -= (float) amount * 30.0F;
 			return true;
@@ -789,6 +1076,13 @@ public final class BlocksTab {
 	}
 
 	public boolean charTyped(CharacterEvent event) {
+		if (adding) {
+			boolean typed = addInput.charTyped(event);
+			if (typed) {
+				addScroll = 0.0F;
+			}
+			return typed;
+		}
 		if (picker.isOpen() && picker.typing()) {
 			return picker.charTyped(event);
 		}
@@ -800,6 +1094,19 @@ public final class BlocksTab {
 	}
 
 	public boolean keyPressed(KeyEvent event) {
+		if (event.isEscape() && (adding || modOpen)) {
+			adding = false;
+			modOpen = false;
+			addInput.focus(false);
+			return true;
+		}
+		if (adding) {
+			boolean used = addInput.keyPressed(event);
+			if (used) {
+				addScroll = 0.0F;
+			}
+			return used;
+		}
 		if (picker.isOpen() && picker.typing()) {
 			return picker.keyPressed(event);
 		}

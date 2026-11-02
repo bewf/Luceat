@@ -323,35 +323,7 @@ public final class TextInput {
 	}
 
 	public void draw(GuiGraphicsExtractor graphics, Font font, int x0, int y0, int x1, int y1, String placeholder) {
-		glass = false;
-		lastFont = font;
-		lastX0 = x0;
-		lastX1 = x1;
-		lastY0 = y0;
-		lastY1 = y1;
 		LuceatLook.roundOutlined(graphics, x0, y0, x1, y1, LuceatLook.CARD, focused ? LuceatLook.ACCENT : LuceatLook.BORDER);
-		int textY = y0 + (y1 - y0 - 8) / 2;
-		boolean empty = text.isEmpty();
-		graphics.enableScissor(x0 + 3, y0, x1 - 3, y1);
-		if (empty && !focused) {
-			lastOffset = 0;
-			graphics.text(font, placeholder, x0 + 7, textY, LuceatLook.MUTED, false);
-		} else {
-			int caretX = font.width(text.substring(0, Math.min(caret, text.length())));
-			int visible = x1 - x0 - 14;
-			int offset = Math.min(0, visible - caretX - 2);
-			lastOffset = offset;
-			int baseX = x0 + 7 + offset;
-			if (focused && hasSelection()) {
-				int a = baseX + font.width(text.substring(0, selStart()));
-				int b = baseX + font.width(text.substring(0, selEnd()));
-				graphics.fill(a, y0 + 4, b, y1 - 4, LuceatLook.ACCENT_DIM);
-			}
-			graphics.text(font, text, baseX, textY, LuceatLook.TEXT, false);
-			if (focused && (System.currentTimeMillis() / 500) % 2 == 0) {
-				graphics.fill(baseX + caretX, y0 + 4, baseX + caretX + 1, y1 - 4, LuceatLook.TEXT);
-			}
-		}
-		graphics.disableScissor();
+		drawGlass(graphics, font, x0, y0, x1, y1, placeholder);
 	}
 }

@@ -364,6 +364,8 @@ public final class LuceatScreen extends Screen {
 			if (showSide) {
 				blocks.drawEditor(graphics, panelX1Wide() + 8, bodyTop, contentX1, bodyBottom, mouseX, mouseY);
 			}
+			blocks.setArea(panelX0, bodyTop, contentX1, bodyBottom);
+			blocks.drawOverlays(graphics, panelX0, bodyTop, contentX1, bodyBottom, mouseX, mouseY);
 		} else if (SPEED.equals(section) && !searching()) {
 			speed().render(graphics, panelX0, bodyTop, contentX1 - panelX0, bodyBottom - bodyTop, mouseX, mouseY, partial);
 		} else if (ABOUT.equals(section) && !searching()) {
