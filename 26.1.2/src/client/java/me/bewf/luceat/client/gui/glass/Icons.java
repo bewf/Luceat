@@ -49,6 +49,8 @@ public final class Icons {
 	public static final Icon PLUS = new Icon(LucideData.PLUS);
 	public static final Icon POWER = new Icon(LucideData.POWER);
 	public static final Icon CPU = new Icon(LucideData.CPU);
+	public static final Icon USER = new Icon(LucideData.USER);
+	public static final Icon EXTERNAL = new Icon(LucideData.EXTERNAL);
 
 	private static final Map<Long, Pane> SPRITES = new HashMap<>();
 

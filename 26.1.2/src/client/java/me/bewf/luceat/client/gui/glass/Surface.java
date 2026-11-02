@@ -21,6 +21,7 @@ public interface Surface {
 	enum Role {
 		BODY,
 		TITLE,
+		WORDMARK,
 		HEADING,
 		QUOTE,
 		POTATO,

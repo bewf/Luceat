@@ -384,7 +384,7 @@ public final class LuceatScreen extends Screen {
 	}
 
 	private void drawLogo(GuiGraphicsExtractor graphics) {
-		graphics.blit(RenderPipelines.GUI_TEXTURED, LOGO_SMALL, slabX0 + 16, slabY0 + 10, 0.0F, 0.0F, 24, 24, 64, 64, 64, 64);
+		graphics.blit(RenderPipelines.GUI_TEXTURED, LOGO_SMALL, slabX0 + 14, slabY0 + 6, 0.0F, 0.0F, 32, 32, 64, 64, 64, 64);
 	}
 
 	private void buildChrome(Surface s, boolean panelNow) {
@@ -411,7 +411,7 @@ public final class LuceatScreen extends Screen {
 
 	private int searchX0() {
 		if (tiny) {
-			return Math.max(slabX0 + 90, searchX1() - 150);
+			return Math.max(slabX0 + 104, searchX1() - 150);
 		}
 		return searchX1() - (compact ? 120 : 176);
 	}
@@ -490,19 +490,20 @@ public final class LuceatScreen extends Screen {
 	}
 
 	private void drawHeader(Surface s) {
-		int x = slabX0 + 48;
-		int ty = slabY0 + 11;
+		int textX = slabX0 + 56;
+		int x = textX;
+		int ty = compact ? slabY0 + 20 : slabY0 + 13;
 		String word = "LUCEAT";
 		for (int i = 0; i < word.length() && !tiny; i++) {
 			String c = word.substring(i, i + 1);
-			s.text(TITLE, c, x, ty, Glass.TEXT);
-			x += s.width(TITLE, c) + 3;
+			s.text(Surface.Role.WORDMARK, c, x, ty, Glass.TEXT);
+			x += s.width(Surface.Role.WORDMARK, c) + 3;
 		}
 		x += tiny ? 0 : 6;
 		if (!compact) {
 			s.text(BODY, version(), x, ty, Glass.FAINT);
-			s.text(BODY, "Dynamic Lighting for Minecraft", slabX0 + 48, slabY0 + 24, Glass.FAINT);
-			x = Math.max(x + s.width(BODY, version()), slabX0 + 48 + s.width(BODY, "Dynamic Lighting for Minecraft")) + 18;
+			s.text(BODY, "Dynamic Lighting for Minecraft", textX, slabY0 + 26, Glass.FAINT);
+			x = Math.max(x + s.width(BODY, version()), textX + s.width(BODY, "Dynamic Lighting for Minecraft")) + 18;
 		}
 		boolean on = LuceatConfig.get().enabled;
 		int tx = x + 2;
@@ -1233,7 +1234,7 @@ public final class LuceatScreen extends Screen {
 			}
 			y += 5;
 		}
-		for (String line : Glass.wrap(s, BODY, "Fonts: Bricolage Grotesque, Instrument Serif, Huninn, Jersey 25, Birthstone and UnifrakturMaguntia, used under the SIL Open Font License. The licences are in the mod file.", width, 3)) {
+		for (String line : Glass.wrap(s, BODY, "Fonts: Bricolage Grotesque, Barlow Condensed, Instrument Serif, Huninn, Jersey 25, Birthstone and UnifrakturMaguntia, used under the SIL Open Font License. The licences are in the mod file.", width, 3)) {
 			s.text(BODY, line, x, y, Glass.MUTED);
 			y += 11;
 		}
@@ -1248,20 +1249,55 @@ public final class LuceatScreen extends Screen {
 			}
 		}
 		y += 8;
+		int endY = drawLinks(s, x, y, width, bodyBottom - 8);
+		if (copiedNote != null && System.currentTimeMillis() < copiedUntil) {
+			s.text(BODY, copiedNote, x, endY + 6, Glass.GOOD);
+		}
+	}
+
+	private int drawLinks(Surface s, int x, int y, int width, int bottom) {
 		String[] labels = {"Modrinth page", "More by bewf", "Report a problem"};
+		String[] notes = {"Downloads and updates", "Other mods and projects", "Open an issue on GitHub"};
+		Icons.Icon[] icons = {Icons.CUBE, Icons.USER, Icons.BUG};
+		int gap = 8;
+		int tallH = 40;
+		boolean stacked = y + 3 * tallH + 2 * gap <= bottom;
 		int bx = x;
+		int by = y;
+		int rowBottom = y;
 		for (int i = 0; i < labels.length; i++) {
-			int bw = s.width(BODY, labels[i]) + 28;
 			String key = "link:" + i;
 			float over = hoverOf(key);
-			Glass.button(s, bx, y, bx + bw, y + 24, i == 0, over, 0.0F);
-			Glass.centred(s, BODY, labels[i], bx + bw / 2, y + 7, i == 0 ? 0xFFFFFFFF : Glass.TEXT);
-			hit(bx, y, bx + bw, y + 24, key, null);
-			bx += bw + 8;
+			boolean primary = i == 0;
+			int labelColour = primary ? 0xFFFFFFFF : Glass.TEXT;
+			int noteColour = primary ? 0xFFE3D9FF : Glass.MUTED;
+			int iconColour = primary ? 0xFFFFFFFF : Glass.LAVENDER;
+			if (stacked) {
+				int w = Math.min(width, 260);
+				Glass.button(s, bx, by, bx + w, by + tallH, primary, over, 0.0F);
+				Paint.round(s, bx + 8, by + 8, bx + 32, by + 32, 12, Paint.argb(primary ? 60 : 46, 235, 225, 255));
+				Icons.draw(s, bx + 13, by + 13, 14, icons[i], iconColour);
+				s.text(BODY, Glass.fit(s, BODY, labels[i], w - 42 - 30), bx + 42, by + 9, labelColour);
+				s.text(BODY, Glass.fit(s, BODY, notes[i], w - 42 - 30), bx + 42, by + 22, noteColour);
+				Icons.draw(s, bx + w - 24, by + 14, 12, Icons.EXTERNAL, Paint.mix(noteColour, labelColour, over));
+				hit(bx, by, bx + w, by + tallH, key, null);
+				by += tallH + gap;
+				rowBottom = by - gap;
+			} else {
+				int w = 38 + s.width(BODY, labels[i]);
+				if (bx + w > x + width && bx > x) {
+					bx = x;
+					by += 30 + gap;
+				}
+				Glass.button(s, bx, by, bx + w, by + 28, primary, over, 0.0F);
+				Icons.draw(s, bx + 10, by + 7, 14, icons[i], iconColour);
+				s.text(BODY, labels[i], bx + 30, by + 10, labelColour);
+				hit(bx, by, bx + w, by + 28, key, null);
+				bx += w + gap;
+				rowBottom = by + 28;
+			}
 		}
-		if (copiedNote != null && System.currentTimeMillis() < copiedUntil) {
-			s.text(BODY, copiedNote, x, y + 34, Glass.GOOD);
-		}
+		return rowBottom;
 	}
 
 	private int drawDebugColumn(Surface s, List<DebugReport.Group> groups, int x, int y, int width) {

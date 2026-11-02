@@ -9,6 +9,7 @@ import net.minecraft.resources.Identifier;
 
 public final class LuceatFonts {
 	private static final Style TITLE = styled("title");
+	private static final Style WORDMARK = styled("wordmark");
 	private static final Style HEADING = styled("heading");
 	private static final Style BODY = styled("body");
 	private static final Style QUOTE = styled("quote");
@@ -26,6 +27,10 @@ public final class LuceatFonts {
 
 	public static Component title(String text) {
 		return Component.literal(text).withStyle(TITLE);
+	}
+
+	public static Component wordmark(String text) {
+		return Component.literal(text).withStyle(WORDMARK);
 	}
 
 	public static Component heading(String text) {

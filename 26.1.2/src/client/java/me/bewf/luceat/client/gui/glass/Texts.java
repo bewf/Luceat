@@ -13,6 +13,7 @@ public final class Texts {
 		return switch (role) {
 			case BODY -> LuceatFonts.body(text);
 			case TITLE -> LuceatFonts.title(text);
+			case WORDMARK -> LuceatFonts.wordmark(text);
 			case HEADING -> LuceatFonts.heading(text);
 			case QUOTE -> LuceatFonts.quote(text);
 			case POTATO -> LuceatFonts.preset("potato", text);
