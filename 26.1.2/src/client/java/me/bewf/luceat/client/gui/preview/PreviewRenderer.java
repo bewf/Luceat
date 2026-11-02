@@ -4,7 +4,6 @@ import java.util.List;
 
 import me.bewf.luceat.client.config.LuceatConfig;
 
-// draws a scene to plain pixels with no gui classes, used for preset cards
 public final class PreviewRenderer {
 	public static final float NIGHT = 0.04F;
 	public static final double LOOP_SECONDS = 3.0;
@@ -12,7 +11,68 @@ public final class PreviewRenderer {
 	private PreviewRenderer() {
 	}
 
-	// everything that needs the game thread, done once per config
+	static Occ[] occluders(Scene scene, PreviewOccluders occluders) {
+		Occ[] occ = new Occ[scene.cells.length];
+		for (int i = 0; i < occ.length; i++) {
+			occ[i] = scene.cells[i] == null ? Occ.EMPTY : occluders.of(scene.cells[i]);
+		}
+		return occ;
+	}
+
+	static double[] lookTarget(Scene scene, double yawDegrees, double pitchDegrees) {
+		double[] eye = scene.eye;
+		double dx = scene.target[0] - eye[0];
+		double dy = scene.target[1] - eye[1];
+		double dz = scene.target[2] - eye[2];
+		double yaw = Math.toRadians(yawDegrees);
+		double rx = dx * Math.cos(yaw) + dz * Math.sin(yaw);
+		double rz = -dx * Math.sin(yaw) + dz * Math.cos(yaw);
+		double horizontal = Math.max(1.0E-6, Math.hypot(rx, rz));
+		double length = Math.hypot(horizontal, dy);
+		double pitch = Math.atan2(dy, horizontal) + Math.toRadians(pitchDegrees);
+		double scale = length * Math.cos(pitch) / horizontal;
+		return new double[]{eye[0] + rx * scale, eye[1] + length * Math.sin(pitch), eye[2] + rz * scale};
+	}
+
+	static double zoomFov(double fov, double zoom) {
+		return Math.toDegrees(2.0 * Math.atan(Math.tan(Math.toRadians(fov) / 2.0) / zoom));
+	}
+
+	static void prepare(Scene scene) {
+		scene.voxels();
+		scene.shine();
+		scene.kind();
+		scene.emit();
+		scene.water();
+		scene.sky();
+		scene.blockLight();
+	}
+
+	static Tracer tracer(Scene scene, LuceatConfig config, Occ[] occ, List<Light> lights, double[] eye, double[] target, double fov, float time, double seconds) {
+		float shadowDistance = scene.shadowScale == 1.0F ? config.shadowDistance : config.shadowDistance * scene.shadowScale;
+		Params params = new Params(config.shadows, config.brightness, config.maxBrightness, config.daylightFade, config.directionalShading, config.shadowStrength, config.vanillaReplace, config.placedStrength, config.shadowSoftness * 0.45F, time, scene.vanilla, shadowDistance, config.lightBounce, config.shine);
+		Light[] array = lights.toArray(new Light[0]);
+		Tracer tracer = new Tracer(scene.width, scene.height, scene.depth, scene.voxels(), occ, scene.shine(), array, params, eye, target, fov);
+		Extras extras = new Extras();
+		extras.sky = scene.sky();
+		extras.emit = scene.emit();
+		extras.water = scene.water();
+		extras.blockLight = scene.blockLight();
+		extras.fog = scene.fog;
+		extras.sunYaw = scene.sunYaw;
+		extras.sunShadows = config.sunShadows;
+		extras.sunStrength = config.sunShadowStrength;
+		extras.reflectivity = scene.reflectivity;
+		extras.caustics = config.caustics && scene.hasWater();
+		extras.clock = seconds;
+		if (config.lightSpread && config.enabled) {
+			extras.spread = Extras.lightField(scene.width, scene.height, scene.depth, scene.kind(), array, 1.0F);
+			extras.spill = config.spillStrength;
+		}
+		tracer.extras(extras);
+		return tracer;
+	}
+
 	public static final class Prepared {
 		private final Scene scene;
 		private final LuceatConfig config;
@@ -21,16 +81,10 @@ public final class PreviewRenderer {
 		private Prepared(Scene scene, LuceatConfig config) {
 			this.scene = scene;
 			this.config = config;
-			PreviewOccluders occluders = new PreviewOccluders(config);
-			this.occ = new Occ[scene.cells.length];
-			for (int i = 0; i < occ.length; i++) {
-				occ[i] = scene.cells[i] == null ? Occ.EMPTY : occluders.of(scene.cells[i]);
-			}
-			scene.voxels();
-			scene.shine();
+			this.occ = occluders(scene, new PreviewOccluders(config));
+			PreviewRenderer.prepare(scene);
 		}
 
-		// safe on any thread, time is in seconds and loops every LOOP_SECONDS
 		public void render(float time, int width, int height, int[] out) {
 			double phase = time / LOOP_SECONDS * Math.PI * 2.0;
 			double seconds = time;
@@ -50,10 +104,7 @@ public final class PreviewRenderer {
 				flickered[i] = l;
 			}
 			double[] eye = {scene.eye[0] + 0.8 * Math.sin(phase), scene.eye[1], scene.eye[2]};
-			float shadowDistance = scene.shadowScale == 1.0F ? config.shadowDistance : config.shadowDistance * scene.shadowScale;
-			Params params = new Params(config.shadows, config.brightness, config.maxBrightness, config.daylightFade, config.directionalShading, config.shadowStrength, config.vanillaReplace, config.placedStrength, config.shadowSoftness * 0.45F, NIGHT, scene.vanilla, shadowDistance, config.lightBounce, config.shine);
-			Tracer tracer = new Tracer(scene.width, scene.height, scene.depth, scene.voxels(), occ, scene.shine(), flickered, params, eye, scene.target, scene.fov);
-			tracer.render(out, width, height);
+			tracer(scene, config, occ, List.of(flickered), eye, scene.target, scene.fov, NIGHT, seconds).render(out, width, height);
 		}
 	}
 

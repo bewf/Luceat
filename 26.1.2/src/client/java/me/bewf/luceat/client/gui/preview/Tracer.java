@@ -1,5 +1,6 @@
 package me.bewf.luceat.client.gui.preview;
 
+import java.util.function.BooleanSupplier;
 import java.util.stream.IntStream;
 
 import me.bewf.luceat.client.shadow.ShapeMasks;
@@ -8,6 +9,9 @@ public final class Tracer {
 	public static final int VOX = 16;
 	private static final int SHAPE_RES = ShapeMasks.RES;
 	private static final double DESIGN_ASPECT = 1.5;
+	private static final float[] FLOOR = {0.035F, 0.04F, 0.065F};
+	private static final float[] WATER_ABSORB = {0.42F, 0.15F, 0.09F};
+	private static final float[] WATER_DEEP = {0.03F, 0.17F, 0.27F};
 
 	private final int width;
 	private final int height;
@@ -22,6 +26,9 @@ public final class Tracer {
 	private final double[] right = new double[3];
 	private final double[] up = new double[3];
 	private final double tanHalf;
+	private Extras extras = new Extras();
+	private Atmosphere atmosphere;
+	private float[] fogColour = new float[3];
 
 	private static final class Ray {
 		float red;
@@ -29,6 +36,7 @@ public final class Tracer {
 		float blue;
 		float transmit = 1.0F;
 		double depth = Double.MAX_VALUE;
+		boolean skipWater;
 	}
 
 	public Tracer(int width, int height, int depth, int[][] voxels, Occ[] occluders, Light[] lights, Params params, double[] eye, double[] target, double fovDegrees) {
@@ -54,25 +62,55 @@ public final class Tracer {
 		cross(forward, worldUp, right);
 		normalize(right);
 		cross(right, forward, up);
+		this.atmosphere = new Atmosphere(params.time(), 0.0);
+		atmosphere.fog(fogColour);
+	}
+
+	public void extras(Extras value) {
+		this.extras = value;
+		this.atmosphere = new Atmosphere(params.time(), value.sunYaw);
+		atmosphere.fog(fogColour);
 	}
 
 	public void render(int[] out, int pixelsWide, int pixelsHigh) {
-		render(out, pixelsWide, pixelsHigh, 0, pixelsWide);
+		render(out, pixelsWide, pixelsHigh, () -> false);
 	}
 
-	public void render(int[] out, int pixelsWide, int pixelsHigh, int fromColumn, int toColumn) {
+	public void render(int[] out, int pixelsWide, int pixelsHigh, BooleanSupplier cancelled) {
 		double aspect = (double) pixelsWide / pixelsHigh;
 		double tanHalf = reach(aspect);
 		IntStream.range(0, pixelsHigh).parallel().forEach(row -> {
+			if (cancelled.getAsBoolean()) {
+				return;
+			}
 			double[] dir = new double[3];
-			for (int column = fromColumn; column < toColumn; column++) {
-				double u = ((column + 0.5) / pixelsWide * 2.0 - 1.0) * tanHalf * aspect;
-				double v = (1.0 - (row + 0.5) / pixelsHigh * 2.0) * tanHalf;
+			for (int column = 0; column < pixelsWide; column++) {
+				double su = (column + 0.5) / pixelsWide * 2.0 - 1.0;
+				double sv = 1.0 - (row + 0.5) / pixelsHigh * 2.0;
+				double u = su * tanHalf * aspect;
+				double v = sv * tanHalf;
 				for (int i = 0; i < 3; i++) {
 					dir[i] = forward[i] + right[i] * u + up[i] * v;
 				}
 				normalize(dir);
-				out[column + row * pixelsWide] = pixel(dir);
+				out[column + row * pixelsWide] = pixel(dir, su, sv, column, row);
+			}
+		});
+	}
+
+	public void renderPanorama(int[] out, int pixelsWide, int pixelsHigh, double yawCentre, double yawSpan, double tanVertical) {
+		double baseYaw = Math.atan2(forward[0], forward[2]);
+		IntStream.range(0, pixelsHigh).parallel().forEach(row -> {
+			double[] dir = new double[3];
+			for (int column = 0; column < pixelsWide; column++) {
+				double yaw = baseYaw + yawCentre + ((column + 0.5) / pixelsWide - 0.5) * yawSpan;
+				double sv = 1.0 - (row + 0.5) / pixelsHigh * 2.0;
+				dir[0] = Math.sin(yaw);
+				dir[1] = sv * tanVertical + forward[1] / Math.max(0.2, Math.sqrt(forward[0] * forward[0] + forward[2] * forward[2]));
+				dir[2] = Math.cos(yaw);
+				normalize(dir);
+				double su = ((column + 0.5) / pixelsWide * 2.0 - 1.0) * 0.35;
+				out[column + row * pixelsWide] = pixel(dir, su, sv, column, row);
 			}
 		});
 	}
@@ -111,10 +149,13 @@ public final class Tracer {
 		return new double[]{(u + 1.0) * 0.5, (1.0 - v) * 0.5, depthAlong};
 	}
 
-	private int pixel(double[] dir) {
+	private int pixel(double[] dir, double su, double sv, int px, int py) {
 		Ray ray = new Ray();
 		trace(ray, eye[0], eye[1], eye[2], dir[0], dir[1], dir[2]);
-		float[] sky = sky();
+		float[] sky = new float[3];
+		if (ray.transmit > 0.02F) {
+			atmosphere.sky(dir[0], dir[1], dir[2], extras.clock, sky);
+		}
 		float red = ray.red + ray.transmit * sky[0];
 		float green = ray.green + ray.transmit * sky[1];
 		float blue = ray.blue + ray.transmit * sky[2];
@@ -128,26 +169,43 @@ public final class Tracer {
 				continue;
 			}
 			double off = lx * lx + ly * ly + lz * lz - along * along;
-			float glow = (float) (1.1 * Math.exp(-off / 0.012) + 0.22 * Math.exp(-off / 0.14));
+			double scale = Math.max(0.6, 2.4 / Math.max(along, 0.5));
+			float glow = (float) ((1.1 * Math.exp(-off / (0.012 * scale)) + 0.22 * Math.exp(-off / (0.14 * scale)) + 0.07 * Math.exp(-off / (1.4 * scale))) * (0.35 + 0.65 * (1.0F - atmosphere.day * 0.8F)));
 			red += light.red() * glow;
 			green += light.green() * glow;
 			blue += light.blue() * glow;
 		}
-		return 0xFF000000 | channel(red) << 16 | channel(green) << 8 | channel(blue);
+		float vignette = 1.0F - 0.16F * (float) Math.min(1.0, (su * su * 0.7 + sv * sv * 0.5));
+		red *= vignette;
+		green *= vignette;
+		blue *= vignette;
+		float noise = Atmosphere.hash(px * 7 + 13, py * 11 + 5) - 0.5F;
+		return 0xFF000000 | channel(shoulder(red), noise) << 16 | channel(shoulder(green), noise) << 8 | channel(shoulder(blue), noise);
 	}
 
-	private static int channel(float value) {
-		return Math.min(255, Math.max(0, Math.round(value * 255.0F)));
+	private static float shoulder(float value) {
+		if (value <= 0.8F) {
+			return value;
+		}
+		return 0.8F + 0.2F * (1.0F - (float) Math.exp(-(value - 0.8F) / 0.2F));
 	}
 
-	private float[] sky() {
-		float t = params.time();
-		return new float[]{0.02F + 0.5F * t, 0.03F + 0.68F * t, 0.08F + 0.9F * t};
+	private static int channel(float value, float noise) {
+		return Math.min(255, Math.max(0, Math.round(value * 255.0F + noise)));
 	}
 
-	private float[] ambient() {
-		float t = params.time();
-		return new float[]{0.06F + 0.89F * t, 0.07F + 0.89F * t, 0.12F + 0.88F * t};
+	private float[] ambientAt(int index) {
+		float level = extras.sky == null || index < 0 ? 1.0F : extras.sky[index];
+		float curved = level / (4.0F - 3.0F * level);
+		float[] a = atmosphere.ambient;
+		return new float[]{a[0] * curved + FLOOR[0], a[1] * curved + FLOOR[1], a[2] * curved + FLOOR[2]};
+	}
+
+	private int indexOf(int x, int y, int z) {
+		if (x < 0 || y < 0 || z < 0 || x >= width || y >= height || z >= depth) {
+			return -1;
+		}
+		return x + width * (y + height * z);
 	}
 
 	private void trace(Ray ray, double ox, double oy, double oz, double dx, double dy, double dz) {
@@ -192,12 +250,24 @@ public final class Tracer {
 		}
 		double tEntry = near;
 		int limit = width + height + depth + 4;
+		byte[] water = extras.water;
 		for (int i = 0; i < limit; i++) {
 			double tExit = Math.min(tMax[0], Math.min(tMax[1], tMax[2]));
 			int exitAxis = tMax[0] <= tMax[1] && tMax[0] <= tMax[2] ? 0 : (tMax[1] <= tMax[2] ? 1 : 2);
-			int[] block = voxels[cell[0] + width * (cell[1] + height * cell[2])];
-			if (block != null && cellRay(ray, block, o, d, cell, tEntry, Math.min(tExit, far), entryAxis, sgn, safe)) {
+			int index = cell[0] + width * (cell[1] + height * cell[2]);
+			int[] block = voxels[index];
+			double segmentEnd = Math.min(tExit, far);
+			if (block != null && cellRay(ray, block, o, d, cell, tEntry, segmentEnd, entryAxis, sgn, safe, index)) {
 				return;
+			}
+			if (water != null && water[index] != Extras.DRY && !ray.skipWater) {
+				if (ray.depth == Double.MAX_VALUE) {
+					ray.depth = tEntry;
+				}
+				volume(ray, water[index], o, d, tEntry, segmentEnd, index);
+				if (ray.transmit < 0.04F) {
+					return;
+				}
 			}
 			if (tExit >= far) {
 				return;
@@ -212,7 +282,87 @@ public final class Tracer {
 		}
 	}
 
-	private boolean cellRay(Ray ray, int[] block, double[] o, double[] d, int[] cell, double t0, double t1, int entryAxis, double[] sgn, double[] safe) {
+	private void volume(Ray ray, byte kind, double[] o, double[] d, double t0, double t1, int index) {
+		double length = Math.max(0.0, t1 - t0);
+		if (length <= 0.0) {
+			return;
+		}
+		double mid = (t0 + t1) * 0.5;
+		double px = o[0] + d[0] * mid;
+		double py = o[1] + d[1] * mid;
+		double pz = o[2] + d[2] * mid;
+		float[] ambient = ambientAt(index);
+		float[] lit = cheapLight(px, py, pz);
+		float light0 = ambient[0] + lit[0];
+		float light1 = ambient[1] + lit[1];
+		float light2 = ambient[2] + lit[2];
+		if (kind == Extras.FALLING) {
+			float streak = streak(px, py, pz);
+			float keep = (float) Math.exp(-length * 2.3);
+			float amount = 1.0F - keep;
+			float base = 0.55F + 0.45F * streak;
+			float r = (0.62F * base + 0.2F * streak) * light0;
+			float g = (0.78F * base + 0.17F * streak) * light1;
+			float b = (0.95F * base + 0.1F * streak) * light2;
+			float[] fogged = fogged(r, g, b, t0);
+			ray.red += ray.transmit * amount * fogged[0];
+			ray.green += ray.transmit * amount * fogged[1];
+			ray.blue += ray.transmit * amount * fogged[2];
+			ray.transmit *= keep;
+			return;
+		}
+		float lengthF = (float) length;
+		float keepR = (float) Math.exp(-lengthF * WATER_ABSORB[0]);
+		float keepG = (float) Math.exp(-lengthF * WATER_ABSORB[1]);
+		float keepB = (float) Math.exp(-lengthF * WATER_ABSORB[2]);
+		float keep = (keepR + keepG + keepB) / 3.0F;
+		float scatter = 1.0F - keep;
+		float r = WATER_DEEP[0] * (0.5F + light0) * scatter;
+		float g = WATER_DEEP[1] * (0.5F + light1) * scatter;
+		float b = WATER_DEEP[2] * (0.5F + light2) * scatter;
+		ray.red += ray.transmit * r;
+		ray.green += ray.transmit * g;
+		ray.blue += ray.transmit * b;
+		ray.transmit *= keep;
+	}
+
+	private float streak(double x, double y, double z) {
+		double along = x * 9.0 + z * 9.0;
+		float a = Atmosphere.noise(along, y * 3.2 + extras.clock * 5.5);
+		float b = Atmosphere.noise(along * 2.3 + 11.0, y * 6.0 + extras.clock * 8.5);
+		return Math.min(1.0F, 0.15F + 0.6F * a + 0.4F * b);
+	}
+
+	private float[] cheapLight(double px, double py, double pz) {
+		float[] total = new float[3];
+		for (Light light : lights) {
+			double dx = light.x() - px;
+			double dy = light.y() - py;
+			double dz = light.z() - pz;
+			double dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
+			float level = Math.min(1.0F, (float) Math.max(light.radius() - dist, 0.0) / 15.0F);
+			if (level <= 0.0F) {
+				continue;
+			}
+			float curved = level / (4.0F - 3.0F * level);
+			float strength = light.placed() ? params.placedStrength() : 1.0F;
+			float scale = params.brightness() * curved * strength * 0.8F;
+			total[0] += light.red() * scale;
+			total[1] += light.green() * scale;
+			total[2] += light.blue() * scale;
+		}
+		return total;
+	}
+
+	private float[] fogged(float r, float g, float b, double distance) {
+		if (extras.fog <= 0.0F) {
+			return new float[]{r, g, b};
+		}
+		float f = 1.0F - (float) Math.exp(-distance * extras.fog);
+		return new float[]{r + (fogColour[0] - r) * f, g + (fogColour[1] - g) * f, b + (fogColour[2] - b) * f};
+	}
+
+	private boolean cellRay(Ray ray, int[] block, double[] o, double[] d, int[] cell, double t0, double t1, int entryAxis, double[] sgn, double[] safe, int index) {
 		double[] local = new double[3];
 		int[] v = new int[3];
 		double[] tMax = new double[3];
@@ -223,6 +373,7 @@ public final class Tracer {
 			tDelta[a] = 1.0 / (safe[a] * VOX);
 			tMax[a] = t0 + (v[a] + Math.max(sgn[a], 0.0) - local[a]) * sgn[a] / (safe[a] * VOX);
 		}
+		byte kind = extras.water == null ? Extras.DRY : extras.water[index];
 		int axis = entryAxis;
 		double t = t0;
 		float[] out = new float[3];
@@ -230,7 +381,7 @@ public final class Tracer {
 			double tNext = Math.min(tMax[0], Math.min(tMax[1], tMax[2]));
 			int argb = block[v[0] + VOX * (v[1] + VOX * v[2])];
 			int alpha = argb >>> 24;
-			if (alpha > 0) {
+			if (alpha > 0 && !(kind != Extras.DRY && ray.skipWater)) {
 				if (ray.depth == Double.MAX_VALUE) {
 					ray.depth = t;
 				}
@@ -242,11 +393,26 @@ public final class Tracer {
 				float albedoRed = (argb >> 16 & 255) / 255.0F;
 				float albedoGreen = (argb >> 8 & 255) / 255.0F;
 				float albedoBlue = (argb & 255) / 255.0F;
-				shade(px, py, pz, normal, albedoRed, albedoGreen, albedoBlue, out, shineAt(cell));
-				float a = alpha / 255.0F;
-				ray.red += ray.transmit * a * out[0];
-				ray.green += ray.transmit * a * out[1];
-				ray.blue += ray.transmit * a * out[2];
+				boolean glow = alpha == 254;
+				float a = glow ? 1.0F : alpha / 255.0F;
+				if (kind != Extras.DRY) {
+					if (kind == Extras.FOAM) {
+						float foam = Atmosphere.noise(px * 8.0 + extras.clock * 0.7, pz * 8.0 + 3.0);
+						float whiten = Math.max(0.0F, foam - 0.38F) * 1.6F;
+						albedoRed += (1.0F - albedoRed) * whiten;
+						albedoGreen += (1.0F - albedoGreen) * whiten;
+						albedoBlue += (1.0F - albedoBlue) * whiten;
+						a = Math.min(1.0F, a + whiten * 0.8F);
+					}
+					shade(px, py, pz, normal, albedoRed, albedoGreen, albedoBlue, out, index, shineAt(cell), t, false);
+					waterTop(ray, o, d, px, py, pz, normal, out);
+				} else {
+					shade(px, py, pz, normal, albedoRed, albedoGreen, albedoBlue, out, index, shineAt(cell), t, glow);
+				}
+				float[] fogged = fogged(out[0], out[1], out[2], t);
+				ray.red += ray.transmit * a * fogged[0];
+				ray.green += ray.transmit * a * fogged[1];
+				ray.blue += ray.transmit * a * fogged[2];
 				ray.transmit *= 1.0F - a;
 				if (ray.transmit < 0.04F) {
 					return true;
@@ -266,16 +432,134 @@ public final class Tracer {
 		return false;
 	}
 
+	private void waterTop(Ray ray, double[] o, double[] d, double px, double py, double pz, double[] n, float[] out) {
+		if (n[1] < 0.5 || extras.reflectivity <= 0.0F) {
+			return;
+		}
+		double nx = (Atmosphere.noise(px * 3.1 + extras.clock * 0.45, pz * 3.1) - 0.5) * 0.16;
+		double nz = (Atmosphere.noise(px * 3.1 + 40.0, pz * 3.1 - extras.clock * 0.4) - 0.5) * 0.16;
+		double[] normal = {nx, 1.0, nz};
+		normalize(normal);
+		double cosine = Math.max(0.0, -(d[0] * normal[0] + d[1] * normal[1] + d[2] * normal[2]));
+		double[] refl = {d[0] + 2.0 * cosine * normal[0], d[1] + 2.0 * cosine * normal[1], d[2] + 2.0 * cosine * normal[2]};
+		if (refl[1] < 0.03) {
+			refl[1] = 0.03;
+		}
+		normalize(refl);
+		float fresnel = (float) Math.min(0.92, (0.1 + 0.85 * Math.pow(1.0 - cosine, 3.0)) * extras.reflectivity);
+		Ray mirror = new Ray();
+		mirror.skipWater = true;
+		trace(mirror, px, py + 0.025, pz, refl[0], refl[1], refl[2]);
+		float[] sky = new float[3];
+		if (mirror.transmit > 0.02F) {
+			atmosphere.sky(refl[0], refl[1], refl[2], extras.clock, sky);
+		}
+		float mr = mirror.red + mirror.transmit * sky[0];
+		float mg = mirror.green + mirror.transmit * sky[1];
+		float mb = mirror.blue + mirror.transmit * sky[2];
+		out[0] = out[0] * (1.0F - fresnel) + mr * fresnel;
+		out[1] = out[1] * (1.0F - fresnel) + mg * fresnel;
+		out[2] = out[2] * (1.0F - fresnel) + mb * fresnel;
+	}
+
 	private float shineAt(int[] cell) {
 		return shineCells == null ? 0.0F : shineCells[cell[0] + width * (cell[1] + height * cell[2])];
 	}
 
-	private void shade(double px, double py, double pz, double[] n, float red, float green, float blue, float[] out, float gloss) {
+	private float occWeight(int x, int y, int z) {
+		if (x < 0 || y < 0 || z < 0 || x >= width || y >= height || z >= depth) {
+			return y < 0 ? 1.0F : 0.0F;
+		}
+		Occ occ = occluders[x + width * (y + height * z)];
+		return occ.kind == Occ.OPAQUE ? 1.0F : occ.kind == Occ.PATTERN ? 0.55F : 0.0F;
+	}
+
+	private float ambientOcclusion(double px, double py, double pz, double[] n) {
+		int axis = Math.abs(n[0]) > 0.5 ? 0 : Math.abs(n[1]) > 0.5 ? 1 : 2;
+		int u = (axis + 1) % 3;
+		int w = (axis + 2) % 3;
+		double[] p = {px + n[0] * 0.03, py + n[1] * 0.03, pz + n[2] * 0.03};
+		int[] c = {(int) Math.floor(p[0]), (int) Math.floor(p[1]), (int) Math.floor(p[2])};
+		if (occWeight(c[0], c[1], c[2]) >= 1.0F) {
+			return 1.0F;
+		}
+		float fu = (float) (p[u] - c[u]);
+		float fw = (float) (p[w] - c[w]);
+		float[][] corner = new float[2][2];
+		for (int cu = 0; cu < 2; cu++) {
+			for (int cw = 0; cw < 2; cw++) {
+				int su = cu == 1 ? 1 : -1;
+				int sw = cw == 1 ? 1 : -1;
+				float side1 = occAxis(c, u, su, w, 0);
+				float side2 = occAxis(c, u, 0, w, sw);
+				float diagonal = occAxis(c, u, su, w, sw);
+				float value;
+				if (side1 >= 1.0F && side2 >= 1.0F) {
+					value = 0.0F;
+				} else {
+					value = 1.0F - (side1 + side2 + diagonal) / 3.0F;
+				}
+				corner[cu][cw] = value;
+			}
+		}
+		float low = corner[0][0] + (corner[1][0] - corner[0][0]) * fu;
+		float high = corner[0][1] + (corner[1][1] - corner[0][1]) * fu;
+		return low + (high - low) * fw;
+	}
+
+	private float occAxis(int[] c, int u, int du, int w, int dw) {
+		int[] at = {c[0], c[1], c[2]};
+		at[u] += du;
+		at[w] += dw;
+		return occWeight(at[0], at[1], at[2]);
+	}
+
+	private void shade(double px, double py, double pz, double[] n, float red, float green, float blue, float[] out, int cellIndex, float gloss, double distance, boolean glow) {
+		if (glow) {
+			out[0] = Math.min(1.6F, red * 1.25F);
+			out[1] = Math.min(1.6F, green * 1.25F);
+			out[2] = Math.min(1.6F, blue * 1.25F);
+			return;
+		}
 		float faceShade = n[1] > 0.5 ? 1.0F : n[1] < -0.5 ? 0.5F : Math.abs(n[2]) > 0.5 ? 0.8F : 0.6F;
-		float[] ambient = ambient();
-		float[] base = {ambient[0] * faceShade, ambient[1] * faceShade, ambient[2] * faceShade};
+		int fx = (int) Math.floor(px + n[0] * 0.04);
+		int fy = (int) Math.floor(py + n[1] * 0.04);
+		int fz = (int) Math.floor(pz + n[2] * 0.04);
+		int front = indexOf(fx, fy, fz);
+		float[] ambient = ambientAt(front);
+		float skyLevel = extras.sky == null || front < 0 ? 1.0F : extras.sky[front];
+		float occlusion = ambientOcclusion(px, py, pz, n);
+		float aoFactor = 0.46F + 0.54F * occlusion;
+		double[] sun = atmosphere.sunDir;
+		float shadeR = 1.0F;
+		float shadeG = 1.0F;
+		float shadeB = 1.0F;
+		float sunVisibility = 1.0F;
+		if (extras.sunShadows && atmosphere.sunPower > 0.04F && skyLevel > 0.15F) {
+			double facing = n[0] * sun[0] + n[1] * sun[1] + n[2] * sun[2];
+			float amount;
+			if (facing > 0.04) {
+				float[] seen = visibility(px, py, pz, n, px + sun[0] * 36.0, py + sun[1] * 36.0, pz + sun[2] * 36.0);
+				sunVisibility = (seen[0] + seen[1] + seen[2]) / 3.0F;
+				amount = extras.sunStrength * atmosphere.sunPower * (1.0F - sunVisibility) * (0.45F + 0.55F * Atmosphere.smooth(0.04, 0.4, facing));
+			} else {
+				sunVisibility = 0.0F;
+				amount = extras.sunStrength * atmosphere.sunPower * 0.3F;
+			}
+			amount *= Math.min(1.0F, skyLevel * 1.4F);
+			shadeR = 1.0F - amount * 0.52F;
+			shadeG = 1.0F - amount * 0.5F;
+			shadeB = 1.0F - amount * 0.34F;
+		}
+		float[] base = {ambient[0] * faceShade * aoFactor * shadeR, ambient[1] * faceShade * aoFactor * shadeG, ambient[2] * faceShade * aoFactor * shadeB};
 		float[] vertex = base.clone();
-		if (params.vanilla()) {
+		if (extras.blockLight != null && front >= 0) {
+			float level = Math.min(1.0F, extras.blockLight[front] / 15.0F);
+			float value = level / (4.0F - 3.0F * level) * 0.9F * (0.6F + 0.4F * occlusion);
+			vertex[0] = Math.max(vertex[0], base[0] + value);
+			vertex[1] = Math.max(vertex[1], base[1] + value * 0.88F);
+			vertex[2] = Math.max(vertex[2], base[2] + value * 0.66F);
+		} else if (params.vanilla()) {
 			for (Light light : lights) {
 				if (!light.placed()) {
 					continue;
@@ -284,19 +568,65 @@ public final class Tracer {
 				double dy = light.y() - py;
 				double dz = light.z() - pz;
 				float level = (float) Math.max(light.radius() - Math.sqrt(dx * dx + dy * dy + dz * dz), 0.0) / 15.0F;
-				float value = level / (4.0F - 3.0F * level) * 0.9F;
+				float value = level / (4.0F - 3.0F * level) * 0.9F * aoFactor;
 				vertex[0] = Math.max(vertex[0], base[0] + value);
 				vertex[1] = Math.max(vertex[1], base[1] + value * 0.88F);
 				vertex[2] = Math.max(vertex[2], base[2] + value * 0.66F);
 			}
 		}
-		float[] extra = lighting(px, py, pz, n, vertex, base, gloss * params.shine());
-		out[0] = red * (vertex[0] + extra[0]) + extra[3];
-		out[1] = green * (vertex[1] + extra[1]) + extra[4];
-		out[2] = blue * (vertex[2] + extra[2]) + extra[5];
+		float[] extra = lighting(px, py, pz, n, vertex, base, gloss * params.shine(), front);
+		float outRed = red * (vertex[0] + extra[0]) + extra[3];
+		float outGreen = green * (vertex[1] + extra[1]) + extra[4];
+		float outBlue = blue * (vertex[2] + extra[2]) + extra[5];
+		if (extras.caustics && atmosphere.sunPower > 0.2F && front >= 0) {
+			float pattern = caustic(px, py, pz, fx, fy, fz);
+			if (pattern > 0.0F) {
+				float amount = pattern * atmosphere.sunPower * sunVisibility * (float) Math.max(0.0, n[1]) * 0.95F;
+				outRed += red * amount * 1.05F + amount * 0.12F;
+				outGreen += green * amount * 1.1F + amount * 0.14F;
+				outBlue += blue * amount * 1.0F + amount * 0.12F;
+			}
+		}
+		float emit = extras.emit == null || cellIndex < 0 ? 0.0F : extras.emit[cellIndex];
+		if (emit > 0.0F) {
+			outRed = Math.max(outRed, red * emit * 1.1F);
+			outGreen = Math.max(outGreen, green * emit * 1.1F);
+			outBlue = Math.max(outBlue, blue * emit * 1.1F);
+		}
+		out[0] = outRed;
+		out[1] = outGreen;
+		out[2] = outBlue;
 	}
 
-	private float[] lighting(double px, double py, double pz, double[] n, float[] vertex, float[] base, float gloss) {
+	private float caustic(double px, double py, double pz, int fx, int fy, int fz) {
+		if (extras.water == null) {
+			return 0.0F;
+		}
+		int found = -1;
+		for (int k = 0; k < 5; k++) {
+			int at = indexOf(fx, fy + k, fz);
+			if (at >= 0 && extras.water[at] != Extras.DRY) {
+				found = k;
+				break;
+			}
+			if (at >= 0 && occluders[at].kind == Occ.OPAQUE) {
+				return 0.0F;
+			}
+		}
+		if (found < 0) {
+			return 0.0F;
+		}
+		double time = extras.clock;
+		double a = Math.sin(px * 5.6 + Math.sin(pz * 3.3 + time * 1.1) * 1.8 + time * 0.9);
+		double b = Math.sin(pz * 5.2 + Math.sin(px * 3.9 - time * 0.8) * 1.6 - time * 0.7);
+		double c = Math.sin((px + pz) * 4.1 + Math.sin((px - pz) * 3.2 + time * 1.3) * 1.2);
+		double sum = (a * b + c * 0.7) * 0.5 + 0.5;
+		float line = (float) Math.pow(Math.max(0.0, sum), 3.2);
+		float depthFade = (float) Math.exp(-found * 0.38);
+		return Math.min(1.2F, line * 1.6F) * depthFade;
+	}
+
+	private float[] lighting(double px, double py, double pz, double[] n, float[] vertex, float[] base, float gloss, int frontCell) {
 		float exposure = Math.max(base[0], Math.max(base[1], base[2]));
 		float fade = 1.0F - params.daylightFade() * smoothstep(0.25F, 0.95F, exposure);
 		float[] total = new float[3];
@@ -375,6 +705,14 @@ public final class Tracer {
 				total[1] += light.green() * amount;
 				total[2] += light.blue() * amount;
 			}
+		}
+		if (extras.spread != null && extras.spill > 0.0F && frontCell >= 0) {
+			float coverage = Math.min(1.0F, (total[0] + total[1] + total[2]) * 0.5F);
+			float open = (1.0F - coverage) * extras.spill * params.brightness();
+			int at = frontCell * 3;
+			total[0] += extras.spread[at] * open;
+			total[1] += extras.spread[at + 1] * open;
+			total[2] += extras.spread[at + 2] * open;
 		}
 		float blockRed = Math.max(vertex[0] - base[0], 0.0F);
 		float blockGreen = Math.max(vertex[1] - base[1], 0.0F);

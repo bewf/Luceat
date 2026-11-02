@@ -328,7 +328,7 @@ public final class LuceatScreen extends Screen {
 		if (previewPage()) {
 			panel.setOverride(null);
 			if (PRESETS.equals(section) && !searching()) {
-				panel.setSpec(new SceneSpec(Scenes.scene("showcase"), "This is how your current settings look.", null, null, null, null));
+				panel.setSpec(new SceneSpec(Scenes.scene("cherry"), "This is how your current settings look.", null));
 			} else if (hovered != null) {
 				panel.setSpec(Scenes.forSetting(hovered.label()));
 			}

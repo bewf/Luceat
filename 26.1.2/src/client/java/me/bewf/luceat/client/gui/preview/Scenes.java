@@ -2,12 +2,8 @@ package me.bewf.luceat.client.gui.preview;
 
 import java.util.HashMap;
 import java.util.Map;
-import java.util.Optional;
-import java.util.function.Consumer;
 import java.util.function.Supplier;
 
-import me.bewf.luceat.client.config.LuceatConfig;
-import me.bewf.luceat.client.config.ShadowQuality;
 import me.bewf.luceat.client.gui.preview.Light.Source;
 
 import net.minecraft.world.level.block.Block;
@@ -26,6 +22,7 @@ public final class Scenes {
 	private static final float[] PURPLE = {0.7F, 0.35F, 1.0F};
 
 	static {
+		MAKERS.put("cherry", Worlds::cherry);
 		MAKERS.put("room", Scenes::room);
 		MAKERS.put("shadows", Scenes::shadows);
 		MAKERS.put("hall", Scenes::hall);
@@ -69,7 +66,7 @@ public final class Scenes {
 	}
 
 	public static SceneSpec fallback() {
-		return new SceneSpec(scene("room"), "A small room with one lamp. Drag the light around.", null, null, null, null);
+		return new SceneSpec(scene("cherry"), "A cherry hill at dusk with lanterns along the river.", null);
 	}
 
 	public static SceneSpec forSetting(String label) {
@@ -77,88 +74,50 @@ public final class Scenes {
 			return fallback();
 		}
 		return switch (label) {
-			case "Luceat" -> pair("room", "Without Luceat the room is dark. With it the lamp lights the room.", c -> c.enabled = false);
-			case "Light strength" -> pair("room", "Light strength changes how bright every light is.", c -> c.brightness = 0.6F);
-			case "Brightness limit" -> pair("many", "The limit stops stacked lights from turning white.", c -> c.maxBrightness = 3.0F);
-			case "Fade in daylight" -> new SceneSpec(scene("day"), "In daylight the lamp fades out so it does not look odd.", c -> c.daylightFade = 0.0F, "Off", "On", 0.85F);
-			case "Surface direction" -> pair("room", "Surfaces facing the light are brighter than surfaces facing away.", c -> c.directionalShading = 0.0F);
-			case "Colours from textures" -> pair("colours", "Each light takes its colour from the item texture.", c -> c.textureColours = false);
-			case "Glow on enchanted items" -> pair("enchant", "Enchanted items give a soft purple glow.", c -> c.enchantGlow = false);
-			case "Shadows", "Shadow darkness" -> pair("shadows", "Blocks stop light and leave a shadow behind them.", c -> {
-				if (label.equals("Shadows")) {
-					c.shadows = false;
-				} else {
-					c.shadowStrength = 0.3F;
-				}
-			});
-			case "Shadow distance" -> pair("hall", "Shadows only appear close to you. Far away lights stay simple and cheap.", c -> c.shadowDistance = 8);
-			case "Soft edges" -> pair("soft", "Soft edges blur the shadow so it looks more natural.", c -> c.shadowSoftness = 0.0F);
-			case "Keep lights out of walls" -> pair("tunnel", "In a tight tunnel the held light stays clear of the wall so the light does not flicker.", c -> c.keepLightOutOfWalls = false);
-			case "Leaves and holes", "Hole strength" -> pair("foliage", "Leaves let some light through the holes.", c -> {
-				if (label.equals("Hole strength")) {
-					c.cutoutOpacity = 0.3F;
-				} else {
-					c.foliageShadows = ShadowQuality.OFF;
-				}
-			});
-			case "Coloured glass" -> pair("glass", "Coloured glass tints the light that passes through.", c -> c.glassTint = false);
-			case "Fences, panes, slabs and more" -> pair("thin", "Thin blocks like fences, panes and slabs cast their real shape.", c -> c.thinShadows = false);
-			case "Grass and flowers" -> pair("plants", "Grass and flowers cast small shadows.", c -> c.plantShadows = false);
-			case "Placed lights", "Placed light strength" -> pair("placed", "Lamps, torches and other light blocks light the world.", c -> {
-				if (label.equals("Placed lights")) {
-					c.placedLights = false;
-				} else {
-					c.placedStrength = 0.4F;
-				}
-			});
-			case "Replace normal light" -> pair("placed", "Placed lights replace the flat vanilla light with real light.", c -> c.vanillaReplace = 0.0F);
-			case "Smallest light" -> pair("levels", "Lights below the smallest level are ignored. Cheap for lots of small lights.", c -> c.placedMinLevel = 1);
-			case "Your held lights", "Held light height" -> pair("held", "Your held light sits in front of you at hand height.", c -> {
-				if (label.equals("Your held lights")) {
-					c.heldLights = false;
-				} else {
-					c.heldHeight = 0.3F;
-				}
-			});
-			case "Other players", "Mobs holding items" -> pair("others", "Other players and mobs light up when they hold a light.", c -> {
-				if (label.equals("Other players")) {
-					c.otherPlayers = false;
-				} else {
-					c.mobs = false;
-				}
-			});
-			case "Dropped items" -> pair("dropped", "Dropped items glow. Items close together join into one light.", c -> c.droppedItems = false);
-			case "Items in item frames" -> pair("frames", "Items in item frames light the wall around them.", c -> c.itemFrames = false);
-			case "Fire, glowing mobs and more", "Fire flicker" -> pair("natural", "Fire, blazes, magma cubes and more give off light.", c -> {
-				if (label.equals("Fire flicker")) {
-					c.flicker = 0.0F;
-				} else {
-					c.naturalLights = false;
-				}
-			});
-			case "Water puts out lights" -> pair("water", "A light under water goes out.", c -> c.waterPutsOutLights = false);
-			case "Light bounce" -> pair("bounce", "Light bounces off surfaces and softly fills places the light cannot reach directly.", c -> c.lightBounce = 0.0F);
-			case "Shiny surfaces" -> pair("shiny", "Metal, ice, glass and polished blocks catch a bright highlight.", c -> c.shine = 0.0F);
-			case "Lights with shadows" -> pair("many", "Only the lights that matter most at each spot cast shadows. More costs more.", c -> c.shadowedLights = 0);
-			case "Join faraway lights" -> pair("many", "Lights far away join into one so big builds stay smooth.", c -> c.mergeFarLights = false);
-			case "Most lights at once" -> pair("many", "Only the closest lights are used. More lights costs more.", c -> c.maxLights = 4);
-			case "Light range" -> pair("hall", "Lights further away than the range are skipped.", c -> c.lightRange = 8);
+			case "Luceat" -> spec("room", "Without Luceat the room is dark. With it the lamp lights the room.");
+			case "Light strength" -> spec("room", "Light strength changes how bright every light is.");
+			case "Brightness limit" -> spec("many", "The limit stops stacked lights from turning white.");
+			case "Fade in daylight" -> new SceneSpec(scene("day"), "In daylight the lamp fades out so it does not look odd.", 0.85F);
+			case "Surface direction" -> spec("room", "Surfaces facing the light are brighter than surfaces facing away.");
+			case "Colours from textures" -> spec("colours", "Each light takes its colour from the item texture.");
+			case "Glow on enchanted items" -> spec("enchant", "Enchanted items give a soft purple glow.");
+			case "Shadows", "Shadow darkness" -> spec("shadows", "Blocks stop light and leave a shadow behind them.");
+			case "Shadow distance" -> spec("hall", "Shadows only appear close to you. Far away lights stay simple and cheap.");
+			case "Soft edges" -> spec("soft", "Soft edges blur the shadow so it looks more natural.");
+			case "Keep lights out of walls" -> spec("tunnel", "In a tight tunnel the held light stays clear of the wall so the light does not flicker.");
+			case "Leaves and holes", "Hole strength" -> spec("foliage", "Leaves let some light through the holes.");
+			case "Coloured glass" -> spec("glass", "Coloured glass tints the light that passes through.");
+			case "Fences, panes, slabs and more" -> spec("thin", "Thin blocks like fences, panes and slabs cast their real shape.");
+			case "Grass and flowers" -> spec("plants", "Grass and flowers cast small shadows.");
+			case "Placed lights", "Placed light strength" -> spec("placed", "Lamps, torches and other light blocks light the world.");
+			case "Replace normal light" -> spec("placed", "Placed lights replace the flat vanilla light with real light.");
+			case "Smallest light" -> spec("levels", "Lights below the smallest level are ignored. Cheap for lots of small lights.");
+			case "Your held lights", "Held light height" -> spec("held", "Your held light sits in front of you at hand height.");
+			case "Other players", "Mobs holding items" -> spec("others", "Other players and mobs light up when they hold a light.");
+			case "Dropped items" -> spec("dropped", "Dropped items glow. Items close together join into one light.");
+			case "Items in item frames" -> spec("frames", "Items in item frames light the wall around them.");
+			case "Fire, glowing mobs and more", "Fire flicker" -> spec("natural", "Fire, blazes, magma cubes and more give off light.");
+			case "Water puts out lights" -> spec("water", "A light under water goes out.");
+			case "Sun shadows", "Sun shadow strength" -> new SceneSpec(scene("cherry"), "In daylight the sun casts shadows from trees and buildings.", 0.85F);
+			case "Water light patterns" -> spec("water", "Light shining through water makes moving patterns on the floor.");
+			case "Light around corners", "Corner light strength" -> spec("tunnel", "Light spreads around corners and into places it cannot reach in a straight line.");
+			case "Placed light reach", "Blocks from other mods" -> spec("placed", "Placed lights reach further with a higher setting.");
+			case "Light bounce" -> spec("bounce", "Light bounces off surfaces and softly fills places the light cannot reach directly.");
+			case "Shiny surfaces" -> spec("shiny", "Metal, ice, glass and polished blocks catch a bright highlight.");
+			case "Lights with shadows" -> spec("many", "Only the lights that matter most at each spot cast shadows. More costs more.");
+			case "Join faraway lights" -> spec("many", "Lights far away join into one so big builds stay smooth.");
+			case "Most lights at once" -> spec("many", "Only the closest lights are used. More lights costs more.");
+			case "Light range" -> spec("hall", "Lights further away than the range are skipped.");
 			default -> fallback();
 		};
 	}
 
-	private static SceneSpec pair(String id, String caption, Consumer<LuceatConfig> baseline) {
-		return new SceneSpec(scene(id), caption, baseline, "Off", "On", null);
+	private static SceneSpec spec(String id, String caption) {
+		return new SceneSpec(scene(id), caption, null);
 	}
 
-	@SuppressWarnings({"unchecked", "rawtypes"})
 	static BlockState with(BlockState state, String name, String value) {
-		Property property = state.getBlock().getStateDefinition().getProperty(name);
-		if (property == null) {
-			return state;
-		}
-		Optional parsed = property.getValue(value);
-		return parsed.isPresent() ? state.setValue(property, (Comparable) parsed.get()) : state;
+		return Bs.with(state, name, value);
 	}
 
 	private static BlockState b(Block block) {
@@ -174,10 +133,6 @@ public final class Scenes {
 
 	private static Light lamp(Source source, double x, double y, double z, int level, float[] c) {
 		return Light.of(source, x, y, z, level, c[0], c[1], c[2]);
-	}
-
-	public static SceneSpec showcase(String leftLabel, String rightLabel, Consumer<LuceatConfig> baseline) {
-		return new SceneSpec(scene("showcase"), "Your settings on the left and the preset on the right.", baseline, leftLabel, rightLabel, null);
 	}
 
 	private static Scene showcase() {
@@ -360,10 +315,10 @@ public final class Scenes {
 		Scene.Builder s = stage("placed", "Placed lights", 11, 4, 8);
 		s.vanilla = true;
 		s.set(2, 1, 4, b(Blocks.LANTERN)).set(4, 1, 4, b(Blocks.TORCH)).set(6, 1, 4, b(Blocks.GLOWSTONE)).set(8, 1, 4, b(Blocks.SEA_LANTERN));
-		s.light(lamp(Source.PLACED, 2.5, 1.4, 4.5, 15, WARM).named("Lantern"));
-		s.light(lamp(Source.PLACED, 4.5, 1.7, 4.5, 14, WARM).asFire().named("Torch"));
-		s.light(lamp(Source.PLACED, 6.5, 1.5, 4.5, 15, new float[]{1.0F, 0.85F, 0.5F}).named("Glowstone"));
-		s.light(lamp(Source.PLACED, 8.5, 1.5, 4.5, 15, new float[]{0.6F, 0.9F, 1.0F}).named("Sea lantern"));
+		s.light(lamp(Source.PLACED, 2.5, 1.4, 4.5, 15, WARM));
+		s.light(lamp(Source.PLACED, 4.5, 1.7, 4.5, 14, WARM).asFire());
+		s.light(lamp(Source.PLACED, 6.5, 1.5, 4.5, 15, new float[]{1.0F, 0.85F, 0.5F}));
+		s.light(lamp(Source.PLACED, 8.5, 1.5, 4.5, 15, new float[]{0.6F, 0.9F, 1.0F}));
 		s.eye = new double[]{5.5, 3.0, -1.5};
 		s.target = new double[]{5.5, 0.8, 4.5};
 		return s.caption("Real light blocks. Each has its own colour.").build();
@@ -375,7 +330,7 @@ public final class Scenes {
 		for (int i = 0; i < levels.length; i++) {
 			double x = 1.5 + i * 1.6;
 			s.set((int) x, 1, 4, b(Blocks.CANDLE));
-			s.light(lamp(Source.PLACED, x, 1.3, 4.5, levels[i], WARM).named("L" + levels[i]));
+			s.light(lamp(Source.PLACED, x, 1.3, 4.5, levels[i], WARM));
 		}
 		s.eye = new double[]{5.5, 3.0, -1.5};
 		s.target = new double[]{5.5, 0.8, 4.5};
@@ -388,7 +343,7 @@ public final class Scenes {
 		s.fill(6, 1, 3, 6, 1, 3, b(Blocks.OAK_PLANKS));
 		s.eye = new double[]{4.5, 3.0, -2.5};
 		s.target = new double[]{4.5, 1.0, 4.5};
-		s.light(lamp(Source.HELD, 4.5, 1.0, 3.0, 14, WARM).asFire().named("You"));
+		s.light(lamp(Source.HELD, 4.5, 1.0, 3.0, 14, WARM).asFire());
 		return s.caption("The light you hold. Drag it forward and back.").movable().build();
 	}
 
@@ -397,8 +352,8 @@ public final class Scenes {
 		s.fill(5, 1, 6, 5, 2, 6, b(Blocks.COBBLESTONE));
 		s.eye = new double[]{5.5, 3.0, -2.5};
 		s.target = new double[]{5.5, 1.0, 4.5};
-		s.light(lamp(Source.PLAYER, 2.5, 1.6, 3.5, 14, WARM).named("Player"));
-		s.light(lamp(Source.MOB, 8.5, 1.4, 3.5, 12, SOUL).named("Zombie"));
+		s.light(lamp(Source.PLAYER, 2.5, 1.6, 3.5, 14, WARM));
+		s.light(lamp(Source.MOB, 8.5, 1.4, 3.5, 12, SOUL));
 		return s.caption("A player and a mob, both holding lights.").build();
 	}
 
@@ -408,7 +363,7 @@ public final class Scenes {
 		s.target = new double[]{5.5, 0.8, 4.5};
 		s.light(lamp(Source.DROPPED, 2.2, 1.2, 3.5, 6, WARM));
 		s.light(lamp(Source.DROPPED, 2.6, 1.2, 3.9, 6, WARM));
-		s.light(lamp(Source.DROPPED, 7.5, 1.2, 3.5, 9, SOUL).named("Pile"));
+		s.light(lamp(Source.DROPPED, 7.5, 1.2, 3.5, 9, SOUL));
 		return s.caption("Items close together join into one stronger light.").movable().build();
 	}
 
@@ -425,9 +380,9 @@ public final class Scenes {
 		Scene.Builder s = stage("natural", "Fire and mobs", 11, 4, 8);
 		s.eye = new double[]{5.5, 3.0, -1.5};
 		s.target = new double[]{5.5, 0.8, 4.5};
-		s.light(lamp(Source.NATURAL, 2.5, 1.6, 4.0, 10, new float[]{1.0F, 0.55F, 0.2F}).asFire().named("Blaze"));
-		s.light(lamp(Source.NATURAL, 5.5, 1.3, 4.0, 8, new float[]{0.35F, 0.8F, 1.0F}).named("Allay"));
-		s.light(lamp(Source.NATURAL, 8.5, 1.2, 4.0, 8, new float[]{1.0F, 0.4F, 0.1F}).asFire().named("Magma cube"));
+		s.light(lamp(Source.NATURAL, 2.5, 1.6, 4.0, 10, new float[]{1.0F, 0.55F, 0.2F}).asFire());
+		s.light(lamp(Source.NATURAL, 5.5, 1.3, 4.0, 8, new float[]{0.35F, 0.8F, 1.0F}));
+		s.light(lamp(Source.NATURAL, 8.5, 1.2, 4.0, 8, new float[]{1.0F, 0.4F, 0.1F}).asFire());
 		return s.caption("Blazes, allays and magma cubes glow.").build();
 	}
 
@@ -437,8 +392,8 @@ public final class Scenes {
 		s.set(4, 1, 4, b(Blocks.QUARTZ_BLOCK));
 		s.eye = new double[]{4.5, 3.2, -1.5};
 		s.target = new double[]{4.5, 0.8, 4.0};
-		s.light(lamp(Source.HELD, 3.5, 1.0, 3.5, 13, WARM).asWet().named("Torch under water"));
-		s.light(lamp(Source.HELD, 7.5, 1.4, 3.5, 13, WARM).named("Torch in air"));
+		s.light(lamp(Source.HELD, 3.5, 1.0, 3.5, 13, WARM).asWet());
+		s.light(lamp(Source.HELD, 7.5, 1.4, 3.5, 13, WARM));
 		return s.caption("The left light is under water.").build();
 	}
 
@@ -446,7 +401,7 @@ public final class Scenes {
 		Scene.Builder s = stage("enchant", "Enchanted", 9, 4, 8);
 		s.eye = new double[]{4.5, 3.0, -1.5};
 		s.target = new double[]{4.5, 0.8, 4.5};
-		s.light(lamp(Source.ENCHANT, 4.5, 1.2, 3.5, 6, PURPLE).named("Enchanted sword"));
+		s.light(lamp(Source.ENCHANT, 4.5, 1.2, 3.5, 6, PURPLE));
 		return s.caption("A soft purple glow around an enchanted item.").build();
 	}
 
@@ -454,9 +409,9 @@ public final class Scenes {
 		Scene.Builder s = stage("colours", "Colours", 11, 4, 8);
 		s.eye = new double[]{5.5, 3.0, -1.5};
 		s.target = new double[]{5.5, 0.8, 4.5};
-		s.light(lamp(Source.HELD, 2.5, 1.4, 4.0, 12, RED).asTextured().named("Redstone"));
-		s.light(lamp(Source.HELD, 5.5, 1.4, 4.0, 12, GREEN).asTextured().named("Copper"));
-		s.light(lamp(Source.HELD, 8.5, 1.4, 4.0, 12, SOUL).asTextured().named("Soul"));
+		s.light(lamp(Source.HELD, 2.5, 1.4, 4.0, 12, RED).asTextured());
+		s.light(lamp(Source.HELD, 5.5, 1.4, 4.0, 12, GREEN).asTextured());
+		s.light(lamp(Source.HELD, 8.5, 1.4, 4.0, 12, SOUL).asTextured());
 		return s.caption("Each light uses the colour of its item.").build();
 	}
 }

@@ -15,7 +15,10 @@ import net.minecraft.client.renderer.block.dispatch.BlockStateModelPart;
 import net.minecraft.client.renderer.texture.TextureAtlasSprite;
 import net.minecraft.client.resources.model.geometry.BakedQuad;
 import net.minecraft.core.Direction;
+import net.minecraft.resources.Identifier;
 import net.minecraft.util.RandomSource;
+import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.LiquidBlock;
 import net.minecraft.world.level.block.RenderShape;
 import net.minecraft.world.level.block.state.BlockState;
 
@@ -46,6 +49,9 @@ public final class BlockVoxels {
 	}
 
 	private static int[] build(BlockState state) {
+		if (state.is(Blocks.WATER)) {
+			return water(state);
+		}
 		if (state.isAir() || state.getRenderShape() != RenderShape.MODEL) {
 			return null;
 		}
@@ -61,6 +67,25 @@ public final class BlockVoxels {
 			}
 		}
 		return drawn ? voxels : null;
+	}
+
+	private static int[] water(BlockState state) {
+		if (state.getValue(LiquidBlock.LEVEL) != 0) {
+			return null;
+		}
+		SpriteData sprite = SpriteData.of(Identifier.fromNamespaceAndPath("minecraft", "block/water_still"));
+		int[] voxels = new int[RES * RES * RES];
+		for (int z = 0; z < RES; z++) {
+			for (int x = 0; x < RES; x++) {
+				int pixel = sprite.sample((x + 0.5F) / RES, (z + 0.5F) / RES);
+				int red = (pixel >> 16 & 255) * 0x3F / 255;
+				int green = (pixel >> 8 & 255) * 0x76 / 255;
+				int blue = (pixel & 255) * 0xE4 / 255;
+				int tone = Math.max(red, Math.max(green, blue)) < 40 ? 1 : 0;
+				voxels[x + RES * (13 + RES * z)] = 120 << 24 | Math.min(255, red * 2 + 20 + tone) << 16 | Math.min(255, green * 2 + 40) << 8 | Math.min(255, blue * 2 + 60);
+			}
+		}
+		return voxels;
 	}
 
 	private static boolean quads(List<BakedQuad> quads, int[] voxels, BlockState state) {

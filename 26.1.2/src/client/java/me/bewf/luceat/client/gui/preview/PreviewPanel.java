@@ -16,13 +16,12 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.renderer.texture.DynamicTexture;
-import net.minecraft.network.chat.Component;
-import net.minecraft.network.chat.Style;
 import net.minecraft.resources.Identifier;
-import net.minecraft.util.FormattedCharSequence;
 
 public final class PreviewPanel {
 	private static final float NIGHT = 0.04F;
+	private static final int MAX_PIXELS = 1_800_000;
+	private static final float[] TIER_SCALE = {0.28F, 0.5F, 1.0F};
 
 	private static final class Target {
 		final Identifier id;
@@ -44,6 +43,7 @@ public final class PreviewPanel {
 	}
 
 	private final Font font;
+	private final PreviewWorker worker = new PreviewWorker();
 	private final List<Target> targets = new ArrayList<>();
 	private int serial;
 	private SceneSpec spec = Scenes.fallback();
@@ -51,26 +51,34 @@ public final class PreviewPanel {
 	private float time = NIGHT;
 	private boolean userTime;
 	private boolean draggingTime;
-	private boolean draggingLight;
-	private double lightX = Double.NaN;
-	private double lightY = Double.NaN;
-	private double lightZ = Double.NaN;
-	private int lastHash;
-	private int lastBase;
-	private long lastChange;
+	private boolean draggingLook;
+	private double lastMouseX;
+	private double lastMouseY;
+	private double lookYaw;
+	private double lookPitch;
+	private double zoom = 1.0;
 	private Target shown;
-	private Tracer lastTracer;
-	private PreviewOccluders leftOccluders;
-	private PreviewOccluders rightOccluders;
-	private int leftKey;
-	private int rightKey;
+	private volatile Tracer lastTracer;
+	private PreviewOccluders occluders;
+	private int occluderKey;
+	private Occ[] occ;
+	private String occScene = "";
+	private int occSerial = -1;
+	private int submittedKey;
+	private int submittedTier = -1;
+	private boolean inFlight;
+	private long lastChange;
+	private int lastBase;
+	private long submittedAt;
+	private long lastRenderMillis;
 	private boolean interactive;
 	private int imageX;
 	private int imageY;
 	private int imageW;
 	private int imageH;
+	private int trackX0;
+	private int trackX1;
 	private int trackY;
-	private long lastRenderMillis;
 
 	public PreviewPanel(Font font) {
 		this.font = font;
@@ -81,9 +89,9 @@ public final class PreviewPanel {
 			next = Scenes.fallback();
 		}
 		if (next.scene() != spec.scene()) {
-			lightX = Double.NaN;
-			lightY = Double.NaN;
-			lightZ = Double.NaN;
+			lookYaw = 0.0;
+			lookPitch = 0.0;
+			zoom = 1.0;
 		}
 		this.spec = next;
 		if (!userTime) {
@@ -95,11 +103,16 @@ public final class PreviewPanel {
 		this.override = config;
 	}
 
+	public void setInteractive(boolean value) {
+		this.interactive = value;
+	}
+
 	public boolean busy() {
-		return draggingLight || draggingTime;
+		return draggingTime || draggingLook;
 	}
 
 	public void close() {
+		worker.shutdown();
 		for (Target target : targets) {
 			target.release();
 		}
@@ -110,10 +123,6 @@ public final class PreviewPanel {
 	public int imageBottom() {
 		return imageY + imageH;
 	}
-
-	private int trackX0;
-	private int trackX1;
-	private int overlayHash;
 
 	public void place(int x, int y, int w, int h) {
 		imageX = x;
@@ -127,7 +136,7 @@ public final class PreviewPanel {
 	}
 
 	public int overlayHash() {
-		return Objects.hash(spec.caption(), spec.scene().id, Math.round(time * 200.0F), draggingLight, draggingTime, imageX, imageY, imageW, imageH);
+		return Objects.hash(spec.caption(), spec.scene().id, Math.round(time * 200.0F), draggingTime, draggingLook, imageX, imageY, imageW, imageH);
 	}
 
 	public void drawImage(GuiGraphicsExtractor graphics, boolean frozen) {
@@ -137,36 +146,10 @@ public final class PreviewPanel {
 		Scene scene = spec.scene();
 		LuceatConfig live = override != null ? override : LuceatConfig.get();
 		if (!frozen) {
-			render(scene, live);
+			update(scene, live);
 		}
 		if (shown != null) {
 			graphics.blit(shown.id, imageX, imageY, imageX + imageW, imageY + imageH, 0.0F, 1.0F, 0.0F, 1.0F);
-		}
-		if (spec.compares()) {
-			int split = imageX + imageW / 2;
-			graphics.fill(split, imageY + 6, split + 1, imageY + imageH - 6, 0x99FFFFFF);
-			tag(graphics, spec.leftLabel(), imageX + 14, imageY + 62, 0xFFFFC857);
-			String right = spec.rightLabel();
-			tag(graphics, right, imageX + imageW - 14 - font.width(right) - 6, imageY + 62, LuceatLook.GOOD);
-		}
-		if (lastTracer != null) {
-			double aspect = (double) imageW / imageH;
-			for (Light light : scene.lights) {
-				if (light.label() == null) {
-					continue;
-				}
-				double[] p = lastTracer.project(light.x(), light.y() + 0.35, light.z(), aspect);
-				if (p == null) {
-					continue;
-				}
-				int lx = imageX + (int) (p[0] * imageW);
-				int ly = imageY + (int) (p[1] * imageH);
-				int tw = font.width(light.label());
-				if (lx - tw / 2 < imageX || lx + tw / 2 > imageX + imageW || ly < imageY || ly > imageY + imageH - 10) {
-					continue;
-				}
-				graphics.text(font, light.label(), lx - tw / 2, ly - 9, 0xFFFFFFFF, true);
-			}
 		}
 	}
 
@@ -175,10 +158,26 @@ public final class PreviewPanel {
 			return;
 		}
 		Scene scene = spec.scene();
-		String title = scene.title;
+		int maxChip = imageW - 24;
+		String title = Glass.fit(s, Surface.Role.BODY, scene.title, maxChip - 20);
 		int tw = s.width(Surface.Role.BODY, title) + 20;
 		Glass.chip(s, imageX + 12, imageY + 10, imageX + 12 + tw, imageY + 28, 0.0F);
 		s.text(Surface.Role.BODY, title, imageX + 22, imageY + 15, Glass.TEXT);
+		int rowY = imageY + 34;
+		if (imageH >= 170) {
+			String hint = Glass.fit(s, Surface.Role.BODY, "Drag to look around | Scroll to zoom", maxChip - 20);
+			int hw = s.width(Surface.Role.BODY, hint) + 20;
+			Glass.chip(s, imageX + 12, rowY, imageX + 12 + hw, rowY + 18, 0.0F);
+			s.text(Surface.Role.BODY, hint, imageX + 22, rowY + 5, Glass.SOFT);
+			rowY += 24;
+		}
+		int captionTop = imageY + imageH - 12 - (imageW < 340 ? 28 : 0) - 34 - 6;
+		if (note != null && !note.isEmpty() && rowY + 18 <= captionTop) {
+			String text = Glass.fit(s, Surface.Role.BODY, note, maxChip - 20);
+			int nw = s.width(Surface.Role.BODY, text) + 20;
+			Glass.chip(s, imageX + 12, rowY, imageX + 12 + nw, rowY + 18, 0.0F);
+			s.text(Surface.Role.BODY, text, imageX + 22, rowY + 5, Glass.WARN);
+		}
 		int bottom = imageY + imageH - 12;
 		boolean stacked = imageW < 340;
 		int timeW = stacked ? imageW - 24 : 150;
@@ -215,29 +214,10 @@ public final class PreviewPanel {
 				ty += 11;
 			}
 		}
-		if (scene.movable) {
-			String hint = "Drag to move the light. Scroll to lift it.";
-			int hw = s.width(Surface.Role.BODY, hint) + 20;
-			Glass.chip(s, imageX + 12, imageY + 34, imageX + 12 + hw, imageY + 52, 0.0F);
-			s.text(Surface.Role.BODY, hint, imageX + 22, imageY + 39, Glass.SOFT);
-		}
-		if (note != null && !note.isEmpty()) {
-			String text = note.length() > 60 ? note.substring(0, 57) + "..." : note;
-			int nw = s.width(Surface.Role.BODY, text) + 20;
-			int nx = imageX + imageW - 12 - nw;
-			Glass.chip(s, nx, imageY + 34, nx + nw, imageY + 52, 0.0F);
-			s.text(Surface.Role.BODY, text, nx + 10, imageY + 39, Glass.WARN);
-		}
 	}
 
 	public boolean overTime(double mx, double my) {
 		return LuceatLook.inside(mx, my, trackX0 - 8, trackY - 10, trackX1 + 8, trackY + 10);
-	}
-
-	private void tag(GuiGraphicsExtractor graphics, String text, int x, int y, int colour) {
-		int width = font.width(text) + 6;
-		graphics.fill(x, y, x + width, y + 11, 0xAA000000);
-		graphics.text(font, text, x + 3, y + 2, colour, false);
 	}
 
 	private Target target(int width, int height) {
@@ -258,128 +238,95 @@ public final class PreviewPanel {
 		return made;
 	}
 
-	private void render(Scene scene, LuceatConfig live) {
-		boolean moving = draggingLight || draggingTime;
+	private static int guiScale() {
+		return Math.min(4, me.bewf.luceat.client.gui.GuiFit.raster());
+	}
+
+	private void update(Scene scene, LuceatConfig live) {
 		int gs = guiScale();
-		int ow = Math.max(64, Math.min(1200, imageW * gs));
-		int oh = Math.max(48, Math.round(ow * (float) imageH / imageW));
-		int finalWidth = Math.min(ow, imageW * 2);
-		LuceatConfig left = null;
-		if (spec.compares()) {
-			left = live.copy();
-			spec.baseline().accept(left);
+		int ow = Math.max(64, imageW * gs);
+		int oh = Math.max(48, imageH * gs);
+		while ((long) ow * oh > MAX_PIXELS) {
+			ow = Math.round(ow * 0.9F);
+			oh = Math.round(oh * 0.9F);
 		}
-		boolean flicker = live.flicker > 0.0F;
-		long bucket = flicker ? System.nanoTime() / 70_000_000L : 0L;
-		int base = Objects.hash(live.asJson(), left == null ? "" : left.asJson(), scene.id, spec.caption(), time, lightX, lightY, lightZ, ow, oh, bucket);
+		PreviewWorker.Result result = worker.take();
+		if (result != null && result.request().key() == submittedKey) {
+			PreviewWorker.Request request = result.request();
+			Target target = target(request.width(), request.height());
+			NativeImage image = target.texture.getPixels();
+			int[] pixels = result.pixels();
+			int w = request.width();
+			int h = request.height();
+			for (int row = 0; row < h; row++) {
+				for (int column = 0; column < w; column++) {
+					image.setPixel(column, row, pixels[column + row * w]);
+				}
+			}
+			target.texture.upload();
+			shown = target;
+			lastTracer = result.tracer();
+			inFlight = false;
+			lastRenderMillis = (System.nanoTime() - submittedAt) / 1_000_000L;
+		}
+		boolean fire = live.flicker > 0.0F && live.enabled && hasFire(scene);
+		long bucket = fire ? System.nanoTime() / 150_000_000L : 0L;
+		int base = Objects.hash(live.asJson(), scene.id, time, lookYaw, lookPitch, zoom, ow, oh, bucket);
 		long now = System.nanoTime();
 		if (base != lastBase) {
 			lastBase = base;
 			lastChange = now;
 		}
-		int tier = moving ? 0 : (now - lastChange > 250_000_000L ? 2 : 1);
-		int hash = base * 31 + tier;
-		if (hash == lastHash && shown != null && shown.width == ow && shown.height == oh) {
-			return;
+		boolean moving = busy();
+		int wantTier = moving ? 0 : (fire ? 1 : (now - lastChange > 220_000_000L ? 2 : 1));
+		boolean changed = base != submittedKey || submittedTier < 0;
+		if ((changed && (!moving || !inFlight)) || (!changed && wantTier > submittedTier && !inFlight)) {
+			submit(scene, live, base, wantTier, ow, oh, gs);
 		}
-		float quality = tier == 0 ? 0.42F : tier == 1 ? 0.7F : 1.0F;
-		int tw = Math.max(48, Math.round(finalWidth * quality));
-		int th = Math.max(36, Math.round(tw * (float) oh / ow));
-		long start = System.nanoTime();
-		Target target = target(ow, oh);
-		int rightKeyNow = PreviewOccluders.key(live);
-		if (rightOccluders == null || rightKey != rightKeyNow) {
-			rightOccluders = new PreviewOccluders(live);
-			rightKey = rightKeyNow;
-		}
-		int[] pixels = new int[tw * th];
-		Tracer rightTracer = tracer(scene, live, rightOccluders);
-		if (left != null) {
-			int leftKeyNow = PreviewOccluders.key(left);
-			if (leftOccluders == null || leftKey != leftKeyNow) {
-				leftOccluders = new PreviewOccluders(left);
-				leftKey = leftKeyNow;
-			}
-			Tracer leftTracer = tracer(scene, left, leftOccluders);
-			int split = tw / 2;
-			leftTracer.render(pixels, tw, th, 0, split);
-			rightTracer.render(pixels, tw, th, split, tw);
-		} else {
-			rightTracer.render(pixels, tw, th);
-		}
-		NativeImage image = target.texture.getPixels();
-		if (tw == ow && th == oh) {
-			for (int row = 0; row < oh; row++) {
-				for (int column = 0; column < ow; column++) {
-					image.setPixel(column, row, pixels[column + row * ow]);
-				}
-			}
-		} else {
-			smoothUpscale(pixels, tw, th, image, ow, oh);
-		}
-		target.texture.upload();
-		shown = target;
-		lastTracer = rightTracer;
-		lastHash = hash;
-		lastRenderMillis = (System.nanoTime() - start) / 1_000_000L;
 	}
 
-	private static int guiScale() {
-		return Math.min(4, me.bewf.luceat.client.gui.GuiFit.raster());
-	}
-
-	// bilinear so the picture stays soft instead of showing blocky pixels
-	private static void smoothUpscale(int[] src, int sw, int sh, NativeImage dst, int dw, int dh) {
-		int[] columns = new int[dw];
-		int[] columnsNext = new int[dw];
-		float[] columnWeight = new float[dw];
-		for (int x = 0; x < dw; x++) {
-			float fx = Math.max(0.0F, Math.min(sw - 1.0F, (x + 0.5F) * sw / dw - 0.5F));
-			int x0 = (int) fx;
-			columns[x] = x0;
-			columnsNext[x] = Math.min(sw - 1, x0 + 1);
-			columnWeight[x] = fx - x0;
-		}
-		for (int y = 0; y < dh; y++) {
-			float fy = Math.max(0.0F, Math.min(sh - 1.0F, (y + 0.5F) * sh / dh - 0.5F));
-			int y0 = (int) fy;
-			int y1 = Math.min(sh - 1, y0 + 1);
-			float wy = fy - y0;
-			for (int x = 0; x < dw; x++) {
-				float wx = columnWeight[x];
-				int a = src[columns[x] + y0 * sw];
-				int b = src[columnsNext[x] + y0 * sw];
-				int c = src[columns[x] + y1 * sw];
-				int d = src[columnsNext[x] + y1 * sw];
-				int out = 0xFF000000;
-				for (int shift = 0; shift <= 16; shift += 8) {
-					float top = ((a >> shift) & 255) * (1.0F - wx) + ((b >> shift) & 255) * wx;
-					float bottom = ((c >> shift) & 255) * (1.0F - wx) + ((d >> shift) & 255) * wx;
-					out |= Math.round(top * (1.0F - wy) + bottom * wy) << shift;
-				}
-				dst.setPixel(x, y, out);
+	private static boolean hasFire(Scene scene) {
+		for (Light light : scene.lights) {
+			if (light.fire()) {
+				return true;
 			}
 		}
+		return false;
+	}
+
+	private void submit(Scene scene, LuceatConfig live, int base, int tier, int ow, int oh, int gs) {
+		int key = PreviewOccluders.key(live);
+		if (occluders == null || occluderKey != key) {
+			occluders = new PreviewOccluders(live);
+			occluderKey = key;
+			occSerial = -1;
+		}
+		if (occSerial != System.identityHashCode(scene) || !occScene.equals(scene.id) || occ == null) {
+			PreviewRenderer.prepare(scene);
+			occ = PreviewRenderer.occluders(scene, occluders);
+			occScene = scene.id;
+			occSerial = System.identityHashCode(scene);
+		}
+		double seconds = (System.nanoTime() / 1_000_000L % 1_000_000L) / 1000.0;
+		List<Light> lights = PreviewLights.build(scene, live, seconds, Double.NaN, Double.NaN, Double.NaN);
+		double[] eye = scene.eye;
+		double[] target = PreviewRenderer.lookTarget(scene, lookYaw, lookPitch);
+		double fov = PreviewRenderer.zoomFov(scene.fov, zoom);
+		float quality = TIER_SCALE[tier];
+		int tw = Math.max(48, Math.round(ow * quality));
+		int th = Math.max(36, Math.round(oh * quality));
+		int radius = Math.round(12.0F * gs);
+		int fade = Math.min(ow / 2, Math.round(Math.max(48.0F * gs, ow * 0.14F)));
+		PreviewWorker.Request request = new PreviewWorker.Request(scene, live.copy(), occ, lights, eye, target, fov, time, 3.0, tw, th, ow, oh, radius, fade, base, tier);
+		submittedKey = base;
+		submittedTier = tier;
+		submittedAt = System.nanoTime();
+		inFlight = true;
+		worker.submit(request);
 	}
 
 	public long lastRenderMillis() {
 		return lastRenderMillis;
-	}
-
-	private Tracer tracer(Scene scene, LuceatConfig config, PreviewOccluders occluders) {
-		Occ[] occ = new Occ[scene.cells.length];
-		for (int i = 0; i < occ.length; i++) {
-			occ[i] = scene.cells[i] == null ? Occ.EMPTY : occluders.of(scene.cells[i]);
-		}
-		double seconds = (System.nanoTime() / 1_000_000L % 1_000_000L) / 1000.0;
-		List<Light> lights = PreviewLights.build(scene, config, seconds, lightX, lightY, lightZ);
-		float shadowDistance = scene.shadowScale == 1.0F ? config.shadowDistance : config.shadowDistance * scene.shadowScale;
-		Params params = new Params(config.shadows, config.brightness, config.maxBrightness, config.daylightFade, config.directionalShading, config.shadowStrength, config.vanillaReplace, config.placedStrength, config.shadowSoftness * 0.45F, time, scene.vanilla, shadowDistance, config.lightBounce, config.shine);
-		return new Tracer(scene.width, scene.height, scene.depth, scene.voxels(), occ, scene.shine(), lights.toArray(new Light[0]), params, scene.eye, scene.target, scene.fov);
-	}
-
-	public void setInteractive(boolean value) {
-		this.interactive = value;
 	}
 
 	public boolean mouseClicked(double mx, double my) {
@@ -392,71 +339,46 @@ public final class PreviewPanel {
 			moveTime(mx);
 			return true;
 		}
-		if (spec.scene().movable && LuceatLook.inside(mx, my, imageX, imageY, imageX + imageW, imageY + imageH)) {
-			draggingLight = true;
-			moveLight(mx, my);
+		if (LuceatLook.inside(mx, my, imageX, imageY, imageX + imageW, imageY + imageH)) {
+			draggingLook = true;
+			lastMouseX = mx;
+			lastMouseY = my;
 			return true;
 		}
 		return false;
 	}
 
 	public boolean mouseDragged(double mx, double my) {
-		if (draggingLight) {
-			moveLight(mx, my);
-			return true;
-		}
 		if (draggingTime) {
 			moveTime(mx);
+			return true;
+		}
+		if (draggingLook) {
+			lookYaw = Math.max(-40.0, Math.min(40.0, lookYaw + (mx - lastMouseX) * 0.22));
+			lookPitch = Math.max(-14.0, Math.min(16.0, lookPitch + (my - lastMouseY) * 0.15));
+			lastMouseX = mx;
+			lastMouseY = my;
 			return true;
 		}
 		return false;
 	}
 
 	public boolean mouseReleased() {
-		boolean was = draggingLight || draggingTime;
-		draggingLight = false;
+		boolean was = busy();
 		draggingTime = false;
+		draggingLook = false;
 		return was;
 	}
 
 	public boolean mouseScrolled(double mx, double my, double amount) {
-		Scene scene = spec.scene();
-		if (!scene.movable || !LuceatLook.inside(mx, my, imageX, imageY, imageX + imageW, imageY + imageH)) {
+		if (!LuceatLook.inside(mx, my, imageX, imageY, imageX + imageW, imageY + imageH)) {
 			return false;
 		}
-		Light first = scene.lights.get(0);
-		double y = Double.isNaN(lightY) ? first.y() : lightY;
-		lightY = Math.max(0.4, Math.min(scene.height - 0.4, y + amount * 0.2));
-		if (Double.isNaN(lightX)) {
-			lightX = first.x();
-			lightZ = first.z();
-		}
+		zoom = Math.max(0.8, Math.min(1.8, zoom * Math.pow(1.1, amount)));
 		return true;
 	}
 
 	private void moveTime(double mx) {
 		time = (float) Math.max(0.0, Math.min(1.0, (mx - trackX0) / Math.max(1, trackX1 - trackX0)));
-	}
-
-	private void moveLight(double mx, double my) {
-		if (lastTracer == null) {
-			return;
-		}
-		Scene scene = spec.scene();
-		Light first = scene.lights.get(0);
-		double y = Double.isNaN(lightY) ? first.y() : lightY;
-		double aspect = (double) imageW / imageH;
-		double[] dir = lastTracer.rayDirection((mx - imageX) / imageW, (my - imageY) / imageH, aspect);
-		double[] eye = lastTracer.eye();
-		if (Math.abs(dir[1]) < 1.0E-4) {
-			return;
-		}
-		double t = (y - eye[1]) / dir[1];
-		if (t <= 0.0) {
-			return;
-		}
-		lightX = Math.max(0.5, Math.min(scene.width - 0.5, eye[0] + dir[0] * t));
-		lightZ = Math.max(0.5, Math.min(scene.depth - 0.5, eye[2] + dir[2] * t));
-		lightY = y;
 	}
 }
