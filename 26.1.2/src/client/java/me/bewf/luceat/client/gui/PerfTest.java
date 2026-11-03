@@ -93,7 +93,7 @@ public final class PerfTest {
 			return;
 		}
 		if (needsSpread && !me.bewf.luceat.client.light.LightSpread.supported()) {
-			note = "This graphics driver reports OpenGL " + me.bewf.luceat.client.gui.presets.HardwareHint.glVersion() + ". Light around corners needs 4.3.";
+			note = "Light around corners is unavailable here: " + me.bewf.luceat.client.light.LightSpread.blocker() + ".";
 			return;
 		}
 		if (needsSpread && !wanted.spread()) {

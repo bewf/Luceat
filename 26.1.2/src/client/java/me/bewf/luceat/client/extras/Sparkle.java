@@ -97,18 +97,32 @@ public final class Sparkle {
 		if (look == null) {
 			return Component.literal(playerName);
 		}
-		return calledByVanilla(hookedMethod) ? render(look, playerName) : legacyName(look, playerName);
+		Reader reader = reader(hookedMethod);
+		return reader == Reader.GAME ? render(look, playerName) : legacyName(look, playerName, reader == Reader.OTHER);
 	}
 
 	public static Component tabName(Component message) {
-		return replaceNames(message, true, false, !calledByVanilla("getNameForDisplay"));
+		return replaceNames(message, true, false, reader("getNameForDisplay"));
 	}
 
-	private static boolean calledByVanilla(String hookedMethod) {
+	/**
+	 * SkyHanni's Advanced Player List splits each tab line on spaces and takes the first word as the
+	 * player name, so it gets only the bare name. This puts the prefix and shine back on its finished line.
+	 */
+	public static Component restoreAfterSkyHanni(Component line) {
+		return replaceNames(line, true, false, Reader.GAME);
+	}
+
+	private enum Reader {
+		GAME, SKYHANNI, OTHER
+	}
+
+	private static Reader reader(String hookedMethod) {
 		try {
 			return WALKER.walk(frames -> {
 				boolean seen = false;
-				for (StackWalker.StackFrame frame : (Iterable<StackWalker.StackFrame>) frames.limit(12)::iterator) {
+				Reader found = null;
+				for (StackWalker.StackFrame frame : (Iterable<StackWalker.StackFrame>) frames.limit(16)::iterator) {
 					boolean hooked = frame.getMethodName().equals(hookedMethod);
 					if (!seen) {
 						seen = hooked;
@@ -117,16 +131,25 @@ public final class Sparkle {
 					if (hooked) {
 						continue;
 					}
-					return frame.getClassName().startsWith("net.minecraft.");
+					String owner = frame.getClassName();
+					if (owner.startsWith("at.hannibal2.skyhanni.")) {
+						return Reader.SKYHANNI;
+					}
+					if (found == null) {
+						found = owner.startsWith("net.minecraft.") ? Reader.GAME : Reader.OTHER;
+						if (found == Reader.GAME) {
+							return found;
+						}
+					}
 				}
-				return true;
+				return found == null ? Reader.GAME : found;
 			});
 		} catch (Throwable error) {
-			return true;
+			return Reader.GAME;
 		}
 	}
 
-	private static Component legacyName(Look look, String playerName) {
+	private static Component legacyName(Look look, String playerName, boolean withPrefix) {
 		ChatFormatting best = ChatFormatting.WHITE;
 		long bestDistance = Long.MAX_VALUE;
 		for (ChatFormatting format : ChatFormatting.values()) {
@@ -144,7 +167,7 @@ public final class Sparkle {
 				best = format;
 			}
 		}
-		return Component.literal(look.prefix() + playerName).withStyle(best);
+		return Component.literal(withPrefix ? look.prefix() + playerName : playerName).withStyle(best);
 	}
 
 	public static void meetOwner(Minecraft minecraft) {
@@ -279,10 +302,10 @@ public final class Sparkle {
 	}
 
 	public static Component replaceNames(Component message, boolean animated, boolean senderOnly) {
-		return replaceNames(message, animated, senderOnly, false);
+		return replaceNames(message, animated, senderOnly, Reader.GAME);
 	}
 
-	public static Component replaceNames(Component message, boolean animated, boolean senderOnly, boolean legacyColours) {
+	private static Component replaceNames(Component message, boolean animated, boolean senderOnly, Reader reader) {
 		try {
 			if (message == null) {
 				return message;
@@ -319,7 +342,7 @@ public final class Sparkle {
 					if (m.start() > last) {
 						out.append(Component.literal(text.substring(last, m.start())).setStyle(style));
 					}
-					out.append(legacyColours ? legacyName(look, m.group(1)) : animated ? render(look, m.group(1)) : staticName(look, m.group(1)));
+					out.append(reader != Reader.GAME ? legacyName(look, m.group(1), reader == Reader.OTHER) : animated ? render(look, m.group(1)) : staticName(look, m.group(1)));
 					changed[0] = true;
 					last = m.end();
 				}

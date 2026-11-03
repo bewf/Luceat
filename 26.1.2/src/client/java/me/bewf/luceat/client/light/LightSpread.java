@@ -116,6 +116,7 @@ public final class LightSpread {
 	private static long lastSignature = Long.MIN_VALUE;
 	private static int restFrames;
 	private static Boolean capable;
+	private static String blocker = "";
 
 	private LightSpread() {
 	}
@@ -127,13 +128,22 @@ public final class LightSpread {
 		if (capable == null) {
 			try {
 				org.lwjgl.opengl.GLCapabilities caps = GL.getCapabilities();
-				capable = caps.OpenGL43 || (caps.GL_ARB_compute_shader && caps.GL_ARB_shader_image_load_store);
-				Luceat.LOGGER.info("Luceat light spreading: OpenGL 4.3 {}, compute extension {}, image extension {}, so it is {}", caps.OpenGL43, caps.GL_ARB_compute_shader, caps.GL_ARB_shader_image_load_store, capable ? "available" : "not available");
+				boolean hardware = caps.OpenGL43 || (caps.GL_ARB_compute_shader && caps.GL_ARB_shader_image_load_store);
+				String vendor = String.valueOf(GL11.glGetString(GL11.GL_VENDOR)) + " " + GL11.glGetString(GL11.GL_RENDERER);
+				boolean intel = vendor.toLowerCase(java.util.Locale.ROOT).contains("intel") && !Boolean.getBoolean("luceat.forceSpread");
+				capable = hardware && !intel;
+				blocker = !hardware ? "needs OpenGL 4.3 or the compute extension" : intel ? "off on Intel graphics, the driver crashes" : "";
+				Luceat.LOGGER.info("Luceat light spreading: OpenGL 4.3 {}, compute {}, image load/store {}, Intel driver {}, so it is {}", caps.OpenGL43, caps.GL_ARB_compute_shader, caps.GL_ARB_shader_image_load_store, intel, capable ? "available" : "off");
 			} catch (RuntimeException error) {
 				capable = false;
 			}
 		}
 		return capable;
+	}
+
+	public static String blocker() {
+		supported();
+		return failed ? "turned off after a graphics error" : blocker;
 	}
 
 	public static long bytes() {

@@ -11,6 +11,7 @@
     "ItemInHandRendererMixin",
     "ParticleMixin",
     "PlayerTabOverlayMixin",
+    "SkyHanniTabMixin",
     "sodium.SodiumChunkRendererMixin",
     "sodium.SodiumShaderLoaderMixin"
   ],

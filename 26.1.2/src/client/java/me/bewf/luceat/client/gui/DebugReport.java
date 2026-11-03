@@ -48,7 +48,7 @@ public final class DebugReport {
 		graphics.add(new Row("GPU", HardwareHint.gpuName(), Glass.TEXT));
 		graphics.add(new Row("OpenGL", HardwareHint.glVersion(), Glass.TEXT));
 		graphics.add(new Row("Renderer", RenderBackend.kind().label(), Glass.TEXT));
-		graphics.add(new Row("Light around corners", compute ? "available" : "needs OpenGL 4.3 or the compute extension", compute ? Glass.GOOD : Glass.WARN));
+		graphics.add(new Row("Light around corners", compute ? "available" : LightSpread.blocker(), compute ? Glass.GOOD : Glass.WARN));
 		groups.add(new Group("Graphics", graphics));
 
 		ShaderVariant built = TerrainShaderPatch.built();
