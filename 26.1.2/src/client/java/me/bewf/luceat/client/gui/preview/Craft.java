@@ -184,9 +184,13 @@ final class Craft {
 	}
 
 	static void lampPost(Scene.Builder s, int x, int ground, int z, Block post, int height) {
+		lampPost(s, x, ground, z, post, height, Blocks.LANTERN);
+	}
+
+	static void lampPost(Scene.Builder s, int x, int ground, int z, Block post, int height, Block lamp) {
 		for (int i = 1; i <= height; i++) {
 			s.set(x, ground + i, z, Bs.b(post));
 		}
-		s.set(x, ground + height + 1, z, Bs.b(Blocks.LANTERN));
+		s.set(x, ground + height + 1, z, Bs.b(lamp));
 	}
 }

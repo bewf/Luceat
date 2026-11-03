@@ -8,6 +8,7 @@ import me.bewf.luceat.Luceat;
 import me.bewf.luceat.client.config.LuceatConfig;
 import me.bewf.luceat.client.gui.LuceatLook;
 import me.bewf.luceat.client.gui.glass.Glass;
+import me.bewf.luceat.client.gui.glass.Icons;
 import me.bewf.luceat.client.gui.glass.Surface;
 
 import com.mojang.blaze3d.platform.NativeImage;
@@ -51,11 +52,19 @@ public final class PreviewPanel {
 	private float time = NIGHT;
 	private boolean userTime;
 	private boolean draggingTime;
+	private static final double YAW_MIN = -40.0;
+	private static final double YAW_MAX = 40.0;
+	private static final double YAW_GIVE = 14.0;
+	private static final double PITCH_MIN = -14.0;
+	private static final double PITCH_MAX = 16.0;
+	private static final double PITCH_GIVE = 7.0;
 	private boolean draggingLook;
 	private double lastMouseX;
 	private double lastMouseY;
 	private double lookYaw;
 	private double lookPitch;
+	private double rawYaw;
+	private double rawPitch;
 	private double zoom = 1.0;
 	private Target shown;
 	private volatile Tracer lastTracer;
@@ -91,6 +100,8 @@ public final class PreviewPanel {
 		if (next.scene() != spec.scene()) {
 			lookYaw = 0.0;
 			lookPitch = 0.0;
+			rawYaw = 0.0;
+			rawPitch = 0.0;
 			zoom = 1.0;
 		}
 		this.spec = next;
@@ -145,6 +156,9 @@ public final class PreviewPanel {
 		}
 		Scene scene = spec.scene();
 		LuceatConfig live = override != null ? override : LuceatConfig.get();
+		if (!draggingLook) {
+			springBack();
+		}
 		if (!frozen) {
 			update(scene, live);
 		}
@@ -159,24 +173,35 @@ public final class PreviewPanel {
 		}
 		Scene scene = spec.scene();
 		int maxChip = imageW - 24;
-		String title = Glass.fit(s, Surface.Role.BODY, scene.title, maxChip - 20);
-		int tw = s.width(Surface.Role.BODY, title) + 20;
+		String title = Glass.fit(s, Surface.Role.BODY, scene.title, maxChip - 42);
+		int tw = s.width(Surface.Role.BODY, title) + 40;
 		Glass.chip(s, imageX + 12, imageY + 10, imageX + 12 + tw, imageY + 28, 0.0F);
-		s.text(Surface.Role.BODY, title, imageX + 22, imageY + 15, Glass.TEXT);
+		Icons.draw(s, imageX + 22, imageY + 14, Icons.CAMERA, Glass.PALE);
+		s.text(Surface.Role.BODY, title, imageX + 38, imageY + 15, Glass.TEXT);
 		int rowY = imageY + 34;
 		if (imageH >= 170) {
-			String hint = Glass.fit(s, Surface.Role.BODY, "Drag to look around | Scroll to zoom", maxChip - 20);
-			int hw = s.width(Surface.Role.BODY, hint) + 20;
-			Glass.chip(s, imageX + 12, rowY, imageX + 12 + hw, rowY + 18, 0.0F);
-			s.text(Surface.Role.BODY, hint, imageX + 22, rowY + 5, Glass.SOFT);
+			String[] hints = {"Drag to look", "Scroll to zoom"};
+			Icons.Icon[] icons = {Icons.MOVE, Icons.ZOOM};
+			int hx = imageX + 12;
+			for (int i = 0; i < hints.length; i++) {
+				int hw = s.width(Surface.Role.BODY, hints[i]) + 40;
+				if (hx + hw > imageX + imageW - 12) {
+					break;
+				}
+				Glass.chip(s, hx, rowY, hx + hw, rowY + 18, 0.0F);
+				Icons.draw(s, hx + 10, rowY + 4, icons[i], Glass.SOFT);
+				s.text(Surface.Role.BODY, hints[i], hx + 26, rowY + 5, Glass.SOFT);
+				hx += hw + 6;
+			}
 			rowY += 24;
 		}
 		int captionTop = imageY + imageH - 12 - (imageW < 340 ? 28 : 0) - 34 - 6;
 		if (note != null && !note.isEmpty() && rowY + 18 <= captionTop) {
-			String text = Glass.fit(s, Surface.Role.BODY, note, maxChip - 20);
-			int nw = s.width(Surface.Role.BODY, text) + 20;
+			String text = Glass.fit(s, Surface.Role.BODY, note, maxChip - 42);
+			int nw = s.width(Surface.Role.BODY, text) + 40;
 			Glass.chip(s, imageX + 12, rowY, imageX + 12 + nw, rowY + 18, 0.0F);
-			s.text(Surface.Role.BODY, text, imageX + 22, rowY + 5, Glass.WARN);
+			Icons.draw(s, imageX + 22, rowY + 4, Icons.ALERT, Glass.WARN);
+			s.text(Surface.Role.BODY, text, imageX + 38, rowY + 5, Glass.WARN);
 		}
 		int bottom = imageY + imageH - 12;
 		boolean stacked = imageW < 340;
@@ -189,8 +214,8 @@ public final class PreviewPanel {
 		Glass.chip(s, timeX0, timeY0, timeX1, timeY1, hoverTime || drag ? 1.0F : 0.0F);
 		String clock = time < 0.34F ? "Night" : time < 0.67F ? "Evening" : "Day";
 		int clockW = s.width(Surface.Role.BODY, clock);
-		s.text(Surface.Role.BODY, "Time", timeX0 + 10, timeY0 + 7, Glass.SOFT);
-		trackX0 = timeX0 + 10 + s.width(Surface.Role.BODY, "Time") + 8;
+		Icons.draw(s, timeX0 + 10, timeY0 + 6, Icons.CLOCK, Glass.SOFT);
+		trackX0 = timeX0 + 28;
 		trackX1 = timeX1 - 10 - clockW - 8;
 		trackY = timeY0 + 11;
 		s.text(Surface.Role.BODY, clock, timeX1 - 10 - clockW, timeY0 + 7, Glass.TEXT);
@@ -199,18 +224,19 @@ public final class PreviewPanel {
 		}
 		int capBottom = stacked ? timeY0 - 6 : bottom;
 		int capRight = stacked ? imageX + imageW - 12 : timeX0 - 8;
-		List<String> lines = Glass.wrap(s, Surface.Role.BODY, spec.caption(), capRight - (imageX + 12) - 20, 2);
+		List<String> lines = Glass.wrap(s, Surface.Role.BODY, spec.caption(), capRight - (imageX + 12) - 42, 2);
 		if (!lines.isEmpty()) {
 			int widest = 0;
 			for (String line : lines) {
 				widest = Math.max(widest, s.width(Surface.Role.BODY, line));
 			}
 			int boxH = 12 + lines.size() * 11;
-			int boxX1 = imageX + 12 + widest + 20;
+			int boxX1 = imageX + 12 + widest + 42;
 			Glass.chip(s, imageX + 12, capBottom - boxH, boxX1, capBottom, 0.0F);
+			Icons.draw(s, imageX + 22, capBottom - boxH / 2 - 4, Icons.INFO, Glass.PALE);
 			int ty = capBottom - boxH + 6;
 			for (String line : lines) {
-				s.text(Surface.Role.BODY, line, imageX + 22, ty, Glass.TEXT);
+				s.text(Surface.Role.BODY, line, imageX + 38, ty, Glass.TEXT);
 				ty += 11;
 			}
 		}
@@ -354,8 +380,10 @@ public final class PreviewPanel {
 			return true;
 		}
 		if (draggingLook) {
-			lookYaw = Math.max(-40.0, Math.min(40.0, lookYaw + (mx - lastMouseX) * 0.22));
-			lookPitch = Math.max(-14.0, Math.min(16.0, lookPitch + (my - lastMouseY) * 0.15));
+			rawYaw = Math.max(YAW_MIN - 3.0 * YAW_GIVE, Math.min(YAW_MAX + 3.0 * YAW_GIVE, rawYaw + (mx - lastMouseX) * 0.22));
+			rawPitch = Math.max(PITCH_MIN - 3.0 * PITCH_GIVE, Math.min(PITCH_MAX + 3.0 * PITCH_GIVE, rawPitch + (my - lastMouseY) * 0.15));
+			lookYaw = rubber(rawYaw, YAW_MIN, YAW_MAX, YAW_GIVE);
+			lookPitch = rubber(rawPitch, PITCH_MIN, PITCH_MAX, PITCH_GIVE);
 			lastMouseX = mx;
 			lastMouseY = my;
 			return true;
@@ -376,6 +404,35 @@ public final class PreviewPanel {
 		}
 		zoom = Math.max(0.8, Math.min(1.8, zoom * Math.pow(1.1, amount)));
 		return true;
+	}
+
+	private static double rubber(double raw, double min, double max, double give) {
+		if (raw > max) {
+			return max + give * (1.0 - Math.exp(-(raw - max) / (give * 4.0)));
+		}
+		if (raw < min) {
+			return min - give * (1.0 - Math.exp(-(min - raw) / (give * 4.0)));
+		}
+		return raw;
+	}
+
+	private void springBack() {
+		double targetYaw = Math.max(YAW_MIN, Math.min(YAW_MAX, rawYaw));
+		double targetPitch = Math.max(PITCH_MIN, Math.min(PITCH_MAX, rawPitch));
+		if (targetYaw == rawYaw && targetPitch == rawPitch) {
+			return;
+		}
+		double k = 1.0 - Math.pow(0.5, me.bewf.luceat.client.gui.glass.Motion.dt() / 0.09);
+		rawYaw += (targetYaw - rawYaw) * k;
+		rawPitch += (targetPitch - rawPitch) * k;
+		if (Math.abs(targetYaw - rawYaw) < 0.02) {
+			rawYaw = targetYaw;
+		}
+		if (Math.abs(targetPitch - rawPitch) < 0.02) {
+			rawPitch = targetPitch;
+		}
+		lookYaw = rubber(rawYaw, YAW_MIN, YAW_MAX, YAW_GIVE);
+		lookPitch = rubber(rawPitch, PITCH_MIN, PITCH_MAX, PITCH_GIVE);
 	}
 
 	private void moveTime(double mx) {

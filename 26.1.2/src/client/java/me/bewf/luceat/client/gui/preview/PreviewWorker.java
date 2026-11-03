@@ -14,7 +14,7 @@ final class PreviewWorker {
 	record Result(Request request, int[] pixels, Tracer tracer) {
 	}
 
-	private final ForkJoinPool pool;
+	private volatile ForkJoinPool pool;
 	private final Object lock = new Object();
 	private Request waiting;
 	private boolean running;
@@ -22,8 +22,12 @@ final class PreviewWorker {
 	private volatile Result ready;
 
 	PreviewWorker() {
+		this.pool = newPool();
+	}
+
+	private static ForkJoinPool newPool() {
 		int threads = Math.max(1, Runtime.getRuntime().availableProcessors() - 2);
-		this.pool = new ForkJoinPool(threads, task -> {
+		return new ForkJoinPool(threads, task -> {
 			java.util.concurrent.ForkJoinWorkerThread thread = ForkJoinPool.defaultForkJoinWorkerThreadFactory.newThread(task);
 			thread.setName("luceat preview");
 			thread.setPriority(Thread.NORM_PRIORITY - 1);
@@ -34,6 +38,9 @@ final class PreviewWorker {
 
 	void submit(Request request) {
 		synchronized (lock) {
+			if (pool.isShutdown()) {
+				pool = newPool();
+			}
 			waiting = request;
 			generation++;
 			if (!running) {

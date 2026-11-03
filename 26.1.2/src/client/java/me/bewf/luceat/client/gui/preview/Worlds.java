@@ -69,10 +69,33 @@ final class Worlds {
 				Craft.lampPost(s, x, y, z, Blocks.OAK_FENCE, 1 + (i % 2));
 			}
 		}
+		for (int i = 0; i < 5; i++) {
+			int z = 26 + i * 6;
+			int x = (int) Math.round(riverX(z)) + 7 + (i % 2);
+			int y = Craft.top(s, x, z);
+			if (y > level) {
+				Craft.lampPost(s, x, y, z, Blocks.COBBLESTONE_WALL, 1, i % 2 == 0 ? Blocks.SOUL_LANTERN : Blocks.SEA_LANTERN);
+			}
+		}
+		int campX = (int) Math.round(riverX(40)) + 11;
+		int campY = Craft.top(s, campX, 40);
+		if (campY > level) {
+			s.set(campX, campY + 1, 40, Bs.b(Blocks.CAMPFIRE));
+			s.set(campX + 2, campY + 1, 41, Bs.b(Blocks.TORCH));
+			s.set(campX - 2, campY + 1, 39, Bs.b(Blocks.TORCH));
+			s.set(campX + 1, campY + 1, 38, Bs.b(Blocks.HAY_BLOCK));
+			s.set(campX - 1, campY + 1, 42, Bs.b(Blocks.HAY_BLOCK));
+		}
+		int shroomX = (int) Math.round(riverX(52)) + 9;
+		int shroomY = Craft.top(s, shroomX, 52);
+		if (shroomY > level) {
+			s.set(shroomX, shroomY + 1, 52, Bs.b(Blocks.SHROOMLIGHT));
+			s.set(shroomX + 1, shroomY + 1, 53, Bs.b(Blocks.GLOWSTONE));
+		}
 		s.camera(new double[]{33, 13.2, 6}, new double[]{37, 10.6, 60}, 62.0);
 		s.time(0.37F);
 		s.sun(0.12);
 		s.fog(0.012F);
-		return s.caption("A cherry hill at dusk. Lanterns light the bank.").build();
+		return s.caption("A cherry hill at dusk. Lanterns, a campfire and torches light both banks.").build();
 	}
 }
