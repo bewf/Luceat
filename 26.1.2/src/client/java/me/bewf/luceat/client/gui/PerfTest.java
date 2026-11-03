@@ -84,7 +84,7 @@ public final class PerfTest {
 			note = "Turn VSync off in the video settings first, or the test cannot see small changes.";
 			return;
 		}
-		String label = setting.label().toLowerCase(Locale.ROOT);
+		String label = setting.id().toLowerCase(Locale.ROOT);
 		boolean needsRays = setting.rebuildsShadows() || label.contains("shadow") || label.contains("bounce") || label.contains("shin") || label.contains("sun") || label.contains("water");
 		me.bewf.luceat.client.shader.ShaderVariant wanted = me.bewf.luceat.client.shader.ShaderVariant.wanted();
 		boolean needsSpread = label.contains("corner");

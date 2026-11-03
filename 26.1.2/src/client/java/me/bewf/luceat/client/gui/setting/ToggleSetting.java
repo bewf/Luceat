@@ -22,6 +22,16 @@ public final class ToggleSetting extends Setting {
 	}
 
 	@Override
+	public String describe() {
+		String reason = blocked();
+		if (!reason.isEmpty()) {
+			return reason;
+		}
+		String text = value() ? onText() : offText();
+		return text != null ? text : help();
+	}
+
+	@Override
 	public String valueText() {
 		return value() ? "On" : "Off";
 	}

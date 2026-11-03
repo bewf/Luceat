@@ -27,6 +27,12 @@ public final class ChoiceSetting<E extends Enum<E>> extends Setting {
 		return index >= 0 && index < notes.length ? notes[index] : "";
 	}
 
+	@Override
+	public String describe() {
+		String note = note(index());
+		return note.isEmpty() ? help() : note;
+	}
+
 	public int count() {
 		return values.length;
 	}

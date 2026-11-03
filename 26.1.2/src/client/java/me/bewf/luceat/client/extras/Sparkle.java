@@ -105,10 +105,6 @@ public final class Sparkle {
 		return replaceNames(message, true, false, reader("getNameForDisplay"));
 	}
 
-	/**
-	 * SkyHanni's Advanced Player List splits each tab line on spaces and takes the first word as the
-	 * player name, so it gets only the bare name. This puts the prefix and shine back on its finished line.
-	 */
 	public static Component restoreAfterSkyHanni(Component line) {
 		return replaceNames(line, true, false, Reader.GAME);
 	}

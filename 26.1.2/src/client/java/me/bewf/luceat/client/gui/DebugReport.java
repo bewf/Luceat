@@ -67,7 +67,7 @@ public final class DebugReport {
 		String iris = modVersion("iris");
 		mods.add(new Row("Iris", iris == null ? "not installed" : iris, Glass.TEXT));
 		String lamb = modVersion("lambdynlights");
-		mods.add(new Row("LambDynamicLights", lamb == null ? "not installed" : lamb + ", lights will double up", lamb == null ? Glass.TEXT : Glass.WARN));
+		mods.add(new Row("LambDynamicLights", lamb == null ? "not installed" : lamb + ", lights add up twice", lamb == null ? Glass.MUTED : Glass.WARN));
 		groups.add(new Group("Mods", mods));
 		return groups;
 	}

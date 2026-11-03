@@ -7,6 +7,7 @@ import me.bewf.luceat.client.config.LuceatConfig;
 import me.bewf.luceat.client.config.ShaderPackMode;
 import me.bewf.luceat.client.config.ShadowQuality;
 import me.bewf.luceat.client.light.LightSpecs;
+import me.bewf.luceat.client.light.LightSpread;
 import me.bewf.luceat.client.shadow.ShadowVolume;
 
 public final class LuceatSettings {
@@ -53,7 +54,7 @@ public final class LuceatSettings {
 			Cost.LOW, false, 0.0F, 1.0F, 0.05F, "", () -> c.lightBounce, value -> c.lightBounce = value));
 		all.add(new ToggleSetting(LIGHTING, "Light around corners",
 			"Spreads light around corners and through gaps, so the room next door glows a little. Needs OpenGL 4.3.",
-			Cost.MEDIUM, false, () -> c.lightSpread, value -> c.lightSpread = value));
+			Cost.MEDIUM, false, () -> c.lightSpread, value -> c.lightSpread = value).blockedBy(LightSpread::blocker));
 		all.add(new SliderSetting(LIGHTING, "Corner light strength",
 			"Sets how strong light around corners is.",
 			Cost.NONE, false, 0.0F, 1.0F, 0.05F, "", () -> c.spillStrength, value -> c.spillStrength = value));
@@ -100,7 +101,7 @@ public final class LuceatSettings {
 		all.add(new ChoiceSetting<>(SHADOWS, "Leaves and holes",
 			"Sets how leaves, grates and other blocks with holes block light. Click to change.",
 			Cost.MEDIUM, true, ShadowQuality.values(), new String[]{"Off", "Fast", "Fancy"}, () -> c.foliageShadows, value -> c.foliageShadows = value)
-			.withNotes("Leaves and grates block light like solid blocks.", "Leaves and grates dim light by how see-through they are.", "Leaves and grates cast the real shape of their holes."));
+			.withNotes("Leaves and grates block light like solid blocks.", "Leaves and grates dim light by how see-through they are.", "Leaves and grates let light through their real holes."));
 		all.add(new ToggleSetting(SHADOWS, "Coloured glass",
 			"Tints light with the colour of the stained glass it passes through.",
 			Cost.LOW, true, () -> c.glassTint, value -> c.glassTint = value));
@@ -194,7 +195,8 @@ public final class LuceatSettings {
 
 		all.add(new ChoiceSetting<>(GENERAL, "When a shader pack is on",
 			"Off: Luceat stays out of the way. Overwrite: turns the pack off so Luceat shows. Compatible: keeps the pack and lights held items, mobs, dropped items and particles with the game's own light.",
-			Cost.NONE, false, ShaderPackMode.values(), new String[]{"Off", "Overwrite", "Compatible"}, () -> c.shaderPacks, value -> c.shaderPacks = value));
+			Cost.NONE, false, ShaderPackMode.values(), new String[]{"Disable", "Overwrite", "Compatible"}, () -> c.shaderPacks, value -> c.shaderPacks = value)
+			.withNotes("Disable Luceat while a shader pack is on.", "Turn the shader pack off so Luceat's lighting shows.", "Keep the shader pack and light held items, mobs, dropped items and particles with the game's own light."));
 		all.add(new ToggleSetting(GENERAL, "Update notices",
 			"Checks Modrinth at startup and tells you in chat about new versions.",
 			Cost.NONE, false, () -> c.updateChecker, value -> c.updateChecker = value));
@@ -244,6 +246,81 @@ public final class LuceatSettings {
 		all.add(new ToggleSetting(ADVANCED, "Pause when it freezes",
 			"Pauses lights if the game stays under 4 fps for several seconds. /luceat resume turns them back on. Off by default.",
 			Cost.NONE, false, () -> c.pauseOnFreeze, value -> c.pauseOnFreeze = value));
+		word(all);
 		return all;
+	}
+
+	private static void word(List<Setting> all) {
+		String[][] table = {
+			{"Luceat", "Luceat", "Luceat Enabled", "Luceat Disabled"},
+			{"Light strength", "Light Strength", "How bright every light is.", null},
+			{"Brightness limit", "Brightness Cap", "The brightest a spot can get when lights stack up.", null},
+			{"Fade in daylight", "Daylight Fade", "How much Luceat's light fades out in daylight.", null},
+			{"Surface direction", "Surface Shading", "How much more light a surface gets when it faces the light.", null},
+			{"Light bounce", "Light Bounce", "How much light stays in the shadows to simulate light bounce.", null},
+			{"Light around corners", "Corner Light", "Light spreads around corners and through gaps.", "Light stops at corners."},
+			{"Corner light strength", "Corner Strength", "How strong the light around corners is.", null},
+			{"Shiny surfaces", "Shiny Surfaces", "How much polished blocks, metal and water catch the light.", null},
+			{"Colours from textures", "Texture Colours", "Lights take their colour from the item's texture, so resource packs change it.", "Lights use fixed colours."},
+			{"Glow on enchanted items", "Enchant Glow", "Enchanted items in your hand give off a faint purple glow.", "Enchanted items don't glow."},
+			{"Sun shadows", "Sun Shadows", "Trees, roofs and cliffs cast sun shadows near you.", "The sun casts no shadows."},
+			{"Sun shadow strength", "Sun Shadow Darkness", "How dark sun shadows are.", null},
+			{"Water light patterns", "Water Patterns", "Moving streaks of sunlight show on pool and sea floors.", "Water floors stay plain."},
+			{"Shadows", "Light Shadows", "Lights cast shadows. Blocks stop their light.", "Light passes through blocks."},
+			{"Shadow darkness", "Shadow Darkness", "How dark shadows from lights get.", null},
+			{"Keep lights out of walls", "Keep Out of Walls", "A light stuck inside a wall moves out, so the wall doesn't go dark.", "Lights stay exactly where they are, even inside walls."},
+			{"Soft edges", "Soft Shadows", "How blurry shadow edges are. Higher looks softer and costs more.", null},
+			{"Fences, panes, slabs and more", "Thin Block Shadows", "Fences, bars, doors, stairs and slabs cast their real shape.", "Fences, bars, doors, stairs and slabs cast no shadow."},
+			{"Grass and flowers", "Plant Shadows", "Grass and flowers cast soft shadows.", "Plants cast no shadows."},
+			{"Leaves and holes", "Leaf Shadows", "How leaves, grates and other blocks with holes block light.", null},
+			{"Coloured glass", "Stained Glass", "Light takes the colour of the stained glass it passes through.", "Stained glass doesn't tint light."},
+			{"Hole strength", "Leaf Density", "How solid leaves and grates count. Lower lets more light through.", null},
+			{"Placed lights", "Placed Lights", "Glowing blocks light up their surroundings in their own colour, with shadows.", "Glowing blocks use the game's normal light."},
+			{"Placed light strength", "Placed Strength", "How bright placed lights are.", null},
+			{"Placed light reach", "Placed Reach", "How far placed light travels before it fades.", null},
+			{"Blocks from other mods", "Modded Blocks", "Glowing blocks from other mods get a Luceat light, coloured from their texture.", "Glowing blocks from other mods use the game's normal light."},
+			{"Replace normal light", "Replace Vanilla Light", "How much of Minecraft's flat block light Luceat replaces.", null},
+			{"Smallest light", "Minimum Level", "Skips light blocks dimmer than this level, like candles and small buds.", null},
+			{"Your held lights", "Held Items", "Items in your hands light up the world around you.", "Items in your hands give no light."},
+			{"Other players", "Other Players", "Items other players hold light up their surroundings.", "Other players' items give no light."},
+			{"Mobs holding items", "Mob Items", "Mobs holding a light item give it off.", "Mobs give no light from items."},
+			{"Dropped items", "Dropped Items", "Items on the ground give off light.", "Items on the ground give no light."},
+			{"Items in item frames", "Item Frames", "Items in item frames light up the wall around them.", "Items in item frames give no light."},
+			{"Fire, glowing mobs and more", "Fire and Mobs", "Blazes, burning mobs, allays, glow squid, magma cubes, fireballs and end crystals give off light.", "Fire and glowing mobs give no light."},
+			{"Light on mobs and items", "Lit Entities", "Players, mobs and dropped items get lit by nearby lights.", "Players, mobs and dropped items ignore Luceat's light."},
+			{"Light on particles", "Lit Particles", "Smoke, sparks and other particles get lit by nearby lights.", "Particles ignore Luceat's light."},
+			{"Held light height", "Held Light Height", "How high your held light sits on your body.", null},
+			{"Fire flicker", "Flicker", "How much warm lights like torches and campfires flicker.", null},
+			{"Water puts out lights", "Water Puts Out Lights", "Torches, campfires and similar items go out under water.", "Lights keep burning under water."},
+			{"Most lights at once", "Light Limit", "The most lights active at once. Each pixel checks only nearby ones, so a high number costs little.", null},
+			{"Join faraway lights", "Merge Far Lights", "Far away lights that sit close together join into one bigger light.", "Far away lights stay separate."},
+			{"Adaptive quality", "Adaptive Quality", "Eases shadows and bounce down when your frame rate drops, then brings them back.", "Quality stays fixed whatever your frame rate does."},
+			{"Light range", "Light Range", "How far Luceat looks for lights. Lights past it fade out.", null},
+			{"Lights with shadows", "Shadowed Lights", "How many of the strongest nearby lights cast shadows. The rest shine without them.", null},
+			{"Shadow distance", "Shadow Distance", "Shadows fade out past this distance. Lower is faster.", null},
+			{"When a shader pack is on", "Shader Pack Settings", "What Luceat does while a shader pack is on.", null},
+			{"Update notices", "Update Notices", "Checks Modrinth at startup and tells you in chat if a new update is available.", "No update checks. You won't hear about new versions."},
+			{"Skip buried lights", "Skip Buried Lights", "Ignores light blocks with no open side, like the inside of a lava lake.", "Every light block counts, even buried ones."},
+			{"Hide lights behind blocks", "Hide Behind Walls", "A placed light shows only where the game's own light reaches, so lava can't glow through the ground.", "Placed light can show through walls and ground."},
+			{"Join crowded lights", "Merge Crowds", "Lava lakes and walls of torches become a few strong lights instead of hundreds.", "Every light in a crowd stays separate."},
+			{"Crowd size", "Crowd Size", "How many lights a 16 block chunk holds before they join.", null},
+			{"Join lights past", "Merge Distance", "How far away lights start joining. Needs Merge Far Lights.", null},
+			{"Search time", "Search Time", "Time per frame spent finding new light blocks. Lower is smoother, but new lights show up later.", null},
+			{"Light easing", "Fade Speed", "How slowly lights fade in, fade out and change size. At zero they change instantly.", null},
+			{"Corner light steps", "Spread Speed", "How far corner light travels each frame. Higher fills rooms faster and costs more.", null},
+			{"Rest corner light", "Pause Corner Light", "Corner light stops updating while nothing moves.", "Corner light updates every frame."},
+			{"Shadow map updates", "Shadow Refresh", "How many 16 block pieces of the shadow map rebuild each frame. Higher catches up faster after you build.", null},
+			{"Lower quality below", "Drop Below", "Quality drops when your frame rate stays under this.", null},
+			{"Raise quality above", "Recover Above", "Quality comes back when your frame rate stays over this.", null},
+			{"Lowest quality", "Quality Floor", "The lowest quality adaptive quality can reach. At 1 it never drops.", null},
+			{"Pause when it freezes", "Freeze Guard", "Pauses lights if the game stays under 4 fps for several seconds. /luceat resume brings them back.", "Lights keep running through a freeze."},
+		};
+		for (String[] row : table) {
+			for (Setting setting : all) {
+				if (setting.id().equals(row[0])) {
+					setting.text(row[1], row[2], row[3]);
+				}
+			}
+		}
 	}
 }

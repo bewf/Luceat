@@ -51,6 +51,27 @@ public final class Icons {
 	public static final Icon CPU = new Icon(LucideData.CPU);
 	public static final Icon USER = new Icon(LucideData.USER);
 	public static final Icon EXTERNAL = new Icon(LucideData.EXTERNAL);
+	public static final Icon MOVE = new Icon(LucideData.MOVE);
+	public static final Icon ZOOM = new Icon(LucideData.ZOOM);
+	public static final Icon CLOCK = new Icon(LucideData.CLOCK);
+	public static final Icon MOON = new Icon(LucideData.MOON);
+	public static final Icon CAMERA = new Icon(LucideData.CAMERA);
+	public static final Icon EYE = new Icon(LucideData.EYE);
+	public static final Icon LEAF = new Icon(LucideData.LEAF);
+	public static final Icon DROPS = new Icon(LucideData.DROPS);
+	public static final Icon SPARKLES = new Icon(LucideData.SPARKLES);
+	public static final Icon LAYERS = new Icon(LucideData.LAYERS);
+	public static final Icon PLAY = new Icon(LucideData.PLAY);
+	public static final Icon IMPORT = new Icon(LucideData.IMPORT);
+	public static final Icon FOLDER = new Icon(LucideData.FOLDER);
+	public static final Icon SAVE = new Icon(LucideData.SAVE);
+	public static final Icon SPLIT = new Icon(LucideData.SPLIT);
+	public static final Icon TREES = new Icon(LucideData.TREES);
+	public static final Icon HAND = new Icon(LucideData.HAND);
+	public static final Icon LAMP = new Icon(LucideData.LAMP);
+	public static final Icon PORTAL = new Icon(LucideData.PORTAL);
+	public static final Icon COMPARE = new Icon(LucideData.COMPARE);
+	public static final Icon ROTATE = new Icon(LucideData.ROTATE);
 
 	private static final Map<Long, Pane> SPRITES = new HashMap<>();
 

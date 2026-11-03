@@ -3,9 +3,13 @@ package me.bewf.luceat.client.gui.setting;
 public abstract class Setting {
 	private final String section;
 	private final String label;
-	private final String help;
+	private String help;
 	private final Cost cost;
 	private final boolean rebuildsShadows;
+	private String name;
+	private String onText;
+	private String offText;
+	private java.util.function.Supplier<String> blocker = () -> "";
 
 	protected Setting(String section, String label, String help, Cost cost, boolean rebuildsShadows) {
 		this.section = section;
@@ -19,8 +23,43 @@ public abstract class Setting {
 		return section;
 	}
 
-	public String label() {
+	public String id() {
 		return label;
+	}
+
+	public String label() {
+		return name != null ? name : label;
+	}
+
+	@SuppressWarnings("unchecked")
+	public <T extends Setting> T text(String name, String on, String off) {
+		this.name = name;
+		this.onText = on;
+		this.offText = off;
+		return (T) this;
+	}
+
+	@SuppressWarnings("unchecked")
+	public <T extends Setting> T blockedBy(java.util.function.Supplier<String> blocker) {
+		this.blocker = blocker;
+		return (T) this;
+	}
+
+	public String blocked() {
+		return blocker.get();
+	}
+
+	protected String onText() {
+		return onText;
+	}
+
+	protected String offText() {
+		return offText;
+	}
+
+	public String describe() {
+		String reason = blocked();
+		return reason.isEmpty() ? help : reason;
 	}
 
 	public String help() {
@@ -37,7 +76,7 @@ public abstract class Setting {
 
 	public boolean matches(String query) {
 		String lower = query.toLowerCase();
-		return label.toLowerCase().contains(lower) || help.toLowerCase().contains(lower) || section.toLowerCase().contains(lower);
+		return label().toLowerCase().contains(lower) || label.toLowerCase().contains(lower) || help.toLowerCase().contains(lower) || section.toLowerCase().contains(lower);
 	}
 
 	public abstract String valueText();
