@@ -59,7 +59,11 @@ public abstract class Setting {
 
 	public String describe() {
 		String reason = blocked();
-		return reason.isEmpty() ? help : reason;
+		return reason.isEmpty() ? help : unavailable(reason);
+	}
+
+	protected static String unavailable(String reason) {
+		return "Unavailable: " + reason + (reason.endsWith(".") ? "" : ".");
 	}
 
 	public String help() {

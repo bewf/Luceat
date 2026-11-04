@@ -25,7 +25,7 @@ public final class ToggleSetting extends Setting {
 	public String describe() {
 		String reason = blocked();
 		if (!reason.isEmpty()) {
-			return reason;
+			return unavailable(reason);
 		}
 		String text = value() ? onText() : offText();
 		return text != null ? text : help();
