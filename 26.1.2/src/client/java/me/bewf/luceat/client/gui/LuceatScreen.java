@@ -312,13 +312,15 @@ public final class LuceatScreen extends Screen {
 
 	@Override
 	public void extractRenderState(GuiGraphicsExtractor graphics, int screenMouseX, int screenMouseY, float partial) {
+		extractBlurredBackground(graphics);
+		Glass.frosted = minecraft.options.getMenuBackgroundBlurriness() >= 1;
 		int mouseX = (int) Math.floor(fit.toUnits(screenMouseX));
 		int mouseY = (int) Math.floor(fit.toUnits(screenMouseY));
 		fit.begin(graphics);
 		Motion.tick(System.nanoTime());
 		int gs = guiScale();
 		boolean panelNow = panelShown();
-		int ck = Objects.hash(fit.width(), fit.height(), gs, panelNow, showSide);
+		int ck = Objects.hash(fit.width(), fit.height(), gs, panelNow, showSide, Glass.frosted);
 		if (!chrome.matches(0, 0, fit.width(), fit.height(), gs) || ck != chromeKey) {
 			chromeKey = ck;
 			chrome.begin(0, 0, fit.width(), fit.height(), gs);

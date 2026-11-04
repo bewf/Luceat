@@ -18,18 +18,20 @@ public final class Glass {
 	public static final int GOOD = 0xFF6FE3A0;
 	public static final int BAD = 0xFFFF7A8A;
 
+	public static boolean frosted;
+
 	private Glass() {
 	}
 
 	public static void backdrop(Surface s, int w, int h) {
-		s.fill(0, 0, w, h, argb(176, 8, 5, 16));
+		s.fill(0, 0, w, h, argb(frosted ? 84 : 176, 8, 5, 16));
 		Paint.vertical(s, 0, 0, w, h / 2, 0, argb(70, 44, 24, 96), argb(0, 44, 24, 96));
 		Paint.vertical(s, 0, h / 2, w, h, 0, argb(0, 30, 14, 70), argb(80, 30, 14, 70));
 	}
 
 	public static void slab(Surface s, int x0, int y0, int x1, int y1, int r) {
 		Paint.halo(s, x0, y0, x1, y1, r, 18, argb(40, 122, 77, 255));
-		Paint.vertical(s, x0, y0, x1, y1, r, argb(224, 25, 18, 50), argb(240, 9, 6, 19));
+		Paint.vertical(s, x0, y0, x1, y1, r, argb(frosted ? 150 : 224, 25, 18, 50), argb(frosted ? 176 : 240, 9, 6, 19));
 		int w = x1 - x0;
 		int h = y1 - y0;
 		Paint.horizontal(s, x0 + r, y0 + 1, x0 + w / 2, y0 + 2, argb(0, 255, 255, 255), argb(46, 255, 255, 255), 6);
