@@ -46,9 +46,9 @@ public final class Presets {
 				c.sunShadowStrength = 0.65F;
 				c.caustics = false;
 				c.shine = 0.0F;
-				c.maxLights = 24;
+				c.maxLights = 48;
 				c.mergeFarLights = true;
-				c.lightRange = 40;
+				c.lightRange = 48;
 				c.heldLights = true;
 				c.otherPlayers = true;
 				c.mobs = true;
