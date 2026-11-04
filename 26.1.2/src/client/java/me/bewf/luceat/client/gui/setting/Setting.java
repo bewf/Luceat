@@ -10,6 +10,8 @@ public abstract class Setting {
 	private String onText;
 	private String offText;
 	private java.util.function.Supplier<String> blocker = () -> "";
+	private java.util.function.Supplier<String> shortReason = () -> "";
+	private java.util.function.Supplier<String> detail = () -> "";
 
 	protected Setting(String section, String label, String help, Cost cost, boolean rebuildsShadows) {
 		this.section = section;
@@ -43,6 +45,24 @@ public abstract class Setting {
 	public <T extends Setting> T blockedBy(java.util.function.Supplier<String> blocker) {
 		this.blocker = blocker;
 		return (T) this;
+	}
+
+	@SuppressWarnings("unchecked")
+	public <T extends Setting> T blockedBy(java.util.function.Supplier<String> blocker, java.util.function.Supplier<String> shortReason, java.util.function.Supplier<String> detail) {
+		this.blocker = blocker;
+		this.shortReason = shortReason;
+		this.detail = detail;
+		return (T) this;
+	}
+
+	public String blockedShort() {
+		String text = shortReason.get();
+		return text.isEmpty() ? blocked() : text;
+	}
+
+	public String blockedDetail() {
+		String text = detail.get();
+		return text.isEmpty() ? blocked() : text;
 	}
 
 	public String blocked() {

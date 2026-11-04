@@ -1,5 +1,0 @@
-{
-  "providers": [
-    {"type": "ttf", "file": "luceat:birthstone.ttf", "size": 15.0, "oversample": 8.0, "shift": [0.0, 0.0]}
-  ]
-}

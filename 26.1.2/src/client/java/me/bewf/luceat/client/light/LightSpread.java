@@ -146,6 +146,31 @@ public final class LightSpread {
 		return failed ? "turned off after a graphics error" : blocker;
 	}
 
+	public static String shortBlocker() {
+		String reason = blocker();
+		if (reason.isEmpty()) {
+			return "";
+		}
+		if (failed) {
+			return "Turned off after an error";
+		}
+		return reason.startsWith("off on Intel") ? "Not supported on Intel graphics" : "Needs OpenGL 4.3";
+	}
+
+	public static String blockerDetail() {
+		String reason = blocker();
+		if (reason.isEmpty()) {
+			return "";
+		}
+		if (failed) {
+			return "A graphics error happened while spreading light, so Luceat turned it off for this session. Restart the game to try again.";
+		}
+		if (reason.startsWith("off on Intel")) {
+			return "Light around corners runs as a compute shader on OpenGL 4.3. Intel's graphics driver crashes on it, so Luceat keeps it off on Intel graphics.";
+		}
+		return "Light around corners runs as a compute shader, which needs OpenGL 4.3 or the compute shader extension. This graphics card or driver does not offer either.";
+	}
+
 	public static long bytes() {
 		return textures[0] == 0 ? 0L : 2L * SIZE * SIZE * SIZE * 4L;
 	}

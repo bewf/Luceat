@@ -1,5 +1,9 @@
 package me.bewf.luceat.client.gui;
 
+import java.util.HashMap;
+import java.util.Locale;
+import java.util.Map;
+
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.network.chat.Component;
@@ -8,52 +12,50 @@ import net.minecraft.network.chat.Style;
 import net.minecraft.resources.Identifier;
 
 public final class LuceatFonts {
-	private static final Style TITLE = styled("title");
-	private static final Style WORDMARK = styled("wordmark");
-	private static final Style HEADING = styled("heading");
-	private static final Style BODY = styled("body");
-	private static final Style QUOTE = styled("quote");
-	private static final Style POTATO = styled("preset_potato");
-	private static final Style BALANCED = styled("preset_balanced");
-	private static final Style PHENOMENAL = styled("preset_phenomenal");
-	private static final Style HARDCORE = styled("preset_hardcore");
+	private static final int MAX_SCALE = 8;
+	private static final Map<String, Style> STYLES = new HashMap<>();
 
 	private LuceatFonts() {
 	}
 
 	private static Style styled(String name) {
-		return Style.EMPTY.withFont(new FontDescription.Resource(Identifier.fromNamespaceAndPath("luceat", name)));
+		int scale = Math.max(1, Math.min(MAX_SCALE, GuiFit.raster()));
+		return STYLES.computeIfAbsent(name + "_" + scale, key -> Style.EMPTY.withFont(new FontDescription.Resource(Identifier.fromNamespaceAndPath("luceat", key))));
 	}
 
 	public static Component title(String text) {
-		return Component.literal(text).withStyle(TITLE);
+		return Component.literal(text).withStyle(styled("title"));
 	}
 
 	public static Component wordmark(String text) {
-		return Component.literal(text).withStyle(WORDMARK);
+		return Component.literal(text).withStyle(styled("wordmark"));
 	}
 
 	public static Component heading(String text) {
-		return Component.literal(text).withStyle(HEADING);
+		return Component.literal(text).withStyle(styled("heading"));
 	}
 
 	public static Component preset(String preset, String text) {
-		Style style = switch (preset.toLowerCase(java.util.Locale.ROOT)) {
-			case "potato" -> POTATO;
-			case "balanced" -> BALANCED;
-			case "phenomenal" -> PHENOMENAL;
-			case "hardcore" -> HARDCORE;
-			default -> TITLE;
+		String name = switch (preset.toLowerCase(Locale.ROOT)) {
+			case "potato" -> "preset_potato";
+			case "balanced" -> "preset_balanced";
+			case "phenomenal" -> "preset_phenomenal";
+			case "hardcore" -> "preset_hardcore";
+			default -> "title";
 		};
-		return Component.literal(text).withStyle(style);
+		return Component.literal(text).withStyle(styled(name));
+	}
+
+	public static Component small(String text) {
+		return Component.literal(text).withStyle(styled("small"));
 	}
 
 	public static Component body(String text) {
-		return Component.literal(text).withStyle(BODY);
+		return Component.literal(text).withStyle(styled("body"));
 	}
 
 	public static Component quote(String text) {
-		return Component.literal(text).withStyle(QUOTE);
+		return Component.literal(text).withStyle(styled("quote"));
 	}
 
 	public static int width(Font font, Component text) {

@@ -1,0 +1,14 @@
+{
+  "providers": [
+    {
+      "type": "ttf",
+      "file": "luceat:barlow_condensed.ttf",
+      "size": 21.0,
+      "oversample": 1.0,
+      "shift": [
+        0.0,
+        0.0
+      ]
+    }
+  ]
+}

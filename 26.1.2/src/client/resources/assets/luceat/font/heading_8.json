@@ -1,0 +1,14 @@
+{
+  "providers": [
+    {
+      "type": "ttf",
+      "file": "luceat:redaction_bold.ttf",
+      "size": 14.0,
+      "oversample": 8.0,
+      "shift": [
+        0.0,
+        0.0
+      ]
+    }
+  ]
+}

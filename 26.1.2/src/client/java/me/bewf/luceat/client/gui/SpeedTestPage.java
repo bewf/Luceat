@@ -34,6 +34,7 @@ public final class SpeedTestPage {
 	private static String stoppedNote = "";
 
 	private final PerfTest perf = new PerfTest();
+	private final List<String> skipped = new ArrayList<>();
 	private final Pane pane = new Pane();
 	private final List<Setting> queue = new ArrayList<>();
 	private final List<Setting> all = new ArrayList<>();
@@ -97,6 +98,7 @@ public final class SpeedTestPage {
 			}
 		}
 		perf.forget();
+		skipped.clear();
 		total = queue.size();
 		note = "";
 		stoppedNote = "";
@@ -113,13 +115,22 @@ public final class SpeedTestPage {
 			finish();
 			return;
 		}
-		Setting setting = queue.remove(0);
-		perf.start(setting);
-		if (!perf.running()) {
-			String reason = perf.note();
-			note = reason.isEmpty() ? "The test could not start." : reason;
-			stop();
+		while (!queue.isEmpty()) {
+			Setting setting = queue.remove(0);
+			perf.start(setting);
+			if (perf.running()) {
+				return;
+			}
+			if (!perf.skippable()) {
+				String reason = perf.note();
+				note = reason.isEmpty() ? "The test could not start." : reason;
+				stop();
+				return;
+			}
+			skipped.add(setting.label());
+			total--;
 		}
+		finish();
 	}
 
 	private void stop() {
@@ -135,7 +146,7 @@ public final class SpeedTestPage {
 		running = false;
 		last = settingRows();
 		lastMod = modRow();
-		note = "";
+		note = skipped.isEmpty() ? "" : "Skipped, off or unsupported here: " + String.join(", ", skipped);
 	}
 
 	private Row modRow() {

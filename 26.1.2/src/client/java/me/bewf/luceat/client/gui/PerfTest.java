@@ -36,6 +36,7 @@ public final class PerfTest {
 
 	private final Map<Setting, Result> results = new HashMap<>();
 	private Setting target;
+	private boolean skip;
 	private Object snapshot;
 	private Phase phase = Phase.IDLE;
 	private int step;
@@ -63,6 +64,10 @@ public final class PerfTest {
 		return note;
 	}
 
+	public boolean skippable() {
+		return skip;
+	}
+
 	public Result result(Setting setting) {
 		return results.get(setting);
 	}
@@ -75,6 +80,7 @@ public final class PerfTest {
 		if (running()) {
 			return;
 		}
+		skip = false;
 		Minecraft minecraft = Minecraft.getInstance();
 		if (minecraft.level == null) {
 			note = "Open a world to run a test.";
@@ -93,15 +99,18 @@ public final class PerfTest {
 			return;
 		}
 		if (needsSpread && !me.bewf.luceat.client.light.LightSpread.supported()) {
-			note = "Light around corners is unavailable here: " + me.bewf.luceat.client.light.LightSpread.blocker() + ".";
+			note = "Not supported here: " + me.bewf.luceat.client.light.LightSpread.blocker() + ".";
+			skip = true;
 			return;
 		}
 		if (needsSpread && !wanted.spread()) {
-			note = "Turn light around corners on first. The test switches it on and off, so its code has to be in the shader.";
+			note = "Turn light around corners on first.";
+			skip = true;
 			return;
 		}
 		if (needsRays && !wanted.rays()) {
-			note = "Turn on shadows, bounce, shine or sun shadows first. The test switches them on and off, so their code has to be in the shader.";
+			note = "Turn on shadows, bounce, shine or sun shadows first.";
+			skip = true;
 			return;
 		}
 		prepRays = needsRays;

@@ -54,7 +54,7 @@ public final class LuceatSettings {
 			Cost.LOW, false, 0.0F, 1.0F, 0.05F, "", () -> c.lightBounce, value -> c.lightBounce = value));
 		all.add(new ToggleSetting(LIGHTING, "Light around corners",
 			"Spreads light around corners and through gaps, so the room next door glows a little. Needs OpenGL 4.3.",
-			Cost.MEDIUM, false, () -> c.lightSpread, value -> c.lightSpread = value).blockedBy(LightSpread::blocker));
+			Cost.MEDIUM, false, () -> c.lightSpread, value -> c.lightSpread = value).blockedBy(LightSpread::blocker, LightSpread::shortBlocker, LightSpread::blockerDetail));
 		all.add(new SliderSetting(LIGHTING, "Corner light strength",
 			"Sets how strong light around corners is.",
 			Cost.NONE, false, 0.0F, 1.0F, 0.05F, "", () -> c.spillStrength, value -> c.spillStrength = value));

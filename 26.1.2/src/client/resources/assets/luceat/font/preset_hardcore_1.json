@@ -1,0 +1,14 @@
+{
+  "providers": [
+    {
+      "type": "ttf",
+      "file": "luceat:unifraktur_cook.ttf",
+      "size": 12.0,
+      "oversample": 1.0,
+      "shift": [
+        0.0,
+        0.0
+      ]
+    }
+  ]
+}
