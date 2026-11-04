@@ -23,6 +23,7 @@ public final class Scenes {
 
 	static {
 		MAKERS.put("cherry", Worlds::cherry);
+		MAKERS.put("portal", Worlds::portal);
 		MAKERS.put("room", Scenes::room);
 		MAKERS.put("shadows", Scenes::shadows);
 		MAKERS.put("hall", Scenes::hall);
@@ -59,10 +60,20 @@ public final class Scenes {
 	public static Scene scene(String id) {
 		Scene known = CACHE.get(id);
 		if (known == null) {
-			known = MAKERS.getOrDefault(id, Scenes::room).get();
+			Scene fromFile = SceneLibrary.has(id) ? SceneLibrary.load(id, null) : null;
+			known = fromFile != null ? fromFile : MAKERS.getOrDefault(id, Scenes::room).get();
 			CACHE.put(id, known);
 		}
 		return known;
+	}
+
+	public static java.util.List<String> builtinIds() {
+		return new java.util.ArrayList<>(new java.util.TreeSet<>(MAKERS.keySet()));
+	}
+
+	public static Scene builtin(String id) {
+		Supplier<Scene> maker = MAKERS.get(id);
+		return maker == null ? null : maker.get();
 	}
 
 	public static SceneSpec fallback() {
@@ -72,6 +83,10 @@ public final class Scenes {
 	public static SceneSpec forSetting(String label) {
 		if (label == null) {
 			return fallback();
+		}
+		SceneSpec bound = SceneLibrary.forSetting(label);
+		if (bound != null) {
+			return bound;
 		}
 		return switch (label) {
 			case "Luceat" -> spec("room", "Without Luceat the room is dark. With it the lamp lights the room.");

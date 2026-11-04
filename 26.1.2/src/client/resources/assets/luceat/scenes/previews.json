@@ -1,0 +1,218 @@
+{
+  "Luceat": {
+    "scene": "dark_room",
+    "shot": "default",
+    "caption": "Without Luceat the room stays dark. With it the lamp lights the room."
+  },
+  "Light strength": {
+    "scene": "dark_room",
+    "shot": "default",
+    "caption": "Light strength changes how bright every light is."
+  },
+  "Brightness limit": {
+    "scene": "dark_room",
+    "shot": "stacked",
+    "caption": "The limit stops stacked lights from turning white."
+  },
+  "Fade in daylight": {
+    "scene": "dark_room",
+    "shot": "window",
+    "caption": "In daylight the lamp fades out so it does not look odd.",
+    "time": 0.85
+  },
+  "Surface direction": {
+    "scene": "dark_room",
+    "shot": "default",
+    "caption": "Surfaces facing the light are brighter than surfaces facing away."
+  },
+  "Light bounce": {
+    "scene": "dark_room",
+    "shot": "bounce",
+    "caption": "Light bounces off surfaces and softly fills places the light cannot reach directly."
+  },
+  "Replace normal light": {
+    "scene": "portal",
+    "shot": "default",
+    "caption": "Placed lights replace the flat vanilla light with real light."
+  },
+  "Light around corners": {
+    "scene": "tunnel",
+    "shot": "corner",
+    "caption": "Light spreads around corners and into places it cannot reach in a straight line."
+  },
+  "Corner light strength": {
+    "scene": "tunnel",
+    "shot": "corner",
+    "caption": "A higher value pushes more light around the corner."
+  },
+  "Corner light steps": {
+    "scene": "tunnel",
+    "shot": "corner",
+    "caption": "Corner light fills the room faster at a higher value."
+  },
+  "Rest corner light": {
+    "scene": "tunnel",
+    "shot": "corner",
+    "caption": "Corner light stops updating while nothing moves."
+  },
+  "Shiny surfaces": {
+    "scene": "polished_hall",
+    "shot": "default",
+    "caption": "Metal, ice, glass and polished blocks catch a bright highlight."
+  },
+  "Sun shadows": {
+    "scene": "cherry",
+    "shot": "sun",
+    "caption": "In daylight the sun casts shadows from trees and buildings.",
+    "time": 0.85
+  },
+  "Sun shadow strength": {
+    "scene": "cherry",
+    "shot": "sun",
+    "caption": "A higher value makes sun shadows darker.",
+    "time": 0.85
+  },
+  "Water light patterns": {
+    "scene": "cherry",
+    "shot": "river",
+    "caption": "Light shining through water makes moving patterns on the floor.",
+    "time": 0.85
+  },
+  "Shadows": {
+    "scene": "shadow_yard",
+    "shot": "default",
+    "caption": "Blocks stop light and leave a shadow behind them."
+  },
+  "Shadow darkness": {
+    "scene": "shadow_yard",
+    "shot": "default",
+    "caption": "A higher value makes shadows from lights darker."
+  },
+  "Soft edges": {
+    "scene": "shadow_yard",
+    "shot": "edges",
+    "caption": "Soft edges blur the shadow so it looks more natural."
+  },
+  "Shadow distance": {
+    "scene": "shadow_yard",
+    "shot": "far",
+    "caption": "Shadows only appear close to you. Far away lights stay simple."
+  },
+  "Shadow map updates": {
+    "scene": "shadow_yard",
+    "shot": "default",
+    "caption": "A higher value rebuilds the shadow map faster after you build."
+  },
+  "Lights with shadows": {
+    "scene": "lantern_street",
+    "shot": "default",
+    "caption": "Only the strongest nearby lights cast shadows. More costs more."
+  },
+  "Fences, panes, slabs and more": {
+    "scene": "shadow_yard",
+    "shot": "thin",
+    "caption": "Fences, bars, doors, stairs and slabs cast their real shape."
+  },
+  "Grass and flowers": {
+    "scene": "meadow",
+    "shot": "default",
+    "caption": "Grass and flowers cast small shadows."
+  },
+  "Leaves and holes": {
+    "scene": "oak_grove",
+    "shot": "canopy",
+    "caption": "Leaves let some light through the holes.",
+    "time": 0.85
+  },
+  "Hole strength": {
+    "scene": "oak_grove",
+    "shot": "canopy",
+    "caption": "Lower values let more light through leaves.",
+    "time": 0.85
+  },
+  "Coloured glass": {
+    "scene": "glass_gallery",
+    "shot": "default",
+    "caption": "Coloured glass tints the light that passes through."
+  },
+  "Placed lights": {
+    "scene": "portal",
+    "shot": "default",
+    "caption": "Glowing blocks light their surroundings in their own colour."
+  },
+  "Placed light strength": {
+    "scene": "portal",
+    "shot": "default",
+    "caption": "A higher value makes glowing blocks brighter."
+  },
+  "Placed light reach": {
+    "scene": "portal",
+    "shot": "lava",
+    "caption": "Placed lights reach further with a higher setting."
+  },
+  "Blocks from other mods": {
+    "scene": "mod_blocks",
+    "shot": "default",
+    "caption": "Glowing blocks from other mods get a Luceat light."
+  },
+  "Smallest light": {
+    "scene": "mod_blocks",
+    "shot": "levels",
+    "caption": "Lights below the smallest level are skipped."
+  },
+  "Skip buried lights": {
+    "scene": "portal",
+    "shot": "lava",
+    "caption": "Light blocks with no open side are ignored."
+  },
+  "Hide lights behind blocks": {
+    "scene": "portal",
+    "shot": "lava",
+    "caption": "Lava under the ground does not glow through it."
+  },
+  "Join crowded lights": {
+    "scene": "portal",
+    "shot": "lava",
+    "caption": "Lava lakes and walls of torches join into a few strong lights."
+  },
+  "Crowd size": {
+    "scene": "portal",
+    "shot": "lava",
+    "caption": "How many lights a chunk holds before they join."
+  },
+  "Join faraway lights": {
+    "scene": "lantern_street",
+    "shot": "far",
+    "caption": "Far away lights close together join into one bigger light."
+  },
+  "Join lights past": {
+    "scene": "lantern_street",
+    "shot": "far",
+    "caption": "How far away lights start joining."
+  },
+  "Most lights at once": {
+    "scene": "lantern_street",
+    "shot": "default",
+    "caption": "Only the closest lights are used. More lights costs more."
+  },
+  "Light range": {
+    "scene": "cherry",
+    "shot": "default",
+    "caption": "Lights further away than the range are skipped."
+  },
+  "Fire flicker": {
+    "scene": "campsite",
+    "shot": "default",
+    "caption": "Warm lights like torches and campfires flicker."
+  },
+  "Light on particles": {
+    "scene": "campsite",
+    "shot": "default",
+    "caption": "Smoke and sparks get lit by nearby lights."
+  },
+  "Water puts out lights": {
+    "scene": "campsite",
+    "shot": "pond",
+    "caption": "A torch under water goes out."
+  }
+}

@@ -62,7 +62,8 @@ public final class LuceatMenu {
 				requested = true;
 				requestedSpeed = true;
 				return 1;
-			})));
+			}))
+			.then(SceneCommands.tree()));
 	}
 
 	public static void tick(Minecraft minecraft) {

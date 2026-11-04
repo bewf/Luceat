@@ -99,6 +99,10 @@ public final class Scene {
 		this.animated = any || b.animated;
 	}
 
+	public boolean hasCustomVoxels() {
+		return !custom.isEmpty();
+	}
+
 	public int index(int x, int y, int z) {
 		return x + width * (y + height * z);
 	}

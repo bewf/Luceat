@@ -98,4 +98,102 @@ final class Worlds {
 		s.fog(0.012F);
 		return s.caption("A cherry hill at dusk. Lanterns, a campfire and torches light both banks.").build();
 	}
+
+	static Scene portal() {
+		int w = 46;
+		int h = 26;
+		int d = 46;
+		Scene.Builder s = new Scene.Builder("portal", "Nether cavern", w, h, d);
+		double lakeX = 32.0;
+		double lakeZ = 30.0;
+		for (int z = 0; z < d; z++) {
+			for (int x = 0; x < w; x++) {
+				double lake = Math.hypot(x - lakeX, (z - lakeZ) * 1.15);
+				int floor = 5 + (int) Math.round(Craft.wave(x * 0.3, z * 0.3, 4.0) * 1.4);
+				boolean basin = lake < 9.5;
+				if (basin) {
+					floor = 3;
+				}
+				int ceiling = 19 + (int) Math.round(Craft.wave(x * 0.22, z * 0.22, 9.0) * 2.0);
+				boolean wall = x < 2 || z < 2 || x >= w - 2 || z >= d - 2;
+				for (int y = 0; y < h; y++) {
+					Block block = null;
+					if (y <= floor) {
+						block = y == floor && !basin && Craft.rand(x, 3, z) < 0.12F ? Blocks.SOUL_SAND : y == floor && !basin && Craft.rand(x, 5, z) < 0.1F ? Blocks.BLACKSTONE : y < floor - 2 && Craft.rand(x, y, z) < 0.04F ? Blocks.MAGMA_BLOCK : Blocks.NETHERRACK;
+					} else if (y >= ceiling || wall && y < ceiling + 2) {
+						block = Craft.rand(x, y, z) < 0.05F ? Blocks.BASALT : Blocks.NETHERRACK;
+					}
+					if (block != null) {
+						s.set(x, y, z, b(block));
+					}
+				}
+				if (basin) {
+					for (int y = floor + 1; y <= 4; y++) {
+						s.set(x, y, z, b(Blocks.LAVA));
+					}
+				}
+			}
+		}
+		int px = 12;
+		int pz = 18;
+		int pf = floorAt(s, px, pz);
+		s.fill(px - 2, pf, pz - 2, px + 5, pf, pz + 2, b(Blocks.BLACKSTONE));
+		for (int y = pf + 1; y <= pf + 8; y++) {
+			s.fill(px - 2, y, pz - 2, px + 5, y, pz + 2, null);
+		}
+		int base = pf + 1;
+		s.fill(px + 1, base, pz, px + 2, base, pz, b(Blocks.OBSIDIAN));
+		s.fill(px + 1, base + 4, pz, px + 2, base + 4, pz, b(Blocks.OBSIDIAN));
+		s.fill(px, base, pz, px, base + 4, pz, b(Blocks.OBSIDIAN));
+		s.fill(px + 3, base, pz, px + 3, base + 4, pz, b(Blocks.OBSIDIAN));
+		s.fill(px + 1, base + 1, pz, px + 2, base + 3, pz, Bs.with(b(Blocks.NETHER_PORTAL), "axis", "x"));
+		s.set(px - 1, pf + 1, pz - 2, b(Blocks.SOUL_TORCH));
+		s.set(px + 4, pf + 1, pz - 2, b(Blocks.SOUL_TORCH));
+		for (int i = 0; i < 9; i++) {
+			int gx = 6 + (int) Math.round(Craft.rand(i, 1, 7) * 32.0);
+			int gz = 6 + (int) Math.round(Craft.rand(i, 2, 7) * 32.0);
+			int top = ceilingAt(s, gx, gz);
+			if (top < 0 || Math.hypot(gx - px - 1.5, gz - pz) < 5.0) {
+				continue;
+			}
+			int len = 1 + (int) (Craft.rand(i, 3, 7) * 3.0);
+			for (int k = 1; k <= len; k++) {
+				s.set(gx, top - k, gz, b(k == len && i % 3 == 0 ? Blocks.SHROOMLIGHT : Blocks.GLOWSTONE));
+			}
+		}
+		for (int i = 0; i < 7; i++) {
+			int x = (int) Math.round(lakeX - 13 + Craft.rand(i, 4, 8) * 8.0);
+			int z = (int) Math.round(lakeZ - 12 + Craft.rand(i, 5, 8) * 24.0);
+			int y = floorAt(s, x, z);
+			if (y >= 5 && s.get(x, y + 1, z) == null) {
+				s.set(x, y + 1, z, b(i % 2 == 0 ? Blocks.SOUL_FIRE : Blocks.FIRE));
+			}
+		}
+		s.camera(new double[]{22, 10.5, 4}, new double[]{21, 7.5, 24}, 66.0);
+		s.time(0.04F);
+		return s.caption("A nether cavern with a portal, a lava lake and glowstone overhead.").build();
+	}
+
+	private static int floorAt(Scene.Builder s, int x, int z) {
+		for (int y = 12; y >= 0; y--) {
+			BlockState state = s.get(x, y, z);
+			if (state != null && !state.is(Blocks.LAVA)) {
+				return y;
+			}
+		}
+		return 0;
+	}
+
+	private static int ceilingAt(Scene.Builder s, int x, int z) {
+		for (int y = s.height - 1; y >= 0; y--) {
+			if (s.get(x, y, z) != null) {
+				int low = y;
+				while (low > 0 && s.get(x, low - 1, z) != null) {
+					low--;
+				}
+				return low > 12 ? low : -1;
+			}
+		}
+		return -1;
+	}
 }
