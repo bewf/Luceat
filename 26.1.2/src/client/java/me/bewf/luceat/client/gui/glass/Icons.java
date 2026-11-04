@@ -3,8 +3,11 @@ package me.bewf.luceat.client.gui.glass;
 import java.util.HashMap;
 import java.util.Map;
 
+import com.mojang.blaze3d.platform.NativeImage;
+
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.resources.Identifier;
 
 public final class Icons {
 	public static final int BOX = 9;
@@ -22,6 +25,63 @@ public final class Icons {
 			}
 		}
 	}
+
+	public static final class Brand {
+		private final String file;
+		private float[] source;
+		private int sourceSize;
+		private final Map<Integer, float[]> masks = new HashMap<>();
+
+		private Brand(String file) {
+			this.file = file;
+		}
+
+		private float[] mask(int px) {
+			if (source == null) {
+				load();
+			}
+			return masks.computeIfAbsent(px, size -> {
+				float[] out = new float[size * size];
+				float ratio = sourceSize / (float) size;
+				for (int y = 0; y < size; y++) {
+					for (int x = 0; x < size; x++) {
+						int fx = Math.min(sourceSize - 1, (int) (x * ratio));
+						int fy = Math.min(sourceSize - 1, (int) (y * ratio));
+						int tx = Math.max(fx + 1, Math.min(sourceSize, (int) Math.ceil((x + 1) * ratio)));
+						int ty = Math.max(fy + 1, Math.min(sourceSize, (int) Math.ceil((y + 1) * ratio)));
+						float sum = 0.0F;
+						for (int sy = fy; sy < ty; sy++) {
+							for (int sx = fx; sx < tx; sx++) {
+								sum += source[sy * sourceSize + sx];
+							}
+						}
+						out[y * size + x] = sum / ((tx - fx) * (ty - fy));
+					}
+				}
+				return out;
+			});
+		}
+
+		private void load() {
+			Identifier id = Identifier.fromNamespaceAndPath("luceat", "textures/gui/brand/" + file + ".png");
+			try (java.io.InputStream stream = Minecraft.getInstance().getResourceManager().open(id); NativeImage image = NativeImage.read(stream)) {
+				sourceSize = image.getWidth();
+				source = new float[sourceSize * sourceSize];
+				for (int y = 0; y < sourceSize; y++) {
+					for (int x = 0; x < sourceSize; x++) {
+						source[y * sourceSize + x] = (image.getPixel(x, y) >>> 24) / 255.0F;
+					}
+				}
+			} catch (java.io.IOException | RuntimeException error) {
+				sourceSize = 1;
+				source = new float[] {0.0F};
+			}
+		}
+	}
+
+	public static final Brand MODRINTH = new Brand("modrinth");
+	public static final Brand KOFI = new Brand("kofi");
+	public static final Brand GITHUB = new Brand("github");
 
 	public static final Icon SUN = new Icon(LucideData.SUN);
 	public static final Icon SHADOW = new Icon(LucideData.SHADOW);
@@ -87,6 +147,11 @@ public final class Icons {
 		paint(s, x * s.scale(), y * s.scale(), size * s.scale(), icon, argb);
 	}
 
+	public static void brand(Surface s, int x, int y, int size, Brand brand, int argb) {
+		int px = size * s.scale();
+		paintMask(s, x * s.scale(), y * s.scale(), px, brand.mask(px), argb);
+	}
+
 	public static void sprite(GuiGraphicsExtractor graphics, int x, int y, int size, Icon icon, int argb) {
 		int scale = me.bewf.luceat.client.gui.GuiFit.raster();
 		long key = ((long) System.identityHashCode(icon) << 32) ^ ((long) size << 24) ^ ((long) scale << 20) ^ (argb & 0xFFFFFFL) ^ ((long) (argb >>> 24) << 16);
@@ -116,7 +181,10 @@ public final class Icons {
 	}
 
 	private static void paint(Surface s, int x0, int y0, int px, Icon icon, int argb) {
-		float[] mask = icon.masks.computeIfAbsent(px, size -> build(icon.data, size));
+		paintMask(s, x0, y0, px, icon.masks.computeIfAbsent(px, size -> build(icon.data, size)), argb);
+	}
+
+	private static void paintMask(Surface s, int x0, int y0, int px, float[] mask, int argb) {
 		int base = argb >>> 24;
 		int rgb = argb & 0xFFFFFF;
 		for (int row = 0; row < px; row++) {

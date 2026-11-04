@@ -46,18 +46,18 @@ public final class LuceatScreen extends Screen {
 	private static final String SPEED = "Speed test";
 	private static final String PRESETS = "Presets";
 	private static final String BLOCKS = "Blocks";
-	private static final String ABOUT = "About";
 	private static final String DEBUG = "Debug";
 	private static final Identifier LOGO = Identifier.fromNamespaceAndPath("luceat", "textures/gui/logo.png");
 	private static final Identifier LOGO_SMALL = Identifier.fromNamespaceAndPath("luceat", "textures/gui/logo_small.png");
 	private static final Object NOTICE = new Object();
-	private static final int NOTICE_HEIGHT = 44;
-	private static final int ROW_HEIGHT = 32;
-	private static final int SLIDER_HEIGHT = 32;
+	private static final Object ABOUT_BLOCK = new Object();
+	private static final int NOTICE_HEIGHT = 58;
+	private static final int ROW_HEIGHT = 46;
 	private static final int HEAD_HEIGHT = 30;
 	private static final int STRIP_HEIGHT = 38;
-	private static final int FOOTER_HEIGHT = 52;
-	private static final int HEADER_HEIGHT = 44;
+	private static final int HEADER_HEIGHT = 58;
+	private static String lastSection;
+	private static float lastScroll;
 	private static final int NAV_HEIGHT = 24;
 	private static final int NAV_STEP = 26;
 	private static final int DROPDOWN_ROWS = 8;
@@ -65,6 +65,38 @@ public final class LuceatScreen extends Screen {
 	private static final Surface.Role BODY = Surface.Role.BODY;
 	private static final Surface.Role TITLE = Surface.Role.TITLE;
 	private static final Surface.Role HEADING = Surface.Role.HEADING;
+	private static final Surface.Role SMALL = Surface.Role.SMALL;
+
+	private static final class Measure implements Surface {
+		@Override
+		public int scale() {
+			return 1;
+		}
+
+		@Override
+		public void fillPx(int x0, int y0, int x1, int y1, int argb) {
+		}
+
+		@Override
+		public void clip(int x0, int y0, int x1, int y1) {
+		}
+
+		@Override
+		public void unclip() {
+		}
+
+		@Override
+		public void text(Role role, String text, int x, int y, int argb) {
+		}
+
+		@Override
+		public int width(Role role, String text) {
+			return Texts.width(role, text);
+		}
+	}
+
+	private record Tip(String text, int x0, int y0, int x1, int y1) {
+	}
 
 	private record Hit(int x0, int y0, int x1, int y1, String key, Setting setting) {
 	}
@@ -112,6 +144,15 @@ public final class LuceatScreen extends Screen {
 	private final Pane popup = new Pane();
 	private final Map<String, Motion.Smooth> anims = new HashMap<>();
 	private final List<Hit> hits = new ArrayList<>();
+	private final Map<String, Tip> tips = new HashMap<>();
+	private Tip tipLast;
+	private String lastRowId = "";
+	private Setting descLast;
+	private int aboutLogoX;
+	private int aboutLogoY;
+	private boolean aboutVisible;
+	private int aboutCacheWidth = -1;
+	private int aboutCacheHeight;
 	private boolean busy;
 	private boolean dirty = true;
 	private boolean fullView;
@@ -145,6 +186,11 @@ public final class LuceatScreen extends Screen {
 	public LuceatScreen(Screen parent) {
 		super(Component.literal("Luceat"));
 		this.parent = parent;
+		if (lastSection != null && !lastSection.equals(PRESETS)) {
+			section = lastSection;
+			scroll = lastScroll;
+			scrollGoal = lastScroll;
+		}
 	}
 
 	public LuceatScreen showSpeedTest() {
@@ -157,8 +203,8 @@ public final class LuceatScreen extends Screen {
 		fit.update(this.width, this.height);
 		int w = fit.width();
 		int h = fit.height();
-		int mx = Math.max(6, Math.round(w * 0.045F));
-		int my = Math.max(6, Math.round(h * 0.05F));
+		int mx = Math.max(4, Math.round(w * 0.025F));
+		int my = Math.max(4, Math.round(h * 0.035F));
 		slabX0 = mx;
 		slabX1 = w - mx;
 		slabY0 = my;
@@ -167,19 +213,19 @@ public final class LuceatScreen extends Screen {
 		compact = slabW < 700;
 		tiny = slabW < 560;
 		sideX0 = slabX0 + 12;
-		sideX1 = sideX0 + (tiny ? 30 : compact ? 104 : 124);
+		sideX1 = sideX0 + (tiny ? 30 : compact ? 88 : 100);
 		bodyTop = slabY0 + HEADER_HEIGHT + 8;
 		bodyBottom = slabY1 - 12;
-		contentX0 = sideX1 + 8;
+		contentX0 = sideX1 + 4;
 		contentX1 = slabX1 - 12;
 		int cw = contentX1 - contentX0;
 		showSide = slabW >= 640;
 		panelX0 = contentX0;
-		panelX1 = showSide ? contentX0 + Math.max(250, Math.round(cw * 0.42F)) : contentX1;
+		panelX1 = showSide ? contentX0 + Math.max(300, Math.round(cw * 0.5F)) : contentX1;
 		previewX0 = panelX1 + 8;
 		previewX1 = contentX1;
 		listLeft = panelX0 + 16;
-		listRight = panelX1 - 16;
+		listRight = panelX1 - 28;
 		if (panel == null) {
 			panel = new PreviewPanel(this.font);
 			blocks = new BlocksTab(this.font);
@@ -199,6 +245,8 @@ public final class LuceatScreen extends Screen {
 
 	@Override
 	public void removed() {
+		lastSection = section;
+		lastScroll = scrollGoal;
 		perf.cancel();
 		if (speed != null) {
 			speed.close();
@@ -246,7 +294,7 @@ public final class LuceatScreen extends Screen {
 	}
 
 	private boolean specialPage() {
-		return PRESETS.equals(section) || BLOCKS.equals(section) || ABOUT.equals(section) || SPEED.equals(section) || DEBUG.equals(section);
+		return PRESETS.equals(section) || BLOCKS.equals(section) || SPEED.equals(section) || DEBUG.equals(section);
 	}
 
 	private boolean settingsPage() {
@@ -339,6 +387,9 @@ public final class LuceatScreen extends Screen {
 			dirty = true;
 		}
 		hovered = search.focused() ? null : settingAt(mouseX, mouseY);
+		if (hovered != null) {
+			lastRowId = hovered.id();
+		}
 		if (previewPage()) {
 			panel.setOverride(null);
 			if (PRESETS.equals(section) && !searching()) {
@@ -370,8 +421,11 @@ public final class LuceatScreen extends Screen {
 			content.showAllText();
 		}
 		content.draw(graphics);
+		if (aboutVisible && settingsPage()) {
+			drawAboutLogo(graphics);
+		}
 		drawLogo(graphics);
-		search.drawGlass(graphics, this.font, searchX0() + 14, slabY0 + 11, searchX1() - 6, slabY0 + 33, "Search settings");
+		search.drawGlass(graphics, this.font, searchX0() + 14, ctl() + 1, searchX1() - 6, ctl() + 23, "Search settings");
 		if (BLOCKS.equals(section) && !searching()) {
 			blocks.setFactor(fit.factor());
 			blocks.drawList(graphics, panelX0, bodyTop, panelX1Wide(), bodyBottom, mouseX, mouseY);
@@ -382,8 +436,6 @@ public final class LuceatScreen extends Screen {
 			blocks.drawOverlays(graphics, panelX0, bodyTop, contentX1, bodyBottom, mouseX, mouseY);
 		} else if (SPEED.equals(section) && !searching()) {
 			speed().render(graphics, panelX0, bodyTop, contentX1 - panelX0, bodyBottom - bodyTop, mouseX, mouseY, partial);
-		} else if (ABOUT.equals(section) && !searching()) {
-			drawAboutLogo(graphics);
 		}
 		if (popupOpen) {
 			popup.draw(graphics);
@@ -400,7 +452,11 @@ public final class LuceatScreen extends Screen {
 	}
 
 	private void drawLogo(GuiGraphicsExtractor graphics) {
-		graphics.blit(RenderPipelines.GUI_TEXTURED, LOGO_SMALL, slabX0 + 14, slabY0 + 6, 0.0F, 0.0F, 32, 32, 64, 64, 64, 64);
+		graphics.blit(RenderPipelines.GUI_TEXTURED, LOGO, slabX0 + 10, slabY0 + 4, 0.0F, 12.0F, 64, 50, 256, 200, 256, 256);
+	}
+
+	private int ctl() {
+		return slabY0 + (HEADER_HEIGHT - 24) / 2;
 	}
 
 	private void buildChrome(Surface s, boolean panelNow) {
@@ -408,8 +464,8 @@ public final class LuceatScreen extends Screen {
 		Glass.slab(s, slabX0, slabY0, slabX1, slabY1, 16);
 		Glass.divider(s, slabX0 + 18, slabX1 - 18, slabY0 + HEADER_HEIGHT);
 		if (panelNow) {
-			Paint.round(s, panelX0, bodyTop, panelX1, bodyBottom, 12, Paint.argb(204, 11, 7, 22));
-			Paint.outline(s, panelX0, bodyTop, panelX1, bodyBottom, 12, (x, y) -> Paint.argb(Math.round(30 * (1.0F - (y - bodyTop) / (float) (bodyBottom - bodyTop))), 205, 187, 255));
+			Paint.round(s, panelX0, bodyTop, panelX1, bodyBottom, 12, Paint.argb(Glass.frosted ? 150 : 196, 11, 7, 22));
+			Paint.outline(s, panelX0, bodyTop, panelX1, bodyBottom, 12, (x, y) -> Paint.argb(Math.round(40 * (1.0F - (y - bodyTop) / (float) (bodyBottom - bodyTop))), 205, 187, 255));
 		}
 	}
 
@@ -441,7 +497,7 @@ public final class LuceatScreen extends Screen {
 	}
 
 	private int popupY0() {
-		return slabY0 + 38;
+		return ctl() + 28;
 	}
 
 	private int popupRows() {
@@ -467,6 +523,7 @@ public final class LuceatScreen extends Screen {
 
 	private void rebuildContent(int mouseX, int mouseY, int gs) {
 		hits.clear();
+		tips.clear();
 		barMax = 0;
 		content.begin(slabX0, slabY0, slabX1 - slabX0, slabY1 - slabY0, gs);
 		Surface s = content;
@@ -478,7 +535,7 @@ public final class LuceatScreen extends Screen {
 			drawSettings(s);
 		} else if (PRESETS.equals(section)) {
 			drawPresets(s);
-		} else if (ABOUT.equals(section) || DEBUG.equals(section)) {
+		} else if (DEBUG.equals(section)) {
 			drawScrolledPage(s);
 		}
 		if (previewPage()) {
@@ -495,6 +552,7 @@ public final class LuceatScreen extends Screen {
 			hit(previewLeft(), bodyTop, previewX1, bodyBottom, "preview", null);
 			hit(cx0, bodyTop + 10, cx1, bodyTop + 28, "pv:full", null);
 		}
+		drawTip(s);
 		content.finish();
 		popupOpen = search.focused();
 		if (popupOpen) {
@@ -505,69 +563,69 @@ public final class LuceatScreen extends Screen {
 	}
 
 	private void drawHeader(Surface s) {
-		int textX = slabX0 + 56;
+		int textX = slabX0 + 84;
 		int x = textX;
-		int ty = compact ? slabY0 + 20 : slabY0 + 13;
+		int c0 = ctl();
 		String word = "LUCEAT";
 		for (int i = 0; i < word.length() && !tiny; i++) {
 			String c = word.substring(i, i + 1);
-			s.text(Surface.Role.WORDMARK, c, x, ty, Glass.TEXT);
-			x += s.width(Surface.Role.WORDMARK, c) + 3;
+			s.text(Surface.Role.WORDMARK, c, x, compact ? slabY0 + 15 : slabY0 + 9, Glass.TEXT);
+			x += s.width(Surface.Role.WORDMARK, c) + 4;
 		}
-		x += tiny ? 0 : 6;
+		x += tiny ? 0 : 8;
 		if (!compact) {
-			s.text(BODY, version(), x, ty, Glass.FAINT);
-			s.text(BODY, "Dynamic Lighting for Minecraft", textX, slabY0 + 26, Glass.FAINT);
-			x = Math.max(x + s.width(BODY, version()), textX + s.width(BODY, "Dynamic Lighting for Minecraft")) + 18;
+			s.text(SMALL, version(), x, slabY0 + 18, Glass.FAINT);
+			String tagline = "Dynamic Lighting Overhaul";
+			s.text(SMALL, tagline, textX, slabY0 + 37, Glass.FAINT);
+			x = Math.max(x + s.width(SMALL, version()), textX + s.width(SMALL, tagline)) + 18;
+		} else if (!tiny) {
+			x += 8;
 		}
 		boolean on = LuceatConfig.get().enabled;
 		int tx = x + 2;
 		float onAnim = anim("tg:master", on ? 1.0F : 0.0F, 0.05F);
 		float powerHover = hoverOf("hd:power");
-		Glass.toggle(s, tx, slabY0 + 14, onAnim, powerHover);
+		Glass.toggle(s, tx, c0 + 4, onAnim, powerHover);
 		if (!tiny) {
-			s.text(BODY, on ? "On" : "Off", tx + 38, slabY0 + 18, on ? Glass.GOOD : Glass.MUTED);
+			s.text(BODY, on ? "On" : "Off", tx + 38, c0 + 8, on ? Glass.GOOD : Glass.MUTED);
 		}
-		hit(tx - 4, slabY0 + 8, tx + (tiny ? 36 : 38 + s.width(BODY, "Off") + 6), slabY0 + 36, "hd:power", null);
+		hit(tx - 4, c0 - 2, tx + (tiny ? 36 : 38 + s.width(BODY, "Off") + 6), c0 + 26, "hd:power", null);
 
 		int closeX0 = slabX1 - 16 - 24;
 		float closeHover = hoverOf("hd:close");
-		Glass.button(s, closeX0, slabY0 + 10, closeX0 + 24, slabY0 + 34, false, closeHover, 0.0F);
-		Icons.draw(s, closeX0 + 8, slabY0 + 18, Icons.CLOSE, Paint.mix(Glass.SOFT, Glass.TEXT, closeHover));
-		hit(closeX0, slabY0 + 10, closeX0 + 24, slabY0 + 34, "hd:close", null);
+		Glass.tool(s, closeX0, c0, closeX0 + 24, c0 + 24, closeHover);
+		Icons.draw(s, closeX0 + 6, c0 + 6, 12, Icons.CLOSE, Paint.mix(Glass.SOFT, Glass.TEXT, closeHover));
+		hit(closeX0, c0, closeX0 + 24, c0 + 24, "hd:close", null);
 
 		int undoX1 = closeX0 - 8;
 		int undoX0 = undoX1 - undoWidth();
 		boolean canUndo = !undo.isEmpty();
 		float undoHover = canUndo ? hoverOf("hd:undo") : 0.0F;
-		Glass.button(s, undoX0, slabY0 + 10, undoX1, slabY0 + 34, false, undoHover, 0.0F);
+		Glass.tool(s, undoX0, c0, undoX1, c0 + 24, undoHover);
 		if (tiny) {
-			Icons.draw(s, undoX0 + 8, slabY0 + 18, Icons.UNDO, canUndo ? Glass.TEXT : Glass.FAINT);
+			Icons.draw(s, undoX0 + 6, c0 + 6, 12, Icons.UNDO, canUndo ? Glass.TEXT : Glass.FAINT);
 		} else {
-			Glass.centred(s, BODY, "Undo", (undoX0 + undoX1) / 2, slabY0 + 18, canUndo ? Glass.TEXT : Glass.FAINT);
+			Glass.centred(s, BODY, "Undo", (undoX0 + undoX1) / 2, c0 + 8, canUndo ? Glass.TEXT : Glass.FAINT);
 		}
-		hit(undoX0, slabY0 + 10, undoX1, slabY0 + 34, "hd:undo", null);
+		hit(undoX0, c0, undoX1, c0 + 24, "hd:undo", null);
 
 		int chipW = presetWidth();
 		int chipX1 = undoX0 - 8;
 		int chipX0 = chipX1 - chipW;
 		float chipHover = hoverOf("hd:preset");
-		Glass.field(s, chipX0, slabY0 + 10, chipX1, slabY0 + 34, 0.0F);
-		if (chipHover > 0.01F) {
-			Paint.outline(s, chipX0, slabY0 + 10, chipX1, slabY0 + 34, 8, Paint.argb(Math.round(90 * chipHover), 205, 187, 255));
-		}
+		Glass.tool(s, chipX0, c0, chipX1, c0 + 24, chipHover);
 		if (tiny) {
-			Icons.draw(s, chipX0 + 8, slabY0 + 18, Icons.STAR, Paint.mix(Glass.SOFT, Glass.TEXT, chipHover));
+			Icons.draw(s, chipX0 + 6, c0 + 6, 12, Icons.STAR, Paint.mix(Glass.SOFT, Glass.TEXT, chipHover));
 		} else {
-			s.text(BODY, Glass.fit(s, BODY, presetLabel(), chipW - 30), chipX0 + 10, slabY0 + 18, Glass.TEXT);
-			Icons.draw(s, chipX1 - 16, slabY0 + 20, Icons.CHEVRON, Glass.MUTED);
+			s.text(BODY, Glass.fit(s, BODY, presetLabel(), chipW - 32), chipX0 + 10, c0 + 8, Glass.TEXT);
+			Icons.draw(s, chipX1 - 18, c0 + 6, 12, Icons.CHEVRON, Glass.MUTED);
 		}
-		hit(chipX0, slabY0 + 10, chipX1, slabY0 + 34, "hd:preset", null);
+		hit(chipX0, c0, chipX1, c0 + 24, "hd:preset", null);
 
 		float focus = anim("focus:search", search.focused() ? 1.0F : 0.0F, 0.05F);
-		Glass.field(s, searchX0(), slabY0 + 10, searchX1(), slabY0 + 34, focus);
-		Icons.draw(s, searchX0() + 8, slabY0 + 18, Icons.SEARCH, Paint.mix(Glass.MUTED, Glass.PALE, focus));
-		hit(searchX0(), slabY0 + 10, searchX1(), slabY0 + 34, "hd:search", null);
+		Glass.field(s, searchX0(), c0, searchX1(), c0 + 24, focus);
+		Icons.draw(s, searchX0() + 7, c0 + 6, 12, Icons.SEARCH, Paint.mix(Glass.MUTED, Glass.PALE, focus));
+		hit(searchX0(), c0, searchX1(), c0 + 24, "hd:search", null);
 	}
 
 	private List<String> sidebarNames() {
@@ -580,8 +638,6 @@ public final class LuceatScreen extends Screen {
 		names.add(BLOCKS);
 		names.add(SPEED);
 		names.add(DEBUG);
-		names.add("-");
-		names.add(ABOUT);
 		return names;
 	}
 
@@ -599,7 +655,6 @@ public final class LuceatScreen extends Screen {
 			case BLOCKS -> Icons.CUBE;
 			case SPEED -> Icons.BOLT;
 			case DEBUG -> Icons.BUG;
-			case ABOUT -> Icons.INFO;
 			default -> Icons.CUBE;
 		};
 	}
@@ -816,6 +871,9 @@ public final class LuceatScreen extends Screen {
 		if (LuceatSettings.ADVANCED.equals(section)) {
 			out.add(NOTICE);
 		}
+		if (LuceatSettings.GENERAL.equals(section)) {
+			out.add(ABOUT_BLOCK);
+		}
 		out.addAll(sectionSettings());
 		return out;
 	}
@@ -827,7 +885,10 @@ public final class LuceatScreen extends Screen {
 		if (item == NOTICE) {
 			return NOTICE_HEIGHT;
 		}
-		return item instanceof SliderSetting ? SLIDER_HEIGHT : ROW_HEIGHT;
+		if (item == ABOUT_BLOCK) {
+			return aboutHeight();
+		}
+		return ROW_HEIGHT;
 	}
 
 	private List<Setting> settingsOf(List<Object> rows) {
@@ -905,51 +966,41 @@ public final class LuceatScreen extends Screen {
 	}
 
 	private int areaBottom() {
-		return bodyBottom - (footerShown() ? FOOTER_HEIGHT : 8);
-	}
-
-	private boolean footerShown() {
-		return bodyBottom - bodyTop > 300;
+		return bodyBottom - 8;
 	}
 
 	private int maxScroll(List<Object> rows) {
-		return Math.max(0, totalHeight(rows) + STRIP_HEIGHT + 6 - (areaBottom() - areaTop()));
+		return Math.max(0, totalHeight(rows) + STRIP_HEIGHT + 64 - (areaBottom() - areaTop()));
 	}
 
-	private void drawResetIcon(Surface s, int x, int y, boolean enabled, float over) {
+	private void drawResetIcon(Surface s, int cx, int cy, boolean enabled, float over) {
 		int colour = !enabled ? Glass.FAINT : Paint.mix(Glass.WARN, Glass.PALE, over);
-		Icons.draw(s, x, y, Icons.RESET, colour);
+		Icons.draw(s, cx - 6, cy - 6, 12, Icons.RESET, colour);
 	}
 
 	private void drawStrip(Surface s, String title, List<Setting> rows, float stick) {
-		int y0 = bodyTop + 3;
-		int y1 = bodyTop + STRIP_HEIGHT - 3;
-		if (stick > 0.01F) {
-			int x0 = panelX0 + 6;
-			int x1 = panelX1 - 6;
-			int mid = (y0 + y1) / 2;
-			Paint.halo(s, x0, y0, x1, y1, 11, 9, Paint.argb(Math.round(52 * stick), 90, 60, 210));
-			Paint.vertical(s, x0, y0, x1, y1, 11, Paint.argb(Math.round(238 * stick), 38, 28, 78), Paint.argb(Math.round(238 * stick), 20, 14, 44));
-			Paint.horizontal(s, x0 + 12, y0 + 1, (x0 + x1) / 2, y0 + 2, Paint.argb(0, 255, 255, 255), Paint.argb(Math.round(60 * stick), 255, 255, 255), 6);
-			Paint.horizontal(s, (x0 + x1) / 2, y0 + 1, x1 - 12, y0 + 2, Paint.argb(Math.round(60 * stick), 255, 255, 255), Paint.argb(0, 255, 255, 255), 6);
-			Paint.outline(s, x0, y0, x1, y1, 11, (x, y) -> Paint.argb(Math.round((y < mid ? 118 : 46) * stick), 205, 187, 255));
+		int y0 = bodyTop;
+		int y1 = bodyTop + STRIP_HEIGHT;
+		if (stick > 0.02F) {
+			s.frost(panelX0, y0, panelX1, y1, 2, 10, 20);
+			Paint.vertical(s, panelX0, y0, panelX1, y1, 12, Paint.argb(Math.round(150 * stick), 58, 40, 120), Paint.argb(Math.round(118 * stick), 34, 22, 76));
+			Paint.horizontal(s, panelX0 + 14, y0 + 1, (panelX0 + panelX1) / 2, y0 + 2, Paint.argb(0, 255, 255, 255), Paint.argb(Math.round(52 * stick), 255, 255, 255), 6);
+			Paint.horizontal(s, (panelX0 + panelX1) / 2, y0 + 1, panelX1 - 14, y0 + 2, Paint.argb(Math.round(52 * stick), 255, 255, 255), Paint.argb(0, 255, 255, 255), 6);
+			Paint.outline(s, panelX0, y0, panelX1, y1, 12, (x, y) -> Paint.argb(Math.round((y < (y0 + y1) / 2 ? 70 : 96) * stick), 205, 187, 255));
 		}
-		s.text(HEADING, title, listLeft, bodyTop + 13, Glass.TEXT);
+		s.text(HEADING, title, listLeft, bodyTop + 11, Glass.TEXT);
 		int changed = changedCount(rows);
 		boolean enabled = changed > 0;
 		String state = changed == 0 ? "All at preset values" : changed + " changed";
-		int bx1 = listRight;
 		String key = "strip:reset";
 		float over = enabled ? hoverOf(key) : 0.0F;
-		int bx0 = bx1 - 22;
-		Glass.button(s, bx0, bodyTop + 9, bx1, bodyTop + 29, false, over, 0.0F);
-		drawResetIcon(s, bx0 + (22 - Icons.width(Icons.RESET)) / 2, bodyTop + 9 + (20 - Icons.height(Icons.RESET)) / 2, enabled, over);
-		Glass.right(s, BODY, state, bx0 - 8, bodyTop + 15, changed == 0 ? Glass.FAINT : Glass.WARN);
-		hit(bx0, bodyTop + 9, bx1, bodyTop + 29, key, null);
+		drawResetIcon(s, listRight - 11, bodyTop + 19, enabled, over);
+		Glass.right(s, BODY, state, listRight - 26, bodyTop + 15, changed == 0 ? Glass.FAINT : Glass.WARN);
+		hit(listRight - 22, bodyTop + 8, listRight, bodyTop + 30, key, null);
 	}
 
 	private boolean stripReset(double mx, double my) {
-		if (!LuceatLook.inside(mx, my, listRight - 22, bodyTop + 9, listRight, bodyTop + 29)) {
+		if (!LuceatLook.inside(mx, my, listRight - 22, bodyTop + 8, listRight, bodyTop + 30)) {
 			return false;
 		}
 		resetSettings(settingsOf(items()));
@@ -960,17 +1011,16 @@ public final class LuceatScreen extends Screen {
 		int ty = y + 12;
 		s.text(HEADING, name, listLeft, ty, fade(Glass.LAVENDER, ty));
 		int lineX = listLeft + s.width(HEADING, name) + 10;
-		Paint.horizontal(s, lineX, y + 17, listRight - 24, y + 18, Paint.argb(40, 205, 187, 255), Paint.argb(0, 205, 187, 255), 6);
+		Paint.horizontal(s, lineX, y + 17, listRight - 30, y + 18, Paint.argb(40, 205, 187, 255), Paint.argb(0, 205, 187, 255), 6);
 		List<Setting> group = settingsIn(name);
 		boolean enabled = changedCount(group) > 0;
-		int ix = listRight - 12;
 		String key = "head:" + name;
 		float over = enabled ? hoverOf(key) : 0.0F;
-		drawResetIcon(s, ix, y + 12, enabled, over);
-		int top = Math.max(y + 8, contentTop());
-		int bottom = Math.min(y + 26, areaBottom());
+		drawResetIcon(s, listRight - 11, y + 17, enabled, over);
+		int top = Math.max(y + 6, contentTop());
+		int bottom = Math.min(y + 28, areaBottom());
 		if (bottom > top) {
-			hit(ix - 4, top, ix + Icons.width(Icons.RESET) + 4, bottom, key, null);
+			hit(listRight - 22, top, listRight, bottom, key, null);
 		}
 	}
 
@@ -1007,7 +1057,7 @@ public final class LuceatScreen extends Screen {
 		float grow = anim("bar", barDrag || over ? 1.0F : 0.0F, 0.05F);
 		int half = 2 + Math.round(grow);
 		int cx = x + 3;
-		Paint.round(s, cx - half, top, cx + half, bottom, half, Paint.argb(Math.round(26 * grow), 205, 187, 255));
+		Paint.round(s, cx - half, top, cx + half, bottom, half, Paint.argb(Math.round(14 + 20 * grow), 205, 187, 255));
 		Paint.round(s, cx - half, thumbTop, cx + half, thumbTop + thumb, half, Paint.argb(Math.round(78 + 100 * grow), 205, 187, 255));
 		hit(x - 4, top, x + 10, bottom, "scrollbar", null);
 	}
@@ -1044,6 +1094,7 @@ public final class LuceatScreen extends Screen {
 		scroll = Math.max(0.0F, Math.min(scroll, max));
 		enter = anim("page", 1.0F, 0.05F);
 		float stick = anim("strip:stick", scroll > 3.0F ? 1.0F : 0.0F, 0.06F);
+		aboutVisible = false;
 		s.clip(panelX0, top, panelX1, bottom);
 		int y = contentTop() - Math.round(scroll) + Math.round((1.0F - enter) * 8.0F);
 		boolean first = true;
@@ -1055,6 +1106,8 @@ public final class LuceatScreen extends Screen {
 					drawSectionHead(s, name, y);
 				} else if (item == NOTICE) {
 					drawNotice(s, y);
+				} else if (item == ABOUT_BLOCK) {
+					drawAbout(s, y, true);
 				} else if (item instanceof Setting setting) {
 					drawRow(s, setting, y, height, contentTop(), bottom, first);
 				}
@@ -1067,57 +1120,94 @@ public final class LuceatScreen extends Screen {
 			s.text(BODY, "Nothing matches that.", listLeft, contentTop() + 8, Glass.MUTED);
 		}
 		drawStrip(s, title, settingsOf(rows), stick);
-		drawScrollbar(s, panelX1 - 10, contentTop() + 2, bottom - 4, max);
-		if (footerShown()) {
-			drawFooter(s);
+		drawScrollbar(s, panelX1 - 17, contentTop() + 2, bottom - 4, max);
+		drawDescription(s);
+	}
+
+	private void drawDescription(Surface s) {
+		boolean show = hovered != null && !search.focused() && !hoverKey.startsWith("tip:");
+		if (show) {
+			descLast = hovered;
+		}
+		float a = anim("desc", show ? 1.0F : 0.0F, 0.04F);
+		if (a < 0.02F || descLast == null) {
+			return;
+		}
+		int x0 = panelX0 + 10;
+		int x1 = panelX1 - 10;
+		List<String> lines = Glass.wrap(s, BODY, descLast.describe(), x1 - x0 - 32, 8);
+		int h = lines.size() * 12 + 20;
+		int y1 = bodyBottom - 8 + Math.round((1.0F - a) * 6.0F);
+		int y0 = y1 - h;
+		s.frost(x0, y0, x1, y1, 3, 10, 26);
+		Paint.vertical(s, x0, y0, x1, y1, 12, Paint.argb(Math.round(140 * a), 34, 24, 68), Paint.argb(Math.round(164 * a), 16, 11, 34));
+		Paint.horizontal(s, x0 + 14, y0 + 1, (x0 + x1) / 2, y0 + 2, Paint.argb(0, 255, 255, 255), Paint.argb(Math.round(48 * a), 255, 255, 255), 6);
+		Paint.horizontal(s, (x0 + x1) / 2, y0 + 1, x1 - 14, y0 + 2, Paint.argb(Math.round(48 * a), 255, 255, 255), Paint.argb(0, 255, 255, 255), 6);
+		Paint.outline(s, x0, y0, x1, y1, 12, (x, y) -> Paint.argb(Math.round((y < (y0 + y1) / 2 ? 80 : 36) * a), 205, 187, 255));
+		int ty = y0 + 10;
+		for (String line : lines) {
+			s.text(BODY, line, x0 + 16, ty, Paint.alpha(Glass.SOFT, a));
+			ty += 12;
 		}
 	}
 
-	private void drawFooter(Surface s) {
-		int y0 = bodyBottom - FOOTER_HEIGHT + 4;
-		Glass.divider(s, panelX0 + 10, panelX1 - 10, y0 - 2);
-		Setting shown = hovered;
-		if (shown == null) {
-			s.text(BODY, "Hover a setting to see what it does.", listLeft, y0 + 14, Glass.FAINT);
+	private void drawTip(Surface s) {
+		Tip tip = hoverKey.startsWith("tip:") ? tips.get(hoverKey) : null;
+		if (tip != null) {
+			tipLast = tip;
+		}
+		float a = anim("tip", tip != null ? 1.0F : 0.0F, 0.04F);
+		if (a < 0.02F || tipLast == null) {
 			return;
 		}
-		String cost = "Cost: " + shown.cost().label();
-		int chip = s.width(BODY, cost) + 18;
-		int chipX1 = listRight;
-		int chipX0 = chipX1 - chip;
-		int chipY = y0 + 4;
-		Paint.round(s, chipX0, chipY, chipX1, chipY + 18, 9, Paint.argb(120, 14, 10, 28));
-		Paint.outline(s, chipX0, chipY, chipX1, chipY + 18, 9, Paint.argb(60, 205, 187, 255));
-		Glass.centred(s, BODY, cost, (chipX0 + chipX1) / 2, chipY + 5, shown.cost().colour());
-		int ty = y0 + 6;
-		for (String line : Glass.wrap(s, BODY, shown.describe(), chipX0 - 12 - listLeft, 3)) {
-			s.text(BODY, line, listLeft, ty, Glass.SOFT);
-			ty += 11;
+		List<String> lines = Glass.wrap(s, BODY, tipLast.text(), 230, 8);
+		int widest = 0;
+		for (String line : lines) {
+			widest = Math.max(widest, s.width(BODY, line));
 		}
-		PerfTest.Result measured = perf.result(shown);
-		if (measured != null) {
-			s.text(BODY, "Last test: " + measured.text(), listLeft, Math.max(ty, y0 + 28), measured.cost().colour());
+		int w = widest + 28;
+		int h = lines.size() * 12 + 18;
+		int x0 = Math.max(slabX0 + 10, Math.min(tipLast.x0(), slabX1 - 10 - w));
+		int y0 = tipLast.y1() + 6;
+		if (y0 + h > slabY1 - 8) {
+			y0 = tipLast.y0() - 6 - h;
 		}
+		int x1 = x0 + w;
+		int y1 = y0 + h;
+		s.frost(x0, y0, x1, y1, 3, 10, 22);
+		Paint.vertical(s, x0, y0, x1, y1, 10, Paint.argb(Math.round(170 * a), 34, 24, 68), Paint.argb(Math.round(190 * a), 16, 11, 34));
+		Paint.outline(s, x0, y0, x1, y1, 10, (x, y) -> Paint.argb(Math.round((y < (y0 + y1) / 2 ? 90 : 40) * a), 205, 187, 255));
+		int ty = y0 + 9;
+		for (String line : lines) {
+			s.text(BODY, line, x0 + 14, ty, Paint.alpha(Glass.TEXT, a));
+			ty += 12;
+		}
+	}
+
+	private int drawTag(Surface s, String key, String tag, String tip, int x, int cy, int colour, int top, int bottom) {
+		float over = hoverOf(key);
+		int tagColour = Paint.mix(colour, 0xFFFFFFFF, over * 0.35F);
+		Paint.round(s, x, cy - 6, x + 1, cy + 6, 0, Paint.argb(70, 205, 187, 255));
+		Icons.draw(s, x + 8, cy - 6, 12, Icons.INFO, tagColour);
+		s.text(BODY, tag, x + 24, cy - 4, tagColour);
+		int w = 24 + s.width(BODY, tag) + 6;
+		int y0 = Math.max(cy - 10, top);
+		int y1 = Math.min(cy + 10, bottom);
+		if (y1 > y0) {
+			hit(x, y0, x + w, y1, key, null);
+			tips.put(key, new Tip(tip, x, cy - 10, x + w, cy + 10));
+		}
+		return w;
 	}
 
 	private void drawNotice(Surface s, int y) {
-		int x0 = listLeft - 4;
-		int x1 = listRight + 4;
-		int y0 = y + 4;
-		int y1 = y + NOTICE_HEIGHT - 4;
-		Paint.round(s, x0, y0, x1, y1, 10, Paint.argb(34, 255, 200, 87));
-		Paint.outline(s, x0, y0, x1, y1, 10, Paint.argb(64, 255, 200, 87));
-		Icons.draw(s, x0 + 12, (y0 + y1) / 2 - Icons.height(Icons.ALERT) / 2, Icons.ALERT, fade(Glass.WARN, y + 14));
-		List<String> lines = Glass.wrap(s, BODY, "Defaults are already good. If something looks off, use the reset arrow at the top.", x1 - x0 - 44, 2);
-		int ty = (y0 + y1) / 2 - lines.size() * 11 / 2;
+		s.text(HEADING, "Advanced Settings", listLeft, y + 10, fade(Glass.TEXT, y + 10));
+		List<String> lines = Glass.wrap(s, BODY, "The defaults are fairly good, only tweak if you know what you're doing", listRight - listLeft, 2);
+		int ty = y + 30;
 		for (String line : lines) {
-			s.text(BODY, line, x0 + 32, ty, fade(Glass.SOFT, ty));
+			s.text(BODY, line, listLeft, ty, fade(Glass.SOFT, ty));
 			ty += 11;
 		}
-	}
-
-	private int toggleX() {
-		return listRight - 30;
 	}
 
 	private int choiceWidth(ChoiceSetting<?> choice) {
@@ -1129,15 +1219,29 @@ public final class LuceatScreen extends Screen {
 	}
 
 	private int trackLeft() {
-		return trackRight() - Math.max(64, Math.min(116, Math.round((listRight - listLeft) * 0.32F)));
+		return listLeft + 2;
 	}
 
 	private int trackRight() {
-		return listRight - 58;
+		return listRight - 56;
 	}
 
-	private int testRight(Setting setting) {
-		return (setting instanceof ChoiceSetting<?> choice ? listRight - choiceWidth(choice) : toggleX()) - 8;
+	private String costText(Setting setting) {
+		PerfTest.Result measured = perf.result(setting);
+		if (measured != null) {
+			return String.format(Locale.ROOT, "%.1f%% of a frame", measured.percent());
+		}
+		return "Cost: " + setting.cost().label();
+	}
+
+	private int costColour(Setting setting) {
+		PerfTest.Result measured = perf.result(setting);
+		return measured != null ? measured.cost().colour() : setting.cost().colour();
+	}
+
+	private String rowLabel(Setting setting) {
+		int limit = listRight - listLeft - Texts.width(BODY, costText(setting)) - 24 - (isDefault(setting) ? 0 : 16);
+		return Glass.fit(this.chrome, BODY, setting.label(), Math.max(36, limit));
 	}
 
 	private void drawRow(Surface s, Setting setting, int y, int height, int hitTop, int areaBottom, boolean first) {
@@ -1147,65 +1251,71 @@ public final class LuceatScreen extends Screen {
 		float hoverAny = Math.max(hover, anim("h:ctl:" + id, hoverKey.endsWith(":" + id) ? 1.0F : 0.0F, 0.05F));
 		boolean flashing = setting == flash && System.currentTimeMillis() < flashUntil;
 		boolean blocked = !setting.blocked().isEmpty();
+		float lit = Math.max(hoverAny, id.equals(lastRowId) ? 0.55F : 0.0F);
 		int vy0 = Math.max(y, hitTop);
 		int vy1 = Math.min(y + height, areaBottom);
-		if (hoverAny > 0.01F || flashing) {
-			int a = Math.round(18 * hoverAny);
+		if (lit > 0.01F || flashing) {
+			int a = Math.round(20 * lit);
 			if (flashing) {
 				a = Math.max(a, 60);
 			}
-			Paint.round(s, listLeft - 8, y + 1, listRight + 8, y + height - 1, 9, Paint.argb(a, flashing ? 123 : 205, flashing ? 99 : 187, 255));
+			Paint.round(s, listLeft - 10, y + 2, listRight + 10, y + height - 2, 10, Paint.argb(a, flashing ? 123 : 235, flashing ? 99 : 228, 255));
 		}
-		if (!first && hoverAny < 0.5F) {
+		if (!first && lit < 0.5F) {
 			Glass.divider(s, listLeft - 2, listRight + 2, y);
 		}
-		int cy = y + height / 2;
-		int ty = cy - 4;
-		boolean slider = setting instanceof SliderSetting;
-		int controlLeft = slider ? trackLeft() : setting instanceof ChoiceSetting<?> c ? listRight - choiceWidth(c) : toggleX();
-		int labelRight = controlLeft - 12 - (setting.testable() && !slider ? 46 : 0);
+		int ty = y + 9;
+		int cy = y + 31;
 		boolean changed = !isDefault(setting);
-		int labelWidth = Math.max(36, labelRight - listLeft - (changed ? 16 : 0));
-		String label = Glass.fit(s, BODY, setting.label(), labelWidth);
+		String label = rowLabel(setting);
 		int labelColour = blocked ? Glass.FAINT : Paint.mix(Glass.TEXT, 0xFFFFFFFF, hoverAny * 0.4F);
 		s.text(BODY, label, listLeft, ty, fade(labelColour, ty));
 		if (changed) {
 			int rx = listLeft + s.width(BODY, label) + 6;
 			String rkey = "rst:" + id;
 			float over = hoverOf(rkey);
-			drawResetIcon(s, rx, cy - Icons.height(Icons.RESET) / 2, true, over);
-			clampedHit(rx - 3, cy - 9, rx + Icons.width(Icons.RESET) + 3, cy + 9, rkey, setting, hitTop, areaBottom);
+			drawResetIcon(s, rx + 6, ty + 5, true, over);
+			clampedHit(rx - 3, y + 5, rx + 15, y + 23, rkey, setting, hitTop, areaBottom);
+		}
+		if (!blocked) {
+			Glass.right(s, BODY, costText(setting), listRight, ty, fade(Paint.alpha(costColour(setting), 0.85F), ty));
 		}
 		if (vy1 > vy0) {
-			hit(listLeft - 8, vy0, listRight + 8, vy1, rowKey, setting);
+			hit(listLeft - 10, vy0, listRight + 10, vy1, rowKey, setting);
 		}
 		if (setting instanceof ToggleSetting toggle) {
-			int x = toggleX();
+			int x = listLeft;
 			int top = cy - 8;
 			float on = anim("tg:" + id, toggle.value() && !blocked ? 1.0F : 0.0F, 0.05F);
 			float over = hoverOf("tg:" + id);
 			Glass.toggle(s, x, top, on, blocked ? 0.0F : Math.max(over, hover));
-			clampedHit(x - 2, top - 4, x + 32, top + 20, "tg:" + id, setting, hitTop, areaBottom);
-			drawTestPill(s, setting, testRight(setting), y, height, hitTop, areaBottom);
-		} else if (slider) {
-			SliderSetting sl = (SliderSetting) setting;
+			String state = blocked ? "Disabled" : toggle.valueText();
+			int sx = x + 38;
+			s.text(BODY, state, sx, cy - 4, fade(blocked ? Glass.FAINT : on > 0.5F ? Glass.GOOD : Glass.MUTED, cy - 4));
+			int end = sx + s.width(BODY, state);
+			if (blocked) {
+				end += 10 + drawTag(s, "tip:" + id, setting.blockedShort(), setting.blockedDetail(), end + 10, cy, Glass.WARN, hitTop, areaBottom);
+			}
+			clampedHit(x - 2, top - 4, sx + s.width(BODY, state) + 4, top + 20, "tg:" + id, setting, hitTop, areaBottom);
+			drawTestPill(s, setting, cy, hitTop, areaBottom);
+		} else if (setting instanceof SliderSetting sl) {
 			float value = anim("sl:" + id, sl.fraction(), dragging == setting ? 0.012F : 0.045F);
 			Glass.slider(s, trackLeft(), cy, trackRight(), value, hoverAny, dragging == setting ? 1.0F : 0.0F);
 			int valueColour = Paint.mix(Glass.SOFT, Glass.TEXT, Math.max(hoverAny, dragging == setting ? 1.0F : 0.0F));
-			Glass.right(s, BODY, sl.valueText(), listRight, ty, fade(valueColour, ty));
+			Glass.right(s, BODY, sl.valueText(), listRight, cy - 4, fade(valueColour, cy - 4));
 			clampedHit(trackLeft() - 10, cy - 10, trackRight() + 10, cy + 10, "sl:" + id, setting, hitTop, areaBottom);
 		} else if (setting instanceof ChoiceSetting<?> choice) {
 			int w = choiceWidth(choice);
-			int x = listRight - w;
+			int x = listLeft;
 			int top = cy - 10;
 			float over = hoverOf("ch:" + id);
 			Glass.field(s, x, top, x + w, top + 20, 0.0F);
 			if (over > 0.01F) {
 				Paint.outline(s, x, top, x + w, top + 20, 8, Paint.argb(Math.round(110 * over), 205, 187, 255));
 			}
-			Glass.centred(s, BODY, choice.name(choice.index()), x + w / 2, ty, fade(Glass.TEXT, ty));
+			Glass.centred(s, BODY, choice.name(choice.index()), x + w / 2, cy - 4, fade(Glass.TEXT, cy - 4));
 			clampedHit(x, top, x + w, top + 20, "ch:" + id, setting, hitTop, areaBottom);
-			drawTestPill(s, setting, testRight(setting), y, height, hitTop, areaBottom);
+			drawTestPill(s, setting, cy, hitTop, areaBottom);
 		}
 	}
 
@@ -1217,21 +1327,21 @@ public final class LuceatScreen extends Screen {
 		}
 	}
 
-	private void drawTestPill(Surface s, Setting setting, int rightEdge, int y, int height, int areaTop, int areaBottom) {
+	private void drawTestPill(Surface s, Setting setting, int cy, int areaTop, int areaBottom) {
 		if (!setting.testable()) {
 			return;
 		}
 		boolean running = perf.running() && perf.target() == setting;
 		int width = 38;
-		int x = rightEdge - width;
-		int cy = y + (height - 16) / 2;
+		int x = listRight - width;
+		int top = cy - 8;
 		String key = "test:" + setting.id();
 		float over = hoverOf(key);
-		Paint.round(s, x, cy, x + width, cy + 16, 8, Paint.argb(Math.round(70 + 50 * over), 40, 30, 80));
-		Paint.outline(s, x, cy, x + width, cy + 16, 8, running ? Paint.argb(200, 178, 140, 255) : Paint.argb(Math.round(50 + 80 * over), 205, 187, 255));
+		Paint.round(s, x, top, x + width, top + 16, 8, Paint.argb(Math.round(18 + 18 * over), 255, 255, 255));
+		Paint.outline(s, x, top, x + width, top + 16, 8, running ? Paint.argb(200, 178, 140, 255) : Paint.argb(Math.round(40 + 60 * over), 235, 228, 255));
 		String label = running ? perf.progress() + "%" : "Test";
-		Glass.centred(s, BODY, label, x + width / 2, cy + 4, fade(running ? Glass.LAVENDER : Glass.SOFT, cy + 4));
-		clampedHit(x, cy, x + width, cy + 16, key, setting, areaTop, areaBottom);
+		Glass.centred(s, BODY, label, x + width / 2, top + 4, fade(running ? Glass.LAVENDER : Glass.SOFT, top + 4));
+		clampedHit(x, top, x + width, top + 16, key, setting, areaTop, areaBottom);
 	}
 
 	private Presets.Preset currentPreset() {
@@ -1300,7 +1410,7 @@ public final class LuceatScreen extends Screen {
 		int shift = Math.round(scroll) - Math.round((1.0F - enter) * 8.0F);
 		pageShift = shift;
 		s.clip(panelX0 - 4, bodyTop, contentX1, bodyBottom);
-		int end = ABOUT.equals(section) ? drawAbout(s, shift) : drawDebug(s, shift);
+		int end = drawDebug(s, shift);
 		s.unclip();
 		pageMax = Math.max(0, end + shift - (bodyBottom - 6));
 		drawScrollbar(s, contentX1 - 10, bodyTop + 2, bodyBottom - 2, pageMax);
@@ -1314,14 +1424,55 @@ public final class LuceatScreen extends Screen {
 		}
 	}
 
-	private int drawAbout(Surface s, int shift) {
-		int x = panelX0 + 4;
-		int y = bodyTop + 6 - shift;
-		s.text(HEADING, "Luceat", x + 100, y + 12, Glass.TEXT);
-		s.text(BODY, "Version " + version(), x + 100, y + 34, Glass.SOFT);
-		s.text(BODY, "Made by bewf", x + 100, y + 48, Glass.SOFT);
-		y += 96;
-		int width = contentX1 - x - 20;
+	private int aboutHeight() {
+		int width = listRight - listLeft;
+		if (aboutCacheWidth != width) {
+			aboutCacheWidth = width;
+			aboutCacheHeight = drawAbout(new Measure(), 0, false);
+		}
+		return aboutCacheHeight;
+	}
+
+	private int drawAbout(Surface s, int y0, boolean paint) {
+		int x = listLeft;
+		int width = listRight - listLeft;
+		int logoW = 84;
+		int tx = x + logoW + 16;
+		s.text(HEADING, "Luceat", tx, y0 + 8, Glass.TEXT);
+		s.text(BODY, "Version " + version() + ", made by bewf", tx, y0 + 29, Glass.SOFT);
+		String[] labels = {"Donate", "Other mods"};
+		Icons.Brand[] brands = {Icons.KOFI, Icons.MODRINTH};
+		int by = y0 + 50;
+		int bx = tx;
+		for (int i = 0; i < labels.length; i++) {
+			int w = 32 + s.width(BODY, labels[i]);
+			if (paint) {
+				String key = "link:" + i;
+				float over = hoverOf(key);
+				Glass.tool(s, bx, by, bx + w, by + 22, over);
+				Icons.brand(s, bx + 9, by + 5, 12, brands[i], Paint.mix(Glass.SOFT, Glass.TEXT, over));
+				s.text(BODY, labels[i], bx + 26, by + 7, Paint.mix(Glass.SOFT, Glass.TEXT, over));
+				clampedHit(bx, by, bx + w, by + 22, key, null, contentTop(), areaBottom());
+			}
+			bx += w + 6;
+		}
+		String report = "Report issue";
+		int rw = 32 + s.width(BODY, report);
+		if (paint) {
+			int rx = listRight - rw;
+			float over = hoverOf("link:2");
+			Glass.tool(s, rx, y0 + 6, listRight, y0 + 28, over);
+			Icons.brand(s, rx + 9, y0 + 11, 12, Icons.GITHUB, Paint.mix(Glass.SOFT, Glass.TEXT, over));
+			s.text(BODY, report, rx + 26, y0 + 13, Paint.mix(Glass.SOFT, Glass.TEXT, over));
+			clampedHit(rx, y0 + 6, listRight, y0 + 28, "link:2", null, contentTop(), areaBottom());
+			aboutLogoX = x;
+			aboutLogoY = y0 + 6;
+			aboutVisible = true;
+			if (copiedNote != null && System.currentTimeMillis() < copiedUntil) {
+				s.text(BODY, copiedNote, bx + 4, by + 7, Glass.WARN);
+			}
+		}
+		int y = y0 + 90;
 		String[] paragraphs = {
 			"Luceat adds dynamic lights to held items, dropped items, other players, placed blocks, and more.",
 			"You can customise light colours, brightness, and shadows to create a look you like. You can add lights to any block you want.",
@@ -1349,58 +1500,7 @@ public final class LuceatScreen extends Screen {
 				y += 11;
 			}
 		}
-		y += 8;
-		int endY = drawLinks(s, x, y, width, Integer.MAX_VALUE / 2);
-		if (copiedNote != null && System.currentTimeMillis() < copiedUntil) {
-			s.text(BODY, copiedNote, x, endY + 6, Glass.GOOD);
-			endY += 18;
-		}
-		return endY + 8;
-	}
-
-	private int drawLinks(Surface s, int x, int y, int width, int bottom) {
-		String[] labels = {"Modrinth page", "More by bewf", "Report a problem"};
-		String[] notes = {"Downloads and updates", "Other mods and projects", "Open an issue on GitHub"};
-		Icons.Icon[] icons = {Icons.CUBE, Icons.USER, Icons.BUG};
-		int gap = 8;
-		int tallH = 40;
-		boolean stacked = y + 3 * tallH + 2 * gap <= bottom;
-		int bx = x;
-		int by = y;
-		int rowBottom = y;
-		for (int i = 0; i < labels.length; i++) {
-			String key = "link:" + i;
-			float over = hoverOf(key);
-			boolean primary = i == 0;
-			int labelColour = primary ? 0xFFFFFFFF : Glass.TEXT;
-			int noteColour = primary ? 0xFFE3D9FF : Glass.MUTED;
-			int iconColour = primary ? 0xFFFFFFFF : Glass.LAVENDER;
-			if (stacked) {
-				int w = Math.min(width, 260);
-				Glass.button(s, bx, by, bx + w, by + tallH, primary, over, 0.0F);
-				Paint.round(s, bx + 8, by + 8, bx + 32, by + 32, 12, Paint.argb(primary ? 60 : 46, 235, 225, 255));
-				Icons.draw(s, bx + 13, by + 13, 14, icons[i], iconColour);
-				s.text(BODY, Glass.fit(s, BODY, labels[i], w - 42 - 30), bx + 42, by + 9, labelColour);
-				s.text(BODY, Glass.fit(s, BODY, notes[i], w - 42 - 30), bx + 42, by + 22, noteColour);
-				Icons.draw(s, bx + w - 24, by + 14, 12, Icons.EXTERNAL, Paint.mix(noteColour, labelColour, over));
-				viewHit(bx, by, bx + w, by + tallH, key);
-				by += tallH + gap;
-				rowBottom = by - gap;
-			} else {
-				int w = 38 + s.width(BODY, labels[i]);
-				if (bx + w > x + width && bx > x) {
-					bx = x;
-					by += 30 + gap;
-				}
-				Glass.button(s, bx, by, bx + w, by + 28, primary, over, 0.0F);
-				Icons.draw(s, bx + 10, by + 7, 14, icons[i], iconColour);
-				s.text(BODY, labels[i], bx + 30, by + 10, labelColour);
-				viewHit(bx, by, bx + w, by + 28, key);
-				bx += w + gap;
-				rowBottom = by + 28;
-			}
-		}
-		return rowBottom;
+		return y + 12 - y0;
 	}
 
 	private int drawDebugColumn(Surface s, List<DebugReport.Group> groups, int x, int y, int width) {
@@ -1413,9 +1513,15 @@ public final class LuceatScreen extends Screen {
 			for (DebugReport.Row row : group.rows()) {
 				s.text(BODY, Glass.fit(s, BODY, row.label(), labelWidth - 6), x, y, Glass.MUTED);
 				int used = 0;
+				String lastLine = "";
 				for (String line : Glass.wrap(s, BODY, row.value(), width - labelWidth, 2)) {
 					s.text(BODY, line, x + labelWidth, y + used, row.colour());
+					lastLine = line;
 					used += 11;
+				}
+				if (row.tag() != null) {
+					int tx = x + labelWidth + s.width(BODY, lastLine) + 8;
+					drawTag(s, "tip:dbg:" + row.label(), row.tag(), row.tip(), tx, y + used - 11 + 4, row.colour(), bodyTop, bodyBottom);
 				}
 				y += Math.max(12, used + 1);
 			}
@@ -1431,20 +1537,6 @@ public final class LuceatScreen extends Screen {
 		int leftEnd = drawDebugColumn(s, DebugReport.left(), x, bodyTop + 6 - shift, columnWidth);
 		int rightEnd = drawDebugColumn(s, DebugReport.right(), x + columnWidth + gap, bodyTop + 6 - shift, columnWidth);
 		int y = Math.max(leftEnd, rightEnd);
-		if (DebugReport.doubleLighting()) {
-			int x1 = contentX1 - 20;
-			List<String> lines = Glass.wrap(s, BODY, "LambDynamicLights is installed, so lights add up twice. Turn one of the two mods off.", x1 - x - 44, 2);
-			int boxHeight = lines.size() * 11 + 16;
-			Paint.round(s, x - 4, y, x1, y + boxHeight, 10, Paint.argb(46, 255, 200, 87));
-			Paint.outline(s, x - 4, y, x1, y + boxHeight, 10, Paint.argb(96, 255, 200, 87));
-			Icons.draw(s, x + 6, y + (boxHeight - Icons.height(Icons.ALERT)) / 2, Icons.ALERT, Glass.WARN);
-			int ty = y + (boxHeight - lines.size() * 11) / 2 + 1;
-			for (String line : lines) {
-				s.text(BODY, line, x + 26, ty, Glass.TEXT);
-				ty += 11;
-			}
-			y += boxHeight + 10;
-		}
 		y += 4;
 		String[] labels = {"Copy report", "Rebuild shader", "Rescan lights", "Resume lights"};
 		int bx = x;
@@ -1493,16 +1585,15 @@ public final class LuceatScreen extends Screen {
 	}
 
 	private void drawAboutLogo(GuiGraphicsExtractor graphics) {
-		int shift = pageShift;
-		graphics.enableScissor(panelX0, bodyTop, contentX1, bodyBottom);
-		graphics.blit(RenderPipelines.GUI_TEXTURED, LOGO, panelX0 + 4, bodyTop + 6 - shift, 0.0F, 0.0F, 80, 80, 256, 256, 256, 256);
+		graphics.enableScissor(panelX0, contentTop(), panelX1, areaBottom());
+		graphics.blit(RenderPipelines.GUI_TEXTURED, LOGO, aboutLogoX, aboutLogoY, 0.0F, 12.0F, 84, 66, 256, 200, 256, 256);
 		graphics.disableScissor();
 	}
 
 	private void clickLink(int index) {
-		String url = index == 0 ? Links.MOD : index == 1 ? Links.AUTHOR : Links.ISSUES;
+		String url = index == 0 ? Links.DONATE : index == 1 ? Links.AUTHOR : Links.ISSUES;
 		if (!Links.open(url)) {
-			copiedNote = "Link copied. Paste it into your browser.";
+			copiedNote = "Could not open your browser.";
 			copiedUntil = System.currentTimeMillis() + 4000L;
 		}
 		dirty = true;
@@ -1571,7 +1662,7 @@ public final class LuceatScreen extends Screen {
 		if (search.focused() && clickDropdown(mx, my)) {
 			return true;
 		}
-		if (LuceatLook.inside(mx, my, searchX0(), slabY0 + 10, searchX1(), slabY0 + 34)) {
+		if (LuceatLook.inside(mx, my, searchX0(), ctl(), searchX1(), ctl() + 24)) {
 			search.mouseClicked(mx, my);
 			search.focus(true);
 			if (blocks != null) {
@@ -1581,17 +1672,17 @@ public final class LuceatScreen extends Screen {
 		}
 		search.focus(false);
 		int closeX0 = slabX1 - 16 - 24;
-		if (LuceatLook.inside(mx, my, closeX0, slabY0 + 10, closeX0 + 24, slabY0 + 34)) {
+		if (LuceatLook.inside(mx, my, closeX0, ctl(), closeX0 + 24, ctl() + 24)) {
 			onClose();
 			return true;
 		}
 		int undoX1 = closeX0 - 8;
-		if (LuceatLook.inside(mx, my, undoX1 - undoWidth(), slabY0 + 10, undoX1, slabY0 + 34)) {
+		if (LuceatLook.inside(mx, my, undoX1 - undoWidth(), ctl(), undoX1, ctl() + 24)) {
 			undoLast();
 			return true;
 		}
 		int chipX1 = undoX1 - undoWidth() - 8;
-		if (LuceatLook.inside(mx, my, chipX1 - presetWidth(), slabY0 + 10, chipX1, slabY0 + 34)) {
+		if (LuceatLook.inside(mx, my, chipX1 - presetWidth(), ctl(), chipX1, ctl() + 24)) {
 			this.minecraft.setScreen(new PresetPicker(this));
 			return true;
 		}
@@ -1608,7 +1699,7 @@ public final class LuceatScreen extends Screen {
 		if (clickSidebar(mx, my)) {
 			return true;
 		}
-		if ((settingsPage() || ABOUT.equals(section) || DEBUG.equals(section)) && clickBar(mx, my)) {
+		if ((settingsPage() || DEBUG.equals(section)) && clickBar(mx, my)) {
 			return true;
 		}
 		if (previewPage() && panel.mouseClicked(mx, my)) {
@@ -1618,6 +1709,10 @@ public final class LuceatScreen extends Screen {
 			return super.mouseClicked(event, doubleClick);
 		}
 		if (settingsPage()) {
+			if (top != null && top.key.startsWith("link:")) {
+				clickLink(top.key.charAt(5) - '0');
+				return true;
+			}
 			if (stripReset(mx, my) || clickList(mx, my)) {
 				return true;
 			}
@@ -1632,10 +1727,6 @@ public final class LuceatScreen extends Screen {
 				return true;
 			}
 			return super.mouseClicked(event, doubleClick);
-		}
-		if (ABOUT.equals(section) && top != null && top.key.startsWith("link:")) {
-			clickLink(top.key.charAt(5) - '0');
-			return true;
 		}
 		if (DEBUG.equals(section) && top != null && top.key.startsWith("dbg:")) {
 			clickDebug(top.key.charAt(4) - '0');
@@ -1658,15 +1749,14 @@ public final class LuceatScreen extends Screen {
 		for (Object item : rows) {
 			int height = itemHeight(item);
 			if (item instanceof String name) {
-				int ix = listRight - 12;
-				if (LuceatLook.inside(mx, my, ix - 4, y + 8, ix + Icons.width(Icons.RESET) + 4, y + 26)) {
+				if (LuceatLook.inside(mx, my, listRight - 22, y + 6, listRight, y + 28)) {
 					List<Setting> group = settingsIn(name);
 					if (changedCount(group) > 0) {
 						resetSettings(group);
 					}
 					return true;
 				}
-			} else if (item instanceof Setting setting && LuceatLook.inside(mx, my, listLeft - 8, y, listRight + 8, y + height)) {
+			} else if (item instanceof Setting setting && LuceatLook.inside(mx, my, listLeft - 10, y, listRight + 10, y + height)) {
 				clickRow(setting, y, height, mx, my);
 				return true;
 			}
@@ -1676,45 +1766,40 @@ public final class LuceatScreen extends Screen {
 	}
 
 	private void clickRow(Setting setting, int y, int height, double mx, double my) {
-		int cy = y + height / 2;
+		int cy = y + 31;
 		if (!isDefault(setting)) {
-			int controlLeft = setting instanceof SliderSetting ? trackLeft() : setting instanceof ChoiceSetting<?> c ? listRight - choiceWidth(c) : toggleX();
-			int labelRight = controlLeft - 12 - (setting.testable() && !(setting instanceof SliderSetting) ? 46 : 0);
-			String shown = Glass.fit(this.chrome, BODY, setting.label(), Math.max(36, labelRight - listLeft - 16));
-			int rx = listLeft + Texts.width(BODY, shown) + 6;
-			if (LuceatLook.inside(mx, my, rx - 3, cy - 9, rx + Icons.width(Icons.RESET) + 3, cy + 9)) {
+			int rx = listLeft + Texts.width(BODY, rowLabel(setting)) + 6;
+			if (LuceatLook.inside(mx, my, rx - 3, y + 5, rx + 15, y + 23)) {
 				resetSettings(List.of(setting));
 				return;
 			}
 		}
+		boolean onTest = setting.testable() && LuceatLook.inside(mx, my, listRight - 38, cy - 8, listRight, cy + 8);
 		if (setting instanceof ToggleSetting toggle) {
-			int x = toggleX();
-			int pillRight = testRight(setting);
-			if (setting.testable() && LuceatLook.inside(mx, my, pillRight - 38, cy - 8, pillRight, cy + 8)) {
+			if (onTest) {
 				perf.start(setting);
 				return;
 			}
-			if (setting.blocked().isEmpty() && LuceatLook.inside(mx, my, x - 6, cy - 12, listRight + 8, cy + 12)) {
+			String state = setting.blocked().isEmpty() ? toggle.valueText() : "Disabled";
+			if (setting.blocked().isEmpty() && LuceatLook.inside(mx, my, listLeft - 2, cy - 12, listLeft + 42 + Texts.width(BODY, state), cy + 12)) {
 				pushUndo();
 				toggle.set(!toggle.value());
 				applyChanged(setting);
 				flushRebuild();
 			}
 		} else if (setting instanceof SliderSetting slider) {
-			if (mx >= trackLeft() - 10) {
+			if (mx >= trackLeft() - 10 && mx <= listRight + 10) {
 				dragBefore = LuceatConfig.snapshot();
 				dragging = slider;
 				dragSlider(slider, mx);
 			}
 		} else if (setting instanceof ChoiceSetting<?> choice) {
-			int w = choiceWidth(choice);
-			int x = listRight - w;
-			int pillRight = testRight(setting);
-			if (setting.testable() && LuceatLook.inside(mx, my, pillRight - 38, cy - 8, pillRight, cy + 8)) {
+			if (onTest) {
 				perf.start(setting);
 				return;
 			}
-			if (LuceatLook.inside(mx, my, x, cy - 10, x + w, cy + 10)) {
+			int w = choiceWidth(choice);
+			if (LuceatLook.inside(mx, my, listLeft, cy - 10, listLeft + w, cy + 10)) {
 				pushUndo();
 				choice.next();
 				applyChanged(setting);
@@ -1801,7 +1886,7 @@ public final class LuceatScreen extends Screen {
 			scrollGoal = Math.max(0.0F, Math.min(scrollGoal - (float) scrollY * 36.0F, maxScroll(items())));
 			return true;
 		}
-		if ((ABOUT.equals(section) || DEBUG.equals(section)) && x >= panelX0) {
+		if (DEBUG.equals(section) && x >= panelX0) {
 			scrollGoal = Math.max(0.0F, Math.min(scrollGoal - (float) scrollY * 36.0F, pageMax));
 			return true;
 		}
@@ -1814,7 +1899,7 @@ public final class LuceatScreen extends Screen {
 		if (BLOCKS.equals(section) && !search.focused()) {
 			return blocks.charTyped(event) || super.charTyped(event);
 		}
-		if (!search.focused() && !ABOUT.equals(section) && !SPEED.equals(section) && event.codepoint() >= 32 && event.codepoint() != 127) {
+		if (!search.focused() && !SPEED.equals(section) && event.codepoint() >= 32 && event.codepoint() != 127) {
 			search.focus(true);
 		}
 		if (search.charTyped(event)) {

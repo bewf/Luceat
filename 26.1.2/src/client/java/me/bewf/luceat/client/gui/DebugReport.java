@@ -24,7 +24,10 @@ import me.bewf.luceat.client.shadow.ShapeMasks;
 import net.fabricmc.loader.api.FabricLoader;
 
 public final class DebugReport {
-	public record Row(String label, String value, int colour) {
+	public record Row(String label, String value, int colour, String tag, String tip) {
+		public Row(String label, String value, int colour) {
+			this(label, value, colour, null, null);
+		}
 	}
 
 	public record Group(String title, List<Row> rows) {
@@ -48,7 +51,7 @@ public final class DebugReport {
 		graphics.add(new Row("GPU", HardwareHint.gpuName(), Glass.TEXT));
 		graphics.add(new Row("OpenGL", HardwareHint.glVersion(), Glass.TEXT));
 		graphics.add(new Row("Renderer", RenderBackend.kind().label(), Glass.TEXT));
-		graphics.add(new Row("Light around corners", compute ? "available" : LightSpread.blocker(), compute ? Glass.GOOD : Glass.WARN));
+		graphics.add(new Row("Light around corners", compute ? "Enabled" : "Disabled", compute ? Glass.GOOD : Glass.WARN, compute ? null : LightSpread.shortBlocker(), compute ? null : LightSpread.blockerDetail()));
 		groups.add(new Group("Graphics", graphics));
 
 		ShaderVariant built = TerrainShaderPatch.built();
@@ -67,7 +70,7 @@ public final class DebugReport {
 		String iris = modVersion("iris");
 		mods.add(new Row("Iris", iris == null ? "not installed" : iris, Glass.TEXT));
 		String lamb = modVersion("lambdynlights");
-		mods.add(new Row("LambDynamicLights", lamb == null ? "not installed" : lamb + ", lights add up twice", lamb == null ? Glass.MUTED : Glass.WARN));
+		mods.add(new Row("LambDynamicLights", lamb == null ? "not installed" : lamb, lamb == null ? Glass.MUTED : Glass.WARN, lamb == null ? null : "redundant", "Luceat and LambDynamicLights do the same job, so lights add up twice. Turn one of them off."));
 		groups.add(new Group("Mods", mods));
 		return groups;
 	}

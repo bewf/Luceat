@@ -30,7 +30,6 @@ public final class Glass {
 	}
 
 	public static void slab(Surface s, int x0, int y0, int x1, int y1, int r) {
-		Paint.halo(s, x0, y0, x1, y1, r, 18, argb(40, 122, 77, 255));
 		Paint.vertical(s, x0, y0, x1, y1, r, argb(frosted ? 150 : 224, 25, 18, 50), argb(frosted ? 176 : 240, 9, 6, 19));
 		int w = x1 - x0;
 		int h = y1 - y0;
@@ -48,14 +47,6 @@ public final class Glass {
 			int base = argb(Math.round(255 * Math.max(0.1F, lit)), 205, 187, 255);
 			return mix(base, argb(230, 168, 107, 255), glow);
 		});
-		for (int k = 0; k < 10; k++) {
-			float f = 1.0F - k / 10.0F;
-			int peak = Math.round(52 * f * f);
-			int xa = x0 + r;
-			int xm = xa + 24;
-			Paint.horizontal(s, xa, y1 - 2 - k, xm, y1 - 1 - k, argb(0, 166, 107, 255), argb(peak, 166, 107, 255), 5);
-			Paint.horizontal(s, xm, y1 - 2 - k, x0 + Math.round(w * 0.42F * f) + 24, y1 - 1 - k, argb(peak, 166, 107, 255), argb(0, 166, 107, 255), 5);
-		}
 	}
 
 	public static void inset(Surface s, int x0, int y0, int x1, int y1, int r) {
@@ -87,7 +78,6 @@ public final class Glass {
 	public static void button(Surface s, int x0, int y0, int x1, int y1, boolean primary, float hover, float press) {
 		int r = Math.min(9, (y1 - y0) / 2);
 		if (primary) {
-			Paint.halo(s, x0, y0, x1, y1, r, 6, argb(Math.round(26 + 40 * hover), 140, 100, 255));
 			Paint.vertical(s, x0, y0 + Math.round(press), x1, y1, r, mix(argb(255, 126, 100, 255), argb(255, 150, 122, 255), hover), mix(argb(255, 88, 66, 210), argb(255, 104, 80, 226), hover));
 			Paint.outline(s, x0, y0 + Math.round(press), x1, y1, r, (x, y) -> y < (y0 + y1) / 2 ? argb(150, 235, 225, 255) : argb(60, 235, 225, 255));
 		} else {
@@ -99,9 +89,6 @@ public final class Glass {
 	public static void toggle(Surface s, int x, int y, float on, float hover) {
 		int w = 30;
 		int h = 16;
-		if (on > 0.01F) {
-			Paint.halo(s, x, y, x + w, y + h, 8, 7, argb(Math.round(70 * on), 140, 100, 255));
-		}
 		Paint.vertical(s, x, y, x + w, y + h, 8, mix(argb(255, 44, 36, 70), argb(255, 130, 106, 255), on), mix(argb(255, 34, 28, 56), argb(255, 96, 72, 226), on));
 		Paint.outline(s, x, y, x + w, y + h, 8, mix(argb(60, 205, 187, 255), argb(120, 235, 225, 255), Math.max(on, hover * 0.6F)));
 		int kx = x + 3 + Math.round(14 * on);
@@ -113,15 +100,11 @@ public final class Glass {
 		int kx = x0 + Math.round(v * (x1 - x0));
 		Paint.round(s, x0, cy - 2, x1, cy + 2, 2, argb(255, 38, 31, 62));
 		Paint.outline(s, x0, cy - 2, x1, cy + 2, 2, argb(30, 0, 0, 0));
-		float glow = (0.12F + 0.78F * v) * (1.0F + 0.25F * Math.max(hover, drag));
 		if (kx > x0 + 2) {
-			Paint.halo(s, x0, cy - 2, kx, cy + 2, 2, 6, argb(Math.round(Math.min(1.0F, glow) * 70), 150, 110, 255));
 			int tipColour = mix(argb(255, 150, 120, 255), argb(255, 226, 208, 255), v);
 			Paint.rows(s, x0, cy - 2, kx, cy + 2, 2, y -> y < cy ? tipColour : mix(tipColour, argb(255, 92, 70, 220), 0.5F), false);
 			Paint.horizontal(s, x0 + 1, cy - 1, kx, cy, argb(255, 108, 92, 255), tipColour, 3);
 		}
-		float ring = 0.25F + 0.75F * v;
-		Paint.halo(s, kx - 5, cy - 5, kx + 5, cy + 5, 5, 9, argb(Math.round(Math.min(1.0F, ring * (1.0F + 0.4F * drag)) * 96), 170, 132, 255));
 		Paint.round(s, kx - 6, cy - 6, kx + 6, cy + 6, 6, argb(255, 236, 228, 255));
 		Paint.round(s, kx - 3, cy - 3, kx + 3, cy + 3, 3, mix(argb(255, 124, 100, 255), argb(255, 190, 150, 255), v));
 	}
@@ -132,11 +115,22 @@ public final class Glass {
 		Paint.outline(s, x0, y0, x1, y1, r, argb(Math.round(46 + 50 * hover), 205, 187, 255));
 	}
 
+	public static void tool(Surface s, int x0, int y0, int x1, int y1, float hover) {
+		int r = Math.min(9, (y1 - y0) / 2);
+		Paint.vertical(s, x0, y0, x1, y1, r, argb(Math.round(22 + 22 * hover), 255, 255, 255), argb(Math.round(10 + 16 * hover), 255, 255, 255));
+		Paint.outline(s, x0, y0, x1, y1, r, (x, y) -> argb(Math.round((y < (y0 + y1) / 2 ? 58 : 26) + 40 * hover), 235, 228, 255));
+	}
+
+	public static void card(Surface s, int x0, int y0, int x1, int y1, int r) {
+		Paint.vertical(s, x0, y0, x1, y1, r, argb(26, 255, 255, 255), argb(12, 255, 255, 255));
+		Paint.horizontal(s, x0 + r, y0 + 1, x1 - r, y0 + 2, argb(0, 255, 255, 255), argb(34, 255, 255, 255), 8);
+		Paint.outline(s, x0, y0, x1, y1, r, (x, y) -> argb(y < (y0 + y1) / 2 ? 40 : 22, 235, 228, 255));
+	}
+
 	public static void field(Surface s, int x0, int y0, int x1, int y1, float focus) {
 		inset(s, x0, y0, x1, y1, 8);
 		if (focus > 0.01F) {
 			Paint.outline(s, x0, y0, x1, y1, 8, argb(Math.round(140 * focus), 160, 124, 255));
-			Paint.halo(s, x0, y0, x1, y1, 8, 4, argb(Math.round(40 * focus), 140, 100, 255));
 		}
 	}
 

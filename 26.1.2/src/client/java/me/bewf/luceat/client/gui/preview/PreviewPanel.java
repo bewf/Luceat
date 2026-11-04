@@ -179,22 +179,6 @@ public final class PreviewPanel {
 		Icons.draw(s, imageX + 22, imageY + 14, Icons.CAMERA, Glass.PALE);
 		s.text(Surface.Role.BODY, title, imageX + 38, imageY + 15, Glass.TEXT);
 		int rowY = imageY + 34;
-		if (imageH >= 170) {
-			String[] hints = {"Drag to look", "Scroll to zoom"};
-			Icons.Icon[] icons = {Icons.MOVE, Icons.ZOOM};
-			int hx = imageX + 12;
-			for (int i = 0; i < hints.length; i++) {
-				int hw = s.width(Surface.Role.BODY, hints[i]) + 40;
-				if (hx + hw > imageX + imageW - 12) {
-					break;
-				}
-				Glass.chip(s, hx, rowY, hx + hw, rowY + 18, 0.0F);
-				Icons.draw(s, hx + 10, rowY + 4, icons[i], Glass.SOFT);
-				s.text(Surface.Role.BODY, hints[i], hx + 26, rowY + 5, Glass.SOFT);
-				hx += hw + 6;
-			}
-			rowY += 24;
-		}
 		int captionTop = imageY + imageH - 12 - (imageW < 340 ? 28 : 0) - 34 - 6;
 		if (note != null && !note.isEmpty() && rowY + 18 <= captionTop) {
 			String text = Glass.fit(s, Surface.Role.BODY, note, maxChip - 42);
@@ -224,21 +208,19 @@ public final class PreviewPanel {
 		}
 		int capBottom = stacked ? timeY0 - 6 : bottom;
 		int capRight = stacked ? imageX + imageW - 12 : timeX0 - 8;
-		List<String> lines = Glass.wrap(s, Surface.Role.BODY, spec.caption(), capRight - (imageX + 12) - 42, 2);
-		if (!lines.isEmpty()) {
-			int widest = 0;
-			for (String line : lines) {
-				widest = Math.max(widest, s.width(Surface.Role.BODY, line));
+		String[] hints = {"Drag", "Scroll"};
+		Icons.Icon[] icons = {Icons.MOVE, Icons.ZOOM};
+		int hx = imageX + 12;
+		int hy1 = capBottom;
+		for (int i = 0; i < hints.length; i++) {
+			int hw = s.width(Surface.Role.SMALL, hints[i]) + 32;
+			if (hx + hw > capRight) {
+				break;
 			}
-			int boxH = 12 + lines.size() * 11;
-			int boxX1 = imageX + 12 + widest + 42;
-			Glass.chip(s, imageX + 12, capBottom - boxH, boxX1, capBottom, 0.0F);
-			Icons.draw(s, imageX + 22, capBottom - boxH / 2 - 4, Icons.INFO, Glass.PALE);
-			int ty = capBottom - boxH + 6;
-			for (String line : lines) {
-				s.text(Surface.Role.BODY, line, imageX + 38, ty, Glass.TEXT);
-				ty += 11;
-			}
+			Glass.chip(s, hx, hy1 - 20, hx + hw, hy1, 0.0F);
+			Icons.draw(s, hx + 9, hy1 - 15, 12, icons[i], Glass.SOFT);
+			s.text(Surface.Role.SMALL, hints[i], hx + 24, hy1 - 14, Glass.SOFT);
+			hx += hw + 6;
 		}
 	}
 

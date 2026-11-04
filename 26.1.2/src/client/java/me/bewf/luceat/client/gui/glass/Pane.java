@@ -14,7 +14,10 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.resources.Identifier;
 
 public final class Pane implements Surface {
-	private record Cmd(Role role, Component text, int x, int y, int argb, int cx0, int cy0, int cx1, int cy1, boolean clipped, int width) {
+	private record Cmd(Role role, Component text, int x, int y, int argb, int cx0, int cy0, int cx1, int cy1, boolean clipped, int width, int order) {
+	}
+
+	private record Veil(int x0, int y0, int x1, int y1, int order) {
 	}
 
 	private static int serial;
@@ -36,6 +39,7 @@ public final class Pane implements Surface {
 	private boolean clipped;
 	private boolean ready;
 	private final List<Cmd> texts = new ArrayList<>();
+	private final List<Veil> veils = new ArrayList<>();
 	private int[] hide;
 	private int minRow;
 	private int maxRow;
@@ -74,6 +78,7 @@ public final class Pane implements Surface {
 		minRow = ph;
 		maxRow = -1;
 		texts.clear();
+		veils.clear();
 		clipped = false;
 		clipX0 = 0;
 		clipY0 = 0;
@@ -123,11 +128,45 @@ public final class Pane implements Surface {
 			if (hide != null && cmd.x < hide[2] && cmd.x + cmd.width > hide[0] && cmd.y < hide[3] && cmd.y + 10 > hide[1]) {
 				continue;
 			}
-			if (cmd.clipped) {
-				graphics.enableScissor(cmd.cx0, cmd.cy0, cmd.cx1, cmd.cy1);
+			int bx0 = cmd.clipped ? Math.max(cmd.cx0, cmd.x) : cmd.x;
+			int by0 = cmd.clipped ? Math.max(cmd.cy0, cmd.y) : cmd.y;
+			int bx1 = cmd.clipped ? Math.min(cmd.cx1, cmd.x + cmd.width) : cmd.x + cmd.width;
+			int by1 = cmd.clipped ? Math.min(cmd.cy1, cmd.y + 12) : cmd.y + 12;
+			List<int[]> pieces = new ArrayList<>();
+			pieces.add(new int[] {bx0, by0, bx1, by1});
+			for (Veil veil : veils) {
+				if (veil.order <= cmd.order || pieces.isEmpty()) {
+					continue;
+				}
+				List<int[]> next = new ArrayList<>();
+				for (int[] p : pieces) {
+					if (veil.x1 <= p[0] || veil.x0 >= p[2] || veil.y1 <= p[1] || veil.y0 >= p[3]) {
+						next.add(p);
+						continue;
+					}
+					if (veil.y0 > p[1]) {
+						next.add(new int[] {p[0], p[1], p[2], veil.y0});
+					}
+					if (veil.y1 < p[3]) {
+						next.add(new int[] {p[0], veil.y1, p[2], p[3]});
+					}
+					int my0 = Math.max(p[1], veil.y0);
+					int my1 = Math.min(p[3], veil.y1);
+					if (veil.x0 > p[0]) {
+						next.add(new int[] {p[0], my0, veil.x0, my1});
+					}
+					if (veil.x1 < p[2]) {
+						next.add(new int[] {veil.x1, my0, p[2], my1});
+					}
+				}
+				pieces = next;
 			}
-			graphics.text(font, cmd.text.getVisualOrderText(), cmd.x, cmd.y, cmd.argb, false);
-			if (cmd.clipped) {
+			for (int[] p : pieces) {
+				if (p[2] <= p[0] || p[3] <= p[1]) {
+					continue;
+				}
+				graphics.enableScissor(p[0], p[1], p[2], p[3]);
+				graphics.text(font, cmd.text.getVisualOrderText(), cmd.x, cmd.y, cmd.argb, false);
 				graphics.disableScissor();
 			}
 		}
@@ -147,6 +186,133 @@ public final class Pane implements Surface {
 	@Override
 	public int scale() {
 		return scale;
+	}
+
+	@Override
+	public void frost(int lx0, int ly0, int lx1, int ly1, int inner, int edge, int edgeWidth) {
+		int ax0 = Math.max(0, Math.max(lx0 * scale - ox * scale, clipX0));
+		int ay0 = Math.max(0, Math.max(ly0 * scale - oy * scale, clipY0));
+		int ax1 = Math.min(pw, Math.min(lx1 * scale - ox * scale, clipX1));
+		int ay1 = Math.min(ph, Math.min(ly1 * scale - oy * scale, clipY1));
+		if (ax1 - ax0 < 8 || ay1 - ay0 < 8) {
+			return;
+		}
+		veils.add(new Veil(lx0, ly0, lx1, ly1, texts.size() + veils.size()));
+		int f = Math.max(2, scale * 2);
+		int cw = (ax1 - ax0 + f - 1) / f;
+		int ch = (ay1 - ay0 + f - 1) / f;
+		float[][] small = new float[4][cw * ch];
+		float[][] sharp = new float[4][cw * ch];
+		for (int cy = 0; cy < ch; cy++) {
+			for (int cx = 0; cx < cw; cx++) {
+				float sa = 0.0F;
+				float sr = 0.0F;
+				float sg = 0.0F;
+				float sb = 0.0F;
+				int count = 0;
+				for (int dy = 0; dy < f; dy++) {
+					int y = ay0 + cy * f + dy;
+					if (y >= ay1) {
+						break;
+					}
+					for (int dx = 0; dx < f; dx++) {
+						int x = ax0 + cx * f + dx;
+						if (x >= ax1) {
+							break;
+						}
+						int p = pixels[y * pw + x];
+						float a = (p >>> 24) / 255.0F;
+						sa += a;
+						sr += ((p >> 16) & 255) * a;
+						sg += ((p >> 8) & 255) * a;
+						sb += (p & 255) * a;
+						count++;
+					}
+				}
+				float inv = count == 0 ? 0.0F : 1.0F / count;
+				int i = cy * cw + cx;
+				sharp[0][i] = sa * inv;
+				sharp[1][i] = sr * inv;
+				sharp[2][i] = sg * inv;
+				sharp[3][i] = sb * inv;
+			}
+		}
+		int innerR = Math.max(1, inner * scale / f);
+		int edgeR = Math.max(innerR + 1, edge * scale / f);
+		for (int c = 0; c < 4; c++) {
+			small[c] = blur(sharp[c], cw, ch, innerR);
+		}
+		float[][] wide = new float[4][];
+		for (int c = 0; c < 4; c++) {
+			wide[c] = blur(sharp[c], cw, ch, edgeR);
+		}
+		float edgePx = Math.max(1.0F, edgeWidth * scale);
+		for (int y = ay0; y < ay1; y++) {
+			for (int x = ax0; x < ax1; x++) {
+				float fx = (x - ax0 + 0.5F) / f - 0.5F;
+				float fy = (y - ay0 + 0.5F) / f - 0.5F;
+				float t = 1.0F - Math.min(1.0F, Math.min(Math.min(x - ax0, ax1 - 1 - x), Math.min(y - ay0, ay1 - 1 - y)) / edgePx);
+				t = t * t;
+				float a = lerp(sample(small[0], cw, ch, fx, fy), sample(wide[0], cw, ch, fx, fy), t);
+				if (a <= 0.003F) {
+					pixels[y * pw + x] = 0;
+					continue;
+				}
+				float r = lerp(sample(small[1], cw, ch, fx, fy), sample(wide[1], cw, ch, fx, fy), t) / a;
+				float g = lerp(sample(small[2], cw, ch, fx, fy), sample(wide[2], cw, ch, fx, fy), t) / a;
+				float b = lerp(sample(small[3], cw, ch, fx, fy), sample(wide[3], cw, ch, fx, fy), t) / a;
+				int ia = Math.min(255, Math.round(a * 255.0F));
+				pixels[y * pw + x] = ia << 24 | Math.min(255, Math.round(r)) << 16 | Math.min(255, Math.round(g)) << 8 | Math.min(255, Math.round(b));
+			}
+		}
+		minRow = Math.min(minRow, ay0);
+		maxRow = Math.max(maxRow, ay1 - 1);
+	}
+
+	private static float lerp(float a, float b, float t) {
+		return a + (b - a) * t;
+	}
+
+	private static float sample(float[] data, int w, int h, float x, float y) {
+		int x0 = Math.max(0, Math.min(w - 1, (int) Math.floor(x)));
+		int y0 = Math.max(0, Math.min(h - 1, (int) Math.floor(y)));
+		int x1 = Math.min(w - 1, x0 + 1);
+		int y1 = Math.min(h - 1, y0 + 1);
+		float tx = Math.max(0.0F, Math.min(1.0F, x - x0));
+		float ty = Math.max(0.0F, Math.min(1.0F, y - y0));
+		float top = lerp(data[y0 * w + x0], data[y0 * w + x1], tx);
+		float bottom = lerp(data[y1 * w + x0], data[y1 * w + x1], tx);
+		return lerp(top, bottom, ty);
+	}
+
+	private static float[] blur(float[] source, int w, int h, int radius) {
+		float[] current = source;
+		for (int pass = 0; pass < 2; pass++) {
+			float[] across = new float[w * h];
+			for (int y = 0; y < h; y++) {
+				float sum = 0.0F;
+				for (int x = -radius; x <= radius; x++) {
+					sum += current[y * w + Math.max(0, Math.min(w - 1, x))];
+				}
+				for (int x = 0; x < w; x++) {
+					across[y * w + x] = sum / (radius * 2 + 1);
+					sum += current[y * w + Math.min(w - 1, x + radius + 1)] - current[y * w + Math.max(0, x - radius)];
+				}
+			}
+			float[] down = new float[w * h];
+			for (int x = 0; x < w; x++) {
+				float sum = 0.0F;
+				for (int y = -radius; y <= radius; y++) {
+					sum += across[Math.max(0, Math.min(h - 1, y)) * w + x];
+				}
+				for (int y = 0; y < h; y++) {
+					down[y * w + x] = sum / (radius * 2 + 1);
+					sum += across[Math.min(h - 1, y + radius + 1) * w + x] - across[Math.max(0, y - radius) * w + x];
+				}
+			}
+			current = down;
+		}
+		return current;
 	}
 
 	@Override
@@ -227,7 +393,7 @@ public final class Pane implements Surface {
 		if (clipped && (x >= clipRect[2] || x + width <= clipRect[0] || y >= clipRect[3] || y + 10 <= clipRect[1])) {
 			return;
 		}
-		texts.add(new Cmd(role, component, x, y, argb, clipRect[0], clipRect[1], clipRect[2], clipRect[3], clipped, width));
+		texts.add(new Cmd(role, component, x, y, argb, clipRect[0], clipRect[1], clipRect[2], clipRect[3], clipped, width, texts.size() + veils.size()));
 	}
 
 	@Override

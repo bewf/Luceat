@@ -12,6 +12,7 @@ public final class Texts {
 	public static Component of(Surface.Role role, String text) {
 		return switch (role) {
 			case BODY -> LuceatFonts.body(text);
+			case SMALL -> LuceatFonts.small(text);
 			case TITLE -> LuceatFonts.title(text);
 			case WORDMARK -> LuceatFonts.wordmark(text);
 			case HEADING -> LuceatFonts.heading(text);
