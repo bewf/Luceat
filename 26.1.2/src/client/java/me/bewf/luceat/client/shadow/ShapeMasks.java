@@ -34,13 +34,14 @@ public final class ShapeMasks {
 	public static final int RES = 16;
 	public static final int VOXELS = RES * RES * RES;
 	public static final int TILE_WIDTH = RES * RES;
-	public static final int TILE_HEIGHT = RES;
+	public static final int TILE_HEIGHT = RES + 1;
 	public static final int PER_ROW = 8;
 	public static final int ROWS = 128;
 	public static final int ATLAS_WIDTH = PER_ROW * TILE_WIDTH;
 	public static final int ATLAS_HEIGHT = ROWS * TILE_HEIGHT;
 	public static final int CAPACITY = PER_ROW * ROWS;
 	public static final int FLAG = 0x8000;
+	public static final int SOFT = 0x4000;
 	public static final String SAMPLER = "u_LuceatShapes";
 
 	public static final int NONE = 0;
@@ -87,8 +88,8 @@ public final class ShapeMasks {
 		GL13.glActiveTexture(previousUnit);
 	}
 
-	public static int idFor(BlockState state, BlockGetter level, BlockPos pos) {
-		return classify(build(state, level, pos, LuceatConfig.get()));
+	public static int idFor(BlockState state, BlockGetter level, BlockPos pos, boolean soft) {
+		return classify(build(state, level, pos, LuceatConfig.get()), soft ? SOFT : 0);
 	}
 
 	public static float[] build(BlockState state, BlockGetter level, BlockPos pos, LuceatConfig config) {
@@ -325,14 +326,16 @@ public final class ShapeMasks {
 		return closedBox(mask);
 	}
 
-	private static int classify(float[] mask) {
+	private static int classify(float[] mask, int extra) {
 		if (empty(mask)) {
 			return NONE;
 		}
 		if (closedBox(mask)) {
 			return SOLID;
 		}
-		byte[] bytes = new byte[VOXELS * 4];
+		byte[] bytes = new byte[TILE_WIDTH * TILE_HEIGHT * 4];
+		Arrays.fill(bytes, VOXELS * 4, bytes.length, (byte) -1);
+		float[] mean = new float[3];
 		for (int z = 0; z < RES; z++) {
 			for (int y = 0; y < RES; y++) {
 				for (int x = 0; x < RES; x++) {
@@ -342,14 +345,20 @@ public final class ShapeMasks {
 					bytes[at + 1] = (byte) Math.round(Math.clamp(mask[index * 3 + 1], 0.0F, 1.0F) * 255.0F);
 					bytes[at + 2] = (byte) Math.round(Math.clamp(mask[index * 3 + 2], 0.0F, 1.0F) * 255.0F);
 					bytes[at + 3] = (byte) -1;
+					mean[0] += mask[index * 3];
+					mean[1] += mask[index * 3 + 1];
+					mean[2] += mask[index * 3 + 2];
 				}
 			}
+		}
+		for (int channel = 0; channel < 3; channel++) {
+			bytes[VOXELS * 4 + channel] = (byte) Math.round(Math.clamp(mean[channel] / VOXELS, 0.0F, 1.0F) * 255.0F);
 		}
 		int hash = Arrays.hashCode(bytes);
 		List<Integer> bucket = BUCKETS.computeIfAbsent(hash, key -> new ArrayList<>(1));
 		for (int known : bucket) {
 			if (Arrays.equals(STORED.get(known), bytes)) {
-				return FLAG | known;
+				return FLAG | extra | known;
 			}
 		}
 		if (STORED.size() >= CAPACITY) {
@@ -359,7 +368,7 @@ public final class ShapeMasks {
 		STORED.add(bytes);
 		bucket.add(index);
 		upload(index, bytes);
-		return FLAG | index;
+		return FLAG | extra | index;
 	}
 
 	private static boolean closedBox(float[] mask) {

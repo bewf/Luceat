@@ -122,7 +122,7 @@ public final class TerrainShaderPatch {
 			    vec3 tDelta = 1.0 / (safe * @RES@.0);
 			    vec3 tMax = vec3(t0) + (vec3(v) + max(sgn, 0.0) - local) * sgn / (safe * @RES@.0);
 			    ivec3 stepCell = ivec3(sgn);
-			    ivec2 base = ivec2(int(tile % @PER_ROW@u) * @TILE_W@, int(tile / @PER_ROW@u) * @RES@);
+			    ivec2 base = ivec2(int(tile % @PER_ROW@u) * @TILE_W@, int(tile / @PER_ROW@u) * @TILE_H@);
 			    vec3 trans = vec3(1.0);
 			    float t = t0;
 			    for (int k = 0; k < @STEPS@; k++) {
@@ -156,6 +156,12 @@ public final class TerrainShaderPatch {
 			        }
 			    }
 			    return trans;
+			}
+
+			vec3 luceatBlur(uint tile, float chord) {
+			    ivec2 at = ivec2(int(tile % @PER_ROW@u) * @TILE_W@, int(tile / @PER_ROW@u) * @TILE_H@ + @RES@);
+			    vec3 mean = texelFetch(@SHAPES@, at, 0).rgb;
+			    return pow(max(mean, vec3(0.03)), vec3(max(chord, 0.0) * @HALF_RES@));
 			}
 
 			vec3 luceatVisibility(vec3 pos, vec3 normal, vec3 lightPos) {
@@ -200,7 +206,11 @@ public final class TerrainShaderPatch {
 			                if ((id & 32768u) != 0u) {
 			                    ivec3 gap = abs(cell - lightCell);
 			                    if (max(gap.x, max(gap.y, gap.z)) > 1) {
-			                        trans *= luceatShape(id & 32767u, origin, dir, cell, tEntry, min(tExit, limit), sgn, safe);
+			                        if ((id & 16384u) != 0u) {
+			                            trans *= luceatBlur(id & 16383u, min(tExit, limit) - tEntry);
+			                        } else {
+			                            trans *= luceatShape(id & 16383u, origin, dir, cell, tEntry, min(tExit, limit), sgn, safe);
+			                        }
 			                    }
 			                } else if (i > 0) {
 			                    bool enterPositive = sgn[entryAxis] < 0.0;
@@ -349,6 +359,27 @@ public final class TerrainShaderPatch {
 			}
 #endif
 
+			#ifdef LUCEAT_RAYS
+			void luceatPush(inout vec4 a, inout vec4 b, float v) {
+			    if (v <= b.w) {
+			        return;
+			    }
+			    float t;
+			    if (v > a.x) { t = a.x; a.x = v; v = t; }
+			    if (v > a.y) { t = a.y; a.y = v; v = t; }
+			    if (v > a.z) { t = a.z; a.z = v; v = t; }
+			    if (v > a.w) { t = a.w; a.w = v; v = t; }
+			    if (v > b.x) { t = b.x; b.x = v; v = t; }
+			    if (v > b.y) { t = b.y; b.y = v; v = t; }
+			    if (v > b.z) { t = b.z; b.z = v; v = t; }
+			    if (v > b.w) { b.w = v; }
+			}
+
+			float luceatKth(vec4 a, vec4 b, int k) {
+			    return k <= 4 ? a[k - 1] : b[k - 5];
+			}
+			#endif
+
 			vec3 luceatSoft(vec3 x, float cap) {
 			    float knee = cap * 0.7;
 			    vec3 over = max(x - vec3(knee), vec3(0.0));
@@ -376,6 +407,8 @@ public final class TerrainShaderPatch {
 			    float full = budget > 0.5 ? 0.5 / budget : 2.0;
 			    float cheap = full * 0.25;
 			    float sumPower = 0.0;
+			    vec4 topA = vec4(0.0);
+			    vec4 topB = vec4(0.0);
 			    bool reached = false;
 			    int slotCap = int(u_LuceatSun2.w + 0.5);
 			    int taken = 0;
@@ -396,14 +429,33 @@ public final class TerrainShaderPatch {
 			            if (level <= 0.0) {
 			                continue;
 			            }
-			            vec3 tint = u_LuceatColor[int(id) - 1].rgb;
-			            sumPower += level / (4.0 - 3.0 * level) * max(tint.r, max(tint.g, tint.b));
+			            vec4 colour = u_LuceatColor[int(id) - 1];
+			            float weight = level / (4.0 - 3.0 * level) * max(colour.r, max(colour.g, colour.b));
+			            sumPower += weight;
+			#ifdef LUCEAT_RAYS
+			            if ((int(colour.w + 0.5) & 2) == 0) {
+			                luceatPush(topA, topB, weight);
+			            }
+			#endif
 			        }
 			    }
 			    if (!reached) {
 			        return vec3(0.0);
 			    }
 			    sumPower = max(sumPower, 1.0e-4);
+			#ifdef LUCEAT_RAYS
+			    int fullRank = int(ceil(budget - 0.01));
+			    float fullCut = 0.0;
+			    float cheapCut = 0.0;
+			    if (fullRank >= 1 && fullRank <= 8) {
+			        fullCut = luceatKth(topA, topB, fullRank) / sumPower;
+			        cheapCut = luceatKth(topA, topB, min(8, fullRank + max(2, fullRank / 2))) / sumPower;
+			    }
+			    float fullEdge = max(full, fullCut);
+			    float cheapEdge = max(cheap, cheapCut);
+			    float fullLow = fullCut > full ? 0.9 * fullCut : 0.6 * full;
+			    float cheapLow = cheapCut > cheap ? 0.9 * cheapCut : 0.6 * cheap;
+			#endif
 			    vec3 total = vec3(0.0);
 			    vec3 shiny = vec3(0.0);
 			    float placedCover = 0.0;
@@ -457,8 +509,8 @@ public final class TerrainShaderPatch {
 			            float share = curved * max(tint.r, max(tint.g, tint.b)) / sumPower;
 #ifdef LUCEAT_RAYS
 			            bool shadowOn = shadowFade > 0.01 && budget > 0.5 && !noShadow;
-			            float wFull = shadowOn ? smoothstep(0.6 * full, full, share) : 0.0;
-			            float wCheap = shadowOn ? smoothstep(0.6 * cheap, cheap, share) : 0.0;
+			            float wFull = shadowOn ? smoothstep(fullLow, fullEdge, share) : 0.0;
+			            float wCheap = shadowOn ? smoothstep(cheapLow, cheapEdge, share) : 0.0;
 #endif
 			            if (level > 0.0 && facing > 0.0) {
 			                float lambert = mix(1.0, 0.4 + 0.6 * clamp(ndotl, 0.0, 1.0), u_LuceatOptions.y);
@@ -531,6 +583,8 @@ public final class TerrainShaderPatch {
 			.replace("@RES@", Integer.toString(ShapeMasks.RES))
 			.replace("@PER_ROW@", Integer.toString(ShapeMasks.PER_ROW))
 			.replace("@TILE_W@", Integer.toString(ShapeMasks.TILE_WIDTH))
+			.replace("@TILE_H@", Integer.toString(ShapeMasks.TILE_HEIGHT))
+			.replace("@HALF_RES@", ShapeMasks.RES / 2 + ".0")
 			.replace("@STEPS@", Integer.toString(ShapeMasks.RES * 3));
 
 	private static boolean vertexPatched;

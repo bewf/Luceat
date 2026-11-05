@@ -56,7 +56,7 @@ public final class Occluders {
 		if (!config.plantShadows && state.getCollisionShape(level, pos).isEmpty()) {
 			return 0;
 		}
-		return ShapeMasks.idFor(state, level, pos);
+		return ShapeMasks.idFor(state, level, pos, state.getCollisionShape(level, pos).isEmpty());
 	}
 
 	private static int cube(BlockState state) {
