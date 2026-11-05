@@ -1174,9 +1174,10 @@ public final class LuceatScreen extends Screen {
 		}
 		int x1 = x0 + w;
 		int y1 = y0 + h;
+		int mid = (y0 + y1) / 2;
 		s.frost(x0, y0, x1, y1, 3, 10, 22);
 		Paint.vertical(s, x0, y0, x1, y1, 10, Paint.argb(Math.round(170 * a), 34, 24, 68), Paint.argb(Math.round(190 * a), 16, 11, 34));
-		Paint.outline(s, x0, y0, x1, y1, 10, (x, y) -> Paint.argb(Math.round((y < (y0 + y1) / 2 ? 90 : 40) * a), 205, 187, 255));
+		Paint.outline(s, x0, y0, x1, y1, 10, (x, y) -> Paint.argb(Math.round((y < mid ? 90 : 40) * a), 205, 187, 255));
 		int ty = y0 + 9;
 		for (String line : lines) {
 			s.text(BODY, line, x0 + 14, ty, Paint.alpha(Glass.TEXT, a));
