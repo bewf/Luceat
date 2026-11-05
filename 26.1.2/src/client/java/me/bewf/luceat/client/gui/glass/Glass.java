@@ -18,6 +18,9 @@ public final class Glass {
 	public static final int GOOD = 0xFF6FE3A0;
 	public static final int BAD = 0xFFFF7A8A;
 
+	public static final int GRAIN_LIGHT = 16;
+	public static final int GRAIN_DARK = 10;
+
 	public static boolean frosted;
 
 	private Glass() {
@@ -33,6 +36,7 @@ public final class Glass {
 		Paint.vertical(s, x0, y0, x1, y1, r, argb(frosted ? 150 : 224, 25, 18, 50), argb(frosted ? 176 : 240, 9, 6, 19));
 		int w = x1 - x0;
 		int h = y1 - y0;
+		s.grain(x0 + 1, y0 + 1, x1 - 1, y1 - 1, r - 1, frosted ? GRAIN_LIGHT : GRAIN_LIGHT / 2, frosted ? GRAIN_DARK : GRAIN_DARK / 2);
 		Paint.horizontal(s, x0 + r, y0 + 1, x0 + w / 2, y0 + 2, argb(0, 255, 255, 255), argb(46, 255, 255, 255), 6);
 		Paint.horizontal(s, x0 + w / 2, y0 + 1, x1 - r, y0 + 2, argb(46, 255, 255, 255), argb(0, 255, 255, 255), 6);
 		Paint.outline(s, x0 + 2, y0 + 2, x1 - 2, y1 - 2, r - 2, (x, y) -> {
@@ -76,7 +80,7 @@ public final class Glass {
 	}
 
 	public static void button(Surface s, int x0, int y0, int x1, int y1, boolean primary, float hover, float press) {
-		int r = Math.min(9, (y1 - y0) / 2);
+		int r = Math.min(8, (y1 - y0) / 2);
 		if (primary) {
 			Paint.vertical(s, x0, y0 + Math.round(press), x1, y1, r, mix(argb(255, 126, 100, 255), argb(255, 150, 122, 255), hover), mix(argb(255, 88, 66, 210), argb(255, 104, 80, 226), hover));
 			Paint.outline(s, x0, y0 + Math.round(press), x1, y1, r, (x, y) -> y < (y0 + y1) / 2 ? argb(150, 235, 225, 255) : argb(60, 235, 225, 255));
@@ -110,15 +114,26 @@ public final class Glass {
 	}
 
 	public static void chip(Surface s, int x0, int y0, int x1, int y1, float hover) {
-		int r = (y1 - y0) / 2;
-		Paint.round(s, x0, y0, x1, y1, r, argb(Math.round(130 + 40 * hover), 14, 10, 28));
-		Paint.outline(s, x0, y0, x1, y1, r, argb(Math.round(46 + 50 * hover), 205, 187, 255));
+		pane(s, x0, y0, x1, y1, Math.min(8, (y1 - y0) / 2), hover, 0.0F);
 	}
 
 	public static void tool(Surface s, int x0, int y0, int x1, int y1, float hover) {
-		int r = Math.min(9, (y1 - y0) / 2);
-		Paint.vertical(s, x0, y0, x1, y1, r, argb(Math.round(22 + 22 * hover), 255, 255, 255), argb(Math.round(10 + 16 * hover), 255, 255, 255));
-		Paint.outline(s, x0, y0, x1, y1, r, (x, y) -> argb(Math.round((y < (y0 + y1) / 2 ? 58 : 26) + 40 * hover), 235, 228, 255));
+		pane(s, x0, y0, x1, y1, Math.min(8, (y1 - y0) / 2), hover, 0.0F);
+	}
+
+	public static void pane(Surface s, int x0, int y0, int x1, int y1, int r, float hover, float press) {
+		int w = x1 - x0;
+		int h = y1 - y0;
+		Paint.vertical(s, x0, y0, x1, y1, r, argb(Math.round(44 + 30 * hover), 226, 214, 255), argb(Math.round(14 + 20 * hover), 150, 120, 255));
+		Paint.horizontal(s, x0 + r, y0 + 1, x0 + w / 2, y0 + 2, argb(0, 255, 255, 255), argb(Math.round(90 + 40 * hover), 255, 255, 255), 4);
+		Paint.horizontal(s, x0 + w / 2, y0 + 1, x1 - r, y0 + 2, argb(Math.round(90 + 40 * hover), 255, 255, 255), argb(0, 255, 255, 255), 4);
+		Paint.horizontal(s, x0 + r, y1 - 2, x1 - r, y1 - 1, argb(0, 190, 160, 255), argb(Math.round(26 + 20 * hover), 190, 160, 255), 6);
+		Paint.outline(s, x0, y0, x1, y1, r, (x, y) -> {
+			float fx = (x - x0) / (float) w;
+			float fy = (y - y0) / (float) h;
+			float lit = 0.8F - 0.62F * (fx * 0.5F + fy * 0.5F);
+			return argb(Math.round(255 * Math.max(0.12F, Math.min(1.0F, lit + 0.25F * hover)) * 0.62F), 226, 214, 255);
+		});
 	}
 
 	public static void card(Surface s, int x0, int y0, int x1, int y1, int r) {
@@ -128,9 +143,19 @@ public final class Glass {
 	}
 
 	public static void field(Surface s, int x0, int y0, int x1, int y1, float focus) {
-		inset(s, x0, y0, x1, y1, 8);
+		int r = Math.min(8, (y1 - y0) / 2);
+		Paint.vertical(s, x0, y0, x1, y1, r, argb(150, 3, 2, 9), argb(96, 8, 5, 20));
+		Paint.horizontal(s, x0 + r, y0 + 1, x1 - r, y0 + 3, argb(40, 0, 0, 0), argb(40, 0, 0, 0), 8);
+		int w = x1 - x0;
+		int h = y1 - y0;
+		Paint.outline(s, x0, y0, x1, y1, r, (x, y) -> {
+			float fy = (y - y0) / (float) h;
+			float fx = (x - x0) / (float) w;
+			return argb(Math.round(fy < 0.5F ? 90 - 60 * fy : 18 + 62 * fy * (1.0F - 0.4F * fx)), fy < 0.5F ? 0 : 205, fy < 0.5F ? 0 : 187, fy < 0.5F ? 0 : 255);
+		});
 		if (focus > 0.01F) {
-			Paint.outline(s, x0, y0, x1, y1, 8, argb(Math.round(140 * focus), 160, 124, 255));
+			Paint.outline(s, x0 - 1, y0 - 1, x1 + 1, y1 + 1, r + 1, argb(Math.round(70 * focus), 160, 124, 255));
+			Paint.outline(s, x0, y0, x1, y1, r, argb(Math.round(170 * focus), 170, 136, 255));
 		}
 	}
 

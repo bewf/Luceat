@@ -644,9 +644,9 @@ public final class BlocksTab {
 	private int toggleRow(GuiGraphicsExtractor graphics, String label, boolean on, int y, Runnable flip) {
 		ink(graphics, label, edX0, y + 5, LuceatLook.TEXT, false);
 		int tx = edX1 - 30;
-		LuceatLook.round(graphics, tx, y + 2, tx + 30, y + 16, on ? LuceatLook.ACCENT : LuceatLook.TRACK);
+		LuceatLook.capsule(graphics, tx, y + 2, tx + 30, y + 16, on ? LuceatLook.ACCENT : LuceatLook.TRACK);
 		int knob = on ? tx + 17 : tx + 3;
-		LuceatLook.round(graphics, knob, y + 4, knob + 10, y + 14, 0xFFFFFFFF);
+		LuceatLook.capsule(graphics, knob, y + 4, knob + 10, y + 14, 0xFFFFFFFF);
 		hit(edX0, y, edX1, y + 18, flip);
 		return y + 22;
 	}
@@ -869,7 +869,7 @@ public final class BlocksTab {
 		graphics.fill(x0, y, x1, y + 2, LuceatLook.TRACK);
 		int filled = Math.round((x1 - x0) * Math.max(0.0F, Math.min(1.0F, fraction)));
 		graphics.fill(x0, y, x0 + filled, y + 2, LuceatLook.ACCENT);
-		LuceatLook.round(graphics, x0 + filled - 4, y - 4, x0 + filled + 4, y + 6, active ? 0xFFFFFFFF : 0xFFE6C9FF);
+		LuceatLook.capsule(graphics, x0 + filled - 4, y - 4, x0 + filled + 4, y + 6, active ? 0xFFFFFFFF : 0xFFE6C9FF);
 	}
 
 	private void button(GuiGraphicsExtractor graphics, int x0, int y0, int x1, int y1, String label, int mx, int my, boolean enabled) {

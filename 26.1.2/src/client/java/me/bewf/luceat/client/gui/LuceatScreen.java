@@ -10,6 +10,7 @@ import java.util.Objects;
 import me.bewf.luceat.client.compat.RenderBackend;
 import me.bewf.luceat.client.config.LuceatConfig;
 import me.bewf.luceat.client.config.Presets;
+import me.bewf.luceat.client.gui.glass.Bar;
 import me.bewf.luceat.client.gui.glass.Glass;
 import me.bewf.luceat.client.gui.glass.Icons;
 import me.bewf.luceat.client.gui.glass.Motion;
@@ -93,6 +94,12 @@ public final class LuceatScreen extends Screen {
 		public int width(Role role, String text) {
 			return Texts.width(role, text);
 		}
+	}
+
+	private static final Surface MEASURE = new Measure();
+
+	private static boolean inside(double mx, double my, int[] box) {
+		return LuceatLook.inside(mx, my, box[0], box[1], box[2], box[3]);
 	}
 
 	private record Tip(String text, int x0, int y0, int x1, int y1) {
@@ -260,6 +267,7 @@ public final class LuceatScreen extends Screen {
 			panel.close();
 		}
 		Icons.release();
+		me.bewf.luceat.client.gui.glass.Rounded.release();
 		GuiFit.release();
 		chrome.release();
 		content.release();
@@ -425,7 +433,8 @@ public final class LuceatScreen extends Screen {
 			drawAboutLogo(graphics);
 		}
 		drawLogo(graphics);
-		search.drawGlass(graphics, this.font, searchX0() + 14, ctl() + 1, searchX1() - 6, ctl() + 23, "Search settings");
+		Bar.Rects field = bar();
+		search.drawGlass(graphics, this.font, field.search()[0] + 22, field.cy() - 12, field.search()[2] - 6, field.cy() + 13, "Search settings");
 		if (BLOCKS.equals(section) && !searching()) {
 			blocks.setFactor(fit.factor());
 			blocks.drawList(graphics, panelX0, bodyTop, panelX1Wide(), bodyBottom, mouseX, mouseY);
@@ -452,11 +461,7 @@ public final class LuceatScreen extends Screen {
 	}
 
 	private void drawLogo(GuiGraphicsExtractor graphics) {
-		graphics.blit(RenderPipelines.GUI_TEXTURED, LOGO, slabX0 + 10, slabY0 + 4, 0.0F, 12.0F, 64, 50, 256, 200, 256, 256);
-	}
-
-	private int ctl() {
-		return slabY0 + (HEADER_HEIGHT - 24) / 2;
+		graphics.blit(RenderPipelines.GUI_TEXTURED, LOGO, slabX0 + 10, slabY0 + 3, 0.0F, 12.0F, 64, 50, 256, 200, 256, 256);
 	}
 
 	private void buildChrome(Surface s, boolean panelNow) {
@@ -469,23 +474,16 @@ public final class LuceatScreen extends Screen {
 		}
 	}
 
-	private int undoWidth() {
-		return tiny ? 24 : 54;
-	}
-
-	private int presetWidth() {
-		return tiny ? 24 : compact ? 84 : 112;
-	}
-
-	private int searchX1() {
-		return slabX1 - 16 - 24 - 8 - undoWidth() - 8 - presetWidth() - 8;
+	private Bar.Rects bar() {
+		return Bar.layout(MEASURE, new Bar.View(slabX0, slabY0, slabX1, compact, tiny, version(), presetLabel(), true, 1.0F, false, 0.0F, 0.0F, 0.0F, 0.0F, 0.0F));
 	}
 
 	private int searchX0() {
-		if (tiny) {
-			return Math.max(slabX0 + 104, searchX1() - 150);
-		}
-		return searchX1() - (compact ? 120 : 176);
+		return bar().search()[0];
+	}
+
+	private int searchX1() {
+		return bar().search()[2];
 	}
 
 	private int popupX0() {
@@ -497,7 +495,7 @@ public final class LuceatScreen extends Screen {
 	}
 
 	private int popupY0() {
-		return ctl() + 28;
+		return bar().search()[3] + 6;
 	}
 
 	private int popupRows() {
@@ -542,15 +540,16 @@ public final class LuceatScreen extends Screen {
 			boolean timeHover = panel.overTime(mouseX, mouseY);
 			panel.drawOverlay(s, perf.running() ? perf.note() : null, timeHover);
 			String label = fullView ? "Back" : "Full view";
-			int cw = s.width(BODY, label) + 34;
-			int cx1 = previewX1 - 12;
+			int cw = s.width(BODY, label) + 20;
+			int cx1 = previewX1 - 14;
 			int cx0 = cx1 - cw;
+			int rowCy = bodyTop + 19;
 			float over = hoverOf("pv:full");
-			Glass.chip(s, cx0, bodyTop + 10, cx1, bodyTop + 28, over);
-			Icons.draw(s, cx0 + 9, bodyTop + 14, Icons.EXPAND, Paint.mix(Glass.SOFT, Glass.TEXT, over));
-			s.text(BODY, label, cx0 + 24, bodyTop + 15, Paint.mix(Glass.SOFT, Glass.TEXT, over));
+			int tint = Paint.mix(Glass.SOFT, Glass.TEXT, over);
+			Icons.draw(s, cx0, rowCy - 6, 12, Icons.EXPAND, tint);
+			s.text(BODY, label, cx0 + 20, Bar.textTop(rowCy), tint);
 			hit(previewLeft(), bodyTop, previewX1, bodyBottom, "preview", null);
-			hit(cx0, bodyTop + 10, cx1, bodyTop + 28, "pv:full", null);
+			hit(cx0 - 6, rowCy - 12, cx1 + 6, rowCy + 12, "pv:full", null);
 		}
 		drawTip(s);
 		content.finish();
@@ -563,69 +562,16 @@ public final class LuceatScreen extends Screen {
 	}
 
 	private void drawHeader(Surface s) {
-		int textX = slabX0 + 84;
-		int x = textX;
-		int c0 = ctl();
-		String word = "LUCEAT";
-		for (int i = 0; i < word.length() && !tiny; i++) {
-			String c = word.substring(i, i + 1);
-			s.text(Surface.Role.WORDMARK, c, x, compact ? slabY0 + 15 : slabY0 + 9, Glass.TEXT);
-			x += s.width(Surface.Role.WORDMARK, c) + 4;
-		}
-		x += tiny ? 0 : 8;
-		if (!compact) {
-			s.text(SMALL, version(), x, slabY0 + 18, Glass.FAINT);
-			String tagline = "Dynamic Lighting Overhaul";
-			s.text(SMALL, tagline, textX, slabY0 + 37, Glass.FAINT);
-			x = Math.max(x + s.width(SMALL, version()), textX + s.width(SMALL, tagline)) + 18;
-		} else if (!tiny) {
-			x += 8;
-		}
 		boolean on = LuceatConfig.get().enabled;
-		int tx = x + 2;
-		float onAnim = anim("tg:master", on ? 1.0F : 0.0F, 0.05F);
-		float powerHover = hoverOf("hd:power");
-		Glass.toggle(s, tx, c0 + 4, onAnim, powerHover);
-		if (!tiny) {
-			s.text(BODY, on ? "On" : "Off", tx + 38, c0 + 8, on ? Glass.GOOD : Glass.MUTED);
-		}
-		hit(tx - 4, c0 - 2, tx + (tiny ? 36 : 38 + s.width(BODY, "Off") + 6), c0 + 26, "hd:power", null);
-
-		int closeX0 = slabX1 - 16 - 24;
-		float closeHover = hoverOf("hd:close");
-		Glass.tool(s, closeX0, c0, closeX0 + 24, c0 + 24, closeHover);
-		Icons.draw(s, closeX0 + 6, c0 + 6, 12, Icons.CLOSE, Paint.mix(Glass.SOFT, Glass.TEXT, closeHover));
-		hit(closeX0, c0, closeX0 + 24, c0 + 24, "hd:close", null);
-
-		int undoX1 = closeX0 - 8;
-		int undoX0 = undoX1 - undoWidth();
 		boolean canUndo = !undo.isEmpty();
-		float undoHover = canUndo ? hoverOf("hd:undo") : 0.0F;
-		Glass.tool(s, undoX0, c0, undoX1, c0 + 24, undoHover);
-		if (tiny) {
-			Icons.draw(s, undoX0 + 6, c0 + 6, 12, Icons.UNDO, canUndo ? Glass.TEXT : Glass.FAINT);
-		} else {
-			Glass.centred(s, BODY, "Undo", (undoX0 + undoX1) / 2, c0 + 8, canUndo ? Glass.TEXT : Glass.FAINT);
-		}
-		hit(undoX0, c0, undoX1, c0 + 24, "hd:undo", null);
-
-		int chipW = presetWidth();
-		int chipX1 = undoX0 - 8;
-		int chipX0 = chipX1 - chipW;
-		float chipHover = hoverOf("hd:preset");
-		Glass.tool(s, chipX0, c0, chipX1, c0 + 24, chipHover);
-		if (tiny) {
-			Icons.draw(s, chipX0 + 6, c0 + 6, 12, Icons.STAR, Paint.mix(Glass.SOFT, Glass.TEXT, chipHover));
-		} else {
-			s.text(BODY, Glass.fit(s, BODY, presetLabel(), chipW - 32), chipX0 + 10, c0 + 8, Glass.TEXT);
-			Icons.draw(s, chipX1 - 18, c0 + 6, 12, Icons.CHEVRON, Glass.MUTED);
-		}
-		hit(chipX0, c0, chipX1, c0 + 24, "hd:preset", null);
-
-		float focus = anim("focus:search", search.focused() ? 1.0F : 0.0F, 0.05F);
-		Glass.field(s, searchX0(), c0, searchX1(), c0 + 24, focus);
-		Icons.draw(s, searchX0() + 7, c0 + 6, 12, Icons.SEARCH, Paint.mix(Glass.MUTED, Glass.PALE, focus));
-		hit(searchX0(), c0, searchX1(), c0 + 24, "hd:search", null);
+		Bar.View view = new Bar.View(slabX0, slabY0, slabX1, compact, tiny, version(), presetLabel(), on, anim("tg:master", on ? 1.0F : 0.0F, 0.05F), canUndo, anim("focus:search", search.focused() ? 1.0F : 0.0F, 0.05F), hoverOf("hd:power"),
+			canUndo ? hoverOf("hd:undo") : 0.0F, hoverOf("hd:preset"), hoverOf("hd:close"));
+		Bar.Rects r = Bar.draw(s, view);
+		hit(r.power()[0], r.power()[1], r.power()[2], r.power()[3], "hd:power", null);
+		hit(r.close()[0], r.close()[1], r.close()[2], r.close()[3], "hd:close", null);
+		hit(r.undo()[0], r.undo()[1], r.undo()[2], r.undo()[3], "hd:undo", null);
+		hit(r.preset()[0], r.preset()[1], r.preset()[2], r.preset()[3], "hd:preset", null);
+		hit(r.search()[0], r.search()[1], r.search()[2], r.search()[3], "hd:search", null);
 	}
 
 	private List<String> sidebarNames() {
@@ -1663,7 +1609,8 @@ public final class LuceatScreen extends Screen {
 		if (search.focused() && clickDropdown(mx, my)) {
 			return true;
 		}
-		if (LuceatLook.inside(mx, my, searchX0(), ctl(), searchX1(), ctl() + 24)) {
+		Bar.Rects header = bar();
+		if (inside(mx, my, header.search())) {
 			search.mouseClicked(mx, my);
 			search.focus(true);
 			if (blocks != null) {
@@ -1672,18 +1619,15 @@ public final class LuceatScreen extends Screen {
 			return true;
 		}
 		search.focus(false);
-		int closeX0 = slabX1 - 16 - 24;
-		if (LuceatLook.inside(mx, my, closeX0, ctl(), closeX0 + 24, ctl() + 24)) {
+		if (inside(mx, my, header.close())) {
 			onClose();
 			return true;
 		}
-		int undoX1 = closeX0 - 8;
-		if (LuceatLook.inside(mx, my, undoX1 - undoWidth(), ctl(), undoX1, ctl() + 24)) {
+		if (inside(mx, my, header.undo())) {
 			undoLast();
 			return true;
 		}
-		int chipX1 = undoX1 - undoWidth() - 8;
-		if (LuceatLook.inside(mx, my, chipX1 - presetWidth(), ctl(), chipX1, ctl() + 24)) {
+		if (inside(mx, my, header.preset())) {
 			this.minecraft.setScreen(new PresetPicker(this));
 			return true;
 		}

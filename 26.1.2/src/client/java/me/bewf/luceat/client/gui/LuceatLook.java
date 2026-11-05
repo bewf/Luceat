@@ -26,14 +26,15 @@ public final class LuceatLook {
 	}
 
 	public static void round(GuiGraphicsExtractor graphics, int x0, int y0, int x1, int y1, int colour) {
-		graphics.fill(x0 + 2, y0, x1 - 2, y1, colour);
-		graphics.fill(x0, y0 + 2, x1, y1 - 2, colour);
-		graphics.fill(x0 + 1, y0 + 1, x1 - 1, y1 - 1, colour);
+		me.bewf.luceat.client.gui.glass.Rounded.draw(graphics, x0, y0, x1, y1, colour, 0);
 	}
 
 	public static void roundOutlined(GuiGraphicsExtractor graphics, int x0, int y0, int x1, int y1, int fill, int border) {
-		round(graphics, x0, y0, x1, y1, border);
-		round(graphics, x0 + 1, y0 + 1, x1 - 1, y1 - 1, fill);
+		me.bewf.luceat.client.gui.glass.Rounded.draw(graphics, x0, y0, x1, y1, fill, border);
+	}
+
+	public static void capsule(GuiGraphicsExtractor graphics, int x0, int y0, int x1, int y1, int colour) {
+		me.bewf.luceat.client.gui.glass.Rounded.draw(graphics, x0, y0, x1, y1, (y1 - y0) / 2, colour, 0);
 	}
 
 	public static int mix(int from, int to, float amount) {
@@ -52,9 +53,9 @@ public final class LuceatLook {
 	}
 
 	public static void drawSwitch(GuiGraphicsExtractor graphics, int x, int y, boolean on) {
-		round(graphics, x, y, x + 30, y + 14, on ? ACCENT : TRACK);
+		capsule(graphics, x, y, x + 30, y + 14, on ? ACCENT : TRACK);
 		int knob = on ? x + 17 : x + 3;
-		round(graphics, knob, y + 2, knob + 10, y + 12, 0xFFFFFFFF);
+		capsule(graphics, knob, y + 2, knob + 10, y + 12, 0xFFFFFFFF);
 	}
 
 	public static boolean inside(double x, double y, int x0, int y0, int x1, int y1) {

@@ -7,8 +7,10 @@ import java.util.Objects;
 import me.bewf.luceat.Luceat;
 import me.bewf.luceat.client.config.LuceatConfig;
 import me.bewf.luceat.client.gui.LuceatLook;
+import me.bewf.luceat.client.gui.glass.Bar;
 import me.bewf.luceat.client.gui.glass.Glass;
 import me.bewf.luceat.client.gui.glass.Icons;
+import me.bewf.luceat.client.gui.glass.Paint;
 import me.bewf.luceat.client.gui.glass.Surface;
 
 import com.mojang.blaze3d.platform.NativeImage;
@@ -20,6 +22,7 @@ import net.minecraft.client.renderer.texture.DynamicTexture;
 import net.minecraft.resources.Identifier;
 
 public final class PreviewPanel {
+	private static final int TIME_W = 170;
 	private static final float NIGHT = 0.04F;
 	private static final int MAX_PIXELS = 1_800_000;
 	private static final float[] TIER_SCALE = {0.28F, 0.5F, 1.0F};
@@ -172,56 +175,49 @@ public final class PreviewPanel {
 			return;
 		}
 		Scene scene = spec.scene();
-		int maxChip = imageW - 24;
-		String title = Glass.fit(s, Surface.Role.BODY, scene.title, maxChip - 42);
-		int tw = s.width(Surface.Role.BODY, title) + 40;
-		Glass.chip(s, imageX + 12, imageY + 10, imageX + 12 + tw, imageY + 28, 0.0F);
-		Icons.draw(s, imageX + 22, imageY + 14, Icons.CAMERA, Glass.PALE);
-		s.text(Surface.Role.BODY, title, imageX + 38, imageY + 15, Glass.TEXT);
-		int rowY = imageY + 34;
-		int captionTop = imageY + imageH - 12 - (imageW < 340 ? 28 : 0) - 34 - 6;
-		if (note != null && !note.isEmpty() && rowY + 18 <= captionTop) {
-			String text = Glass.fit(s, Surface.Role.BODY, note, maxChip - 42);
-			int nw = s.width(Surface.Role.BODY, text) + 40;
-			Glass.chip(s, imageX + 12, rowY, imageX + 12 + nw, rowY + 18, 0.0F);
-			Icons.draw(s, imageX + 22, rowY + 4, Icons.ALERT, Glass.WARN);
-			s.text(Surface.Role.BODY, text, imageX + 38, rowY + 5, Glass.WARN);
-		}
-		int bottom = imageY + imageH - 12;
+		int left = imageX + 14;
+		int right = imageX + imageW - 14;
+		Paint.vertical(s, imageX, imageY, imageX + imageW, imageY + 40, 12, Paint.argb(120, 6, 4, 14), Paint.argb(0, 6, 4, 14));
+		Paint.vertical(s, imageX, imageY + imageH - 52, imageX + imageW, imageY + imageH, 12, Paint.argb(0, 6, 4, 14), Paint.argb(130, 6, 4, 14));
+		int rowTop = imageY + 19;
+		int fullReserve = 92;
+		String title = Glass.fit(s, Surface.Role.BODY, scene.title, imageW - 28 - 18 - fullReserve);
+		Icons.draw(s, left, rowTop - 6, 12, Icons.CAMERA, Glass.PALE);
+		s.text(Surface.Role.BODY, title, left + 18, Bar.textTop(rowTop), Glass.TEXT);
+		int noteRow = rowTop + 20;
 		boolean stacked = imageW < 340;
-		int timeW = stacked ? imageW - 24 : 150;
-		int timeX1 = stacked ? imageX + 12 + timeW : imageX + imageW - 12;
-		int timeX0 = timeX1 - timeW;
-		int timeY1 = bottom;
-		int timeY0 = timeY1 - 22;
-		boolean drag = draggingTime;
-		Glass.chip(s, timeX0, timeY0, timeX1, timeY1, hoverTime || drag ? 1.0F : 0.0F);
-		String clock = time < 0.34F ? "Night" : time < 0.67F ? "Evening" : "Day";
-		int clockW = s.width(Surface.Role.BODY, clock);
-		Icons.draw(s, timeX0 + 10, timeY0 + 6, Icons.CLOCK, Glass.SOFT);
-		trackX0 = timeX0 + 28;
-		trackX1 = timeX1 - 10 - clockW - 8;
-		trackY = timeY0 + 11;
-		s.text(Surface.Role.BODY, clock, timeX1 - 10 - clockW, timeY0 + 7, Glass.TEXT);
-		if (trackX1 > trackX0 + 20) {
-			Glass.slider(s, trackX0, trackY, trackX1, time, hoverTime ? 1.0F : 0.0F, drag ? 1.0F : 0.0F);
+		int bottomRow = imageY + imageH - 20;
+		int hintRow = stacked ? bottomRow - 24 : bottomRow;
+		if (note != null && !note.isEmpty() && noteRow + 8 < hintRow - 14) {
+			String text = Glass.fit(s, Surface.Role.BODY, note, imageW - 28 - 18);
+			Icons.draw(s, left, noteRow - 6, 12, Icons.ALERT, Glass.WARN);
+			s.text(Surface.Role.BODY, text, left + 18, Bar.textTop(noteRow), Glass.WARN);
 		}
-		int capBottom = stacked ? timeY0 - 6 : bottom;
-		int capRight = stacked ? imageX + imageW - 12 : timeX0 - 8;
-		String[] hints = {"Drag", "Scroll"};
+		String[] labels = {"Drag to look", "Scroll to zoom"};
 		Icons.Icon[] icons = {Icons.MOVE, Icons.ZOOM};
-		int hx = imageX + 12;
-		int hy1 = capBottom;
-		for (int i = 0; i < hints.length; i++) {
-			int hw = s.width(Surface.Role.SMALL, hints[i]) + 32;
-			if (hx + hw > capRight) {
+		int hx = left;
+		int hintLimit = stacked ? right : right - TIME_W - 16;
+		for (int i = 0; i < labels.length; i++) {
+			int hw = 14 + 6 + s.width(Surface.Role.BODY, labels[i]);
+			if (hx + hw > hintLimit) {
 				break;
 			}
-			Glass.chip(s, hx, hy1 - 20, hx + hw, hy1, 0.0F);
-			Icons.draw(s, hx + 9, hy1 - 15, 12, icons[i], Glass.SOFT);
-			s.text(Surface.Role.SMALL, hints[i], hx + 24, hy1 - 14, Glass.SOFT);
-			hx += hw + 6;
+			Icons.draw(s, hx, hintRow - 7, 14, icons[i], Glass.SOFT);
+			s.text(Surface.Role.BODY, labels[i], hx + 20, Bar.textTop(hintRow), Glass.SOFT);
+			hx += hw + 18;
 		}
+		int timeX1 = right;
+		int timeX0 = timeX1 - TIME_W;
+		int timeRow = bottomRow;
+		String clock = time < 0.34F ? "Night" : time < 0.67F ? "Evening" : "Day";
+		int labelW = Math.max(s.width(Surface.Role.BODY, "Night"), Math.max(s.width(Surface.Role.BODY, "Evening"), s.width(Surface.Role.BODY, "Day")));
+		Icons.draw(s, timeX0, timeRow - 7, 14, Icons.CLOCK, Glass.SOFT);
+		trackX0 = timeX0 + 14 + 10;
+		trackX1 = timeX1 - labelW - 12;
+		trackY = timeRow;
+		boolean drag = draggingTime;
+		Glass.slider(s, trackX0, trackY, trackX1, time, hoverTime ? 1.0F : 0.0F, drag ? 1.0F : 0.0F);
+		s.text(Surface.Role.BODY, clock, timeX1 - labelW, Bar.textTop(timeRow), Glass.TEXT);
 	}
 
 	public boolean overTime(double mx, double my) {
