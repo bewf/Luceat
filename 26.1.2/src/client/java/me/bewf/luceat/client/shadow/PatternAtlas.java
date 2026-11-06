@@ -81,23 +81,28 @@ public final class PatternAtlas {
 				return OPAQUE;
 			}
 			ensureTexture();
-			fill(image);
+			float[] mean = fill(image);
 			int index = next - FIRST;
 			upload(index % TILES_PER_ROW, index / TILES_PER_ROW);
+			Transmit.set(next, mean[0], mean[1], mean[2]);
 			return next++;
 		}
 	}
 
-	private static void fill(NativeImage image) {
+	private static float[] fill(NativeImage image) {
 		float[] data = compute(image, LuceatConfig.get());
+		float[] mean = new float[3];
 		TILE_DATA.clear();
 		for (int i = 0; i < TILE * TILE; i++) {
 			for (int c = 0; c < 3; c++) {
-				TILE_DATA.put((byte) Math.round(Math.clamp(data[i * 3 + c], 0.0F, 1.0F) * 255.0F));
+				float value = Math.clamp(data[i * 3 + c], 0.0F, 1.0F);
+				mean[c] += value / (TILE * TILE);
+				TILE_DATA.put((byte) Math.round(value * 255.0F));
 			}
 			TILE_DATA.put((byte) -1);
 		}
 		TILE_DATA.flip();
+		return mean;
 	}
 
 	public static float[] cpuTile(Identifier sprite, LuceatConfig config) {

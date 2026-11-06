@@ -3,22 +3,22 @@ package me.bewf.luceat.client.gui;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 
 public final class LuceatLook {
-	public static final int ACCENT = 0xFFA78BFF;
-	public static final int ACCENT_SOFT = 0x33A78BFF;
-	public static final int ACCENT_DIM = 0xFF5B46C8;
+	public static final int ACCENT = 0xFFC66BFF;
+	public static final int ACCENT_SOFT = 0x33BE3FFF;
+	public static final int ACCENT_DIM = 0xFF8A3DD0;
 	public static final int BACKDROP = 0xA0000000;
-	public static final int WINDOW = 0xFF140F24;
+	public static final int WINDOW = 0xF4281E52;
 	public static final int HEADER = 0xFF1A1330;
-	public static final int SIDEBAR = 0xFF120D20;
-	public static final int CARD = 0xFF1D1633;
-	public static final int CARD_HOVER = 0xFF271E44;
-	public static final int BORDER = 0xFF372C5C;
+	public static final int SIDEBAR = 0x4A05030C;
+	public static final int CARD = 0x20FFFFFF;
+	public static final int CARD_HOVER = 0x36FFFFFF;
+	public static final int BORDER = 0x44E4D6FF;
 	public static final int TEXT = 0xFFF1EEFA;
 	public static final int SOFT = 0xFFBDB6D6;
 	public static final int MUTED = 0xFF8A84A6;
 	public static final int GOOD = 0xFF5BE38A;
-	public static final int WARN = 0xFFFFC857;
-	public static final int ORANGE = 0xFFFF9A4D;
+	public static final int WARN = 0xFFF4EAD2;
+	public static final int ORANGE = 0xFFBE3FFF;
 	public static final int BAD = 0xFFFF6B6B;
 	public static final int TRACK = 0xFF2D2548;
 
@@ -35,6 +35,15 @@ public final class LuceatLook {
 
 	public static void capsule(GuiGraphicsExtractor graphics, int x0, int y0, int x1, int y1, int colour) {
 		me.bewf.luceat.client.gui.glass.Rounded.draw(graphics, x0, y0, x1, y1, (y1 - y0) / 2, colour, 0);
+	}
+
+	public static void swatch(GuiGraphicsExtractor graphics, int x0, int y0, int x1, int y1, int rgb, boolean hot) {
+		me.bewf.luceat.client.gui.glass.Rounded.draw(graphics, x0, y0, x1, y1, Math.min(4, (y1 - y0) / 2), 0xFF000000 | rgb, hot ? 0xE6FFFFFF : 0x70FFFFFF);
+	}
+
+	public static void tag(GuiGraphicsExtractor graphics, int x0, int y0, int x1, int y1, int colour) {
+		int rgb = colour & 0xFFFFFF;
+		me.bewf.luceat.client.gui.glass.Rounded.draw(graphics, x0, y0, x1, y1, (y1 - y0) / 2, 0x38000000 | rgb, 0x90000000 | rgb);
 	}
 
 	public static int mix(int from, int to, float amount) {

@@ -5,8 +5,8 @@ import me.bewf.luceat.client.gui.LuceatLook;
 public enum Cost {
 	NONE("None", LuceatLook.MUTED),
 	LOW("Low", LuceatLook.GOOD),
-	MEDIUM("Medium", LuceatLook.WARN),
-	HIGH("High", LuceatLook.ORANGE),
+	MEDIUM("Medium", 0xFFB28CFF),
+	HIGH("High", 0xFFBE3FFF),
 	VERY_HIGH("Very high", LuceatLook.BAD);
 
 	private final String label;

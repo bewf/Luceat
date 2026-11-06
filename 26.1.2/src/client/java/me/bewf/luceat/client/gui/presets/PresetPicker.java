@@ -8,7 +8,12 @@ import me.bewf.luceat.client.config.LuceatConfig;
 import me.bewf.luceat.client.config.Presets;
 import me.bewf.luceat.client.gui.LuceatFonts;
 import me.bewf.luceat.client.gui.LuceatLook;
+import me.bewf.luceat.client.gui.glass.Glass;
+import me.bewf.luceat.client.gui.glass.Icons;
+import me.bewf.luceat.client.gui.glass.LuceatBlur;
+import me.bewf.luceat.client.gui.glass.Rounded;
 
+import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.input.KeyEvent;
@@ -16,13 +21,19 @@ import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.Identifier;
 
-// the first thing a new player sees, pick how much lighting to pay for
+import org.lwjgl.glfw.GLFW;
+
 public final class PresetPicker extends Screen {
-	private static final int GOLD = 0xFFFFD35A;
-	private static final int FIRE = 0xFFFF5A3C;
+	private static final int CREAM = 0xFFF4EAD2;
+	private static final int MAGENTA = 0xFFBE3FFF;
 	private static final long HOLD_NANOS = 1_500_000_000L;
 	private static final float DRAG_NEEDED = 120.0F;
-	private static final long REVEAL_NANOS = 1_100_000_000L;
+	private static final long INTENT_NANOS = 80_000_000L;
+	private static final long LEAVE_NANOS = 150_000_000L;
+	private static final long RING_NANOS = 350_000_000L;
+	private static final float IMAGE_ASPECT = PresetFilmstrips.WIDTH / (float) PresetFilmstrips.HEIGHT;
+	private static final int RADIUS = 16;
+	private static final int GAP = 14;
 
 	private final Screen parent;
 	private final List<Presets.Preset> normal = new ArrayList<>();
@@ -32,12 +43,19 @@ public final class PresetPicker extends Screen {
 	private boolean holding;
 	private long holdStart;
 	private float dragged;
-	private float crush;
-	private long revealStart = -1L;
+	private long ringStart = -1L;
 	private boolean unlocked;
-	private final float[] hover = new float[4];
-	private float tint;
-	private int tintColour = 0xFF4FD1C5;
+	private final float[] weight = {1.0F / 3.0F, 1.0F / 3.0F, 1.0F / 3.0F, 0.0F};
+	private final float[] dim = new float[4];
+	private final float[] lift = new float[4];
+	private int focus = -1;
+	private int pending = -1;
+	private long pendingSince;
+	private long leftSince = -1L;
+	private double lastMouseX = -1.0;
+	private double lastMouseY = -1.0;
+	private boolean mouseLive;
+	private long lastNanos = System.nanoTime();
 	private Presets.Preset chosen;
 	private int chosenIndex;
 	private long chosenAt;
@@ -58,6 +76,11 @@ public final class PresetPicker extends Screen {
 	}
 
 	@Override
+	protected void init() {
+		LuceatBlur.activate(true);
+	}
+
+	@Override
 	public boolean isPauseScreen() {
 		return false;
 	}
@@ -69,25 +92,31 @@ public final class PresetPicker extends Screen {
 
 	@Override
 	public void removed() {
+		LuceatBlur.activate(false);
 		PresetFilmstrips.releaseTextures();
 	}
 
 	@Override
 	public void extractBackground(GuiGraphicsExtractor graphics, int mouseX, int mouseY, float partial) {
-		graphics.fill(0, 0, this.width, this.height, 0xE00B0B10);
-		graphics.fill(0, 0, this.width, this.height, alpha(tintColour, Math.round(tint * 28.0F)));
+		extractBlurredBackground(graphics);
+		boolean blurred = this.minecraft.options.getMenuBackgroundBlurriness() >= 1;
+		graphics.fill(0, 0, this.width, this.height, blurred ? 0x42080511 : 0xB8080511);
 	}
 
 	private static int alpha(int rgb, int a) {
 		return (Math.max(0, Math.min(255, a)) << 24) | (rgb & 0xFFFFFF);
 	}
 
+	private static float q(float value) {
+		return Math.round(Math.max(0.0F, Math.min(1.0F, value)) * 8.0F) / 8.0F;
+	}
+
 	private static int accent(Presets.Preset preset) {
 		return switch (preset.name().toUpperCase(Locale.ROOT)) {
-			case "POTATO" -> 0xFFC9975B;
-			case "BALANCED" -> 0xFF4FD1C5;
+			case "POTATO" -> 0xFFD9B27C;
+			case "BALANCED" -> 0xFF5ED6C9;
 			case "PHENOMENAL" -> 0xFFB68CFF;
-			default -> FIRE;
+			default -> MAGENTA;
 		};
 	}
 
@@ -97,74 +126,10 @@ public final class PresetPicker extends Screen {
 		return ((h ^ (h >>> 16)) & 0xFFFF) / 65535.0F;
 	}
 
-	private static void outline(GuiGraphicsExtractor graphics, int x0, int y0, int x1, int y1, int colour) {
-		graphics.fill(x0, y0, x1, y0 + 1, colour);
-		graphics.fill(x0, y1 - 1, x1, y1, colour);
-		graphics.fill(x0, y0, x0 + 1, y1, colour);
-		graphics.fill(x1 - 1, y0, x1, y1, colour);
-	}
-
-	private void particles(GuiGraphicsExtractor graphics, int index, int x0, int y0, int x1, int y1, int colour, long now) {
-		int w = x1 - x0;
-		int h = y1 - y0;
-		double t = now / 1.0E9;
-		for (int k = 0; k < 14; k++) {
-			float seed = hash(index, k);
-			float seed2 = hash(k, index + 7);
-			int px;
-			int py;
-			int a;
-			int size = 1;
-			switch (index) {
-				case 0 -> {
-					double phase = (t * 0.07 + seed) % 1.0;
-					px = x0 + Math.round(seed2 * (w - 2));
-					py = y1 - 2 - (int) (phase * (h - 2));
-					a = (int) (90 * Math.sin(phase * Math.PI));
-				}
-				case 1 -> {
-					double phase = (t * 0.11 + seed) % 1.0;
-					px = x0 + 1 + Math.round(seed2 * (w - 4) + (float) Math.sin(t * 1.3 + k) * 3.0F);
-					py = y1 - 2 - (int) (phase * (h - 2));
-					a = (int) (150 * Math.sin(phase * Math.PI));
-				}
-				case 2 -> {
-					double phase = (t * 0.45 + seed) % 1.0;
-					px = x0 + 2 + Math.round(seed2 * (w - 6));
-					py = y0 + 2 + Math.round(hash(k, 3 + index) * (h - 6));
-					a = (int) (255 * Math.pow(Math.sin(phase * Math.PI), 3.0));
-					size = a > 170 ? 2 : 1;
-				}
-				default -> {
-					double phase = (t * 0.34 + seed) % 1.0;
-					px = x0 + 1 + Math.round(seed2 * (w - 4) + (float) Math.sin(t * 5.0 + k * 2.0) * 2.0F);
-					py = y1 - 2 - (int) (phase * (h - 2));
-					a = (int) (230 * (1.0 - phase));
-				}
-			}
-			if (px < x0 || py < y0 || px + size > x1 || py + size > y1 || a < 8) {
-				continue;
-			}
-			int c = index == 3 && k % 3 == 0 ? 0xFFD35A : colour;
-			graphics.fill(px, py, px + size, py + size, alpha(c, a));
-			if (index == 2 && size == 2) {
-				graphics.fill(px - 1, py, px, py + 1, alpha(c, a / 2));
-				graphics.fill(px + 2, py, px + 3, py + 1, alpha(c, a / 2));
-				graphics.fill(px, py - 1, px + 1, py, alpha(c, a / 2));
-				graphics.fill(px, py + 2, px + 1, py + 3, alpha(c, a / 2));
-			}
-		}
-	}
-
-	private float reveal() {
-		if (!unlocked) {
-			return 0.0F;
-		}
-		if (revealStart < 0L) {
-			return 1.0F;
-		}
-		float t = Math.min(1.0F, (System.nanoTime() - revealStart) / (float) REVEAL_NANOS);
-		return t * t * (3.0F - 2.0F * t);
+	private static float ease(float t) {
+		float c = Math.max(0.0F, Math.min(1.0F, t));
+		float k = 1.0F - c;
+		return 1.0F - k * k * k;
 	}
 
 	private float holdProgress() {
@@ -175,67 +140,129 @@ public final class PresetPicker extends Screen {
 		return Math.max(0.0F, Math.min(1.0F, Math.min(byTime, dragged / DRAG_NEEDED)));
 	}
 
+	private int count() {
+		return unlocked && hardcore != null ? 4 : 3;
+	}
+
 	private int cardTop() {
-		return 78;
+		return Math.round(this.height * 0.15F);
 	}
 
-	private int cardHeight() {
-		return Math.min(this.height - cardTop() - 56, 300);
+	private int cardBottom() {
+		return Math.round(this.height * 0.88F);
 	}
 
-	private int[] slots(int count, float shift) {
-		int margin = 36;
-		int gap = 12;
-		int usable = this.width - margin * 2 - gap * (count - 1);
-		int w = Math.min(190, usable / count);
-		int total = w * count + gap * (count - 1);
-		int x = (this.width - total) / 2 + Math.round(shift);
-		int[] out = new int[count * 2];
-		for (int i = 0; i < count; i++) {
-			out[i * 2] = x + i * (w + gap);
-			out[i * 2 + 1] = w;
+	private float[] targetWeights(int cards, int focusIndex) {
+		float[] out = new float[4];
+		float share = focusIndex < 0 ? 1.0F / cards : cards == 3 ? 0.57F : 0.46F;
+		for (int i = 0; i < cards; i++) {
+			out[i] = focusIndex < 0 || i == focusIndex ? share : (1.0F - share) / (cards - 1);
 		}
 		return out;
 	}
 
-	// x and width of each card at this moment, the fourth  only exists once unlocked
-	private int[] layout() {
-		float r = reveal();
-		float p = holdProgress();
-		float shift = -p * 12.0F + (p > 0.0F ? (float) Math.sin(System.nanoTime() / 4.0E7) * p * 2.5F : 0.0F);
-		int[] four = slots(3, shift);
-		int[] five = slots(4, shift);
+	private int[] rects(float[] weights) {
+		float p = unlocked ? 0.0F : ease(holdProgress());
+		int margin = Math.round(this.width * 0.04F);
+		float last = Math.min(1.0F, weights[3] * 4.0F);
+		float usable = this.width - margin * 2 - GAP * (2.0F + last);
+		float sum = 0.0F;
+		for (float w : weights) {
+			sum += w;
+		}
 		int[] out = new int[8];
-		for (int i = 0; i < 3; i++) {
-			out[i * 2] = Math.round(four[i * 2] + (five[i * 2] - four[i * 2]) * r);
-			out[i * 2 + 1] = Math.round(four[i * 2 + 1] + (five[i * 2 + 1] - four[i * 2 + 1]) * r);
+		float x = margin - p * 28.0F;
+		for (int i = 0; i < 4; i++) {
+			float w = sum <= 0.0F ? 0.0F : weights[i] / sum * usable;
+			out[i * 2] = Math.round(x);
+			out[i * 2 + 1] = Math.round(x + w);
+			x += w + (i < 2 ? GAP : i == 2 ? GAP * last : 0.0F);
 		}
-		out[6] = five[6];
-		out[7] = Math.round(five[7] * r);
 		return out;
 	}
 
-	private static float ease(float t) {
-		float c = Math.max(0.0F, Math.min(1.0F, t));
-		float k = 1.0F - c;
-		return 1.0F - k * k * k;
+	private int[] layout() {
+		return rects(weight);
 	}
 
-	private static String[] split(String blurb) {
-		int cut = blurb.lastIndexOf(" - ");
-		return cut < 0 ? new String[]{blurb, ""} : new String[]{blurb.substring(0, cut), blurb.substring(cut + 3)};
+	private int cardAt(double mx, double my, int[] r, int cards) {
+		if (my < cardTop() || my > cardBottom()) {
+			return -1;
+		}
+		for (int i = 0; i < cards; i++) {
+			if (r[i * 2 + 1] - r[i * 2] > 8 && mx >= r[i * 2] && mx < r[i * 2 + 1]) {
+				return i;
+			}
+		}
+		return -1;
 	}
 
-	private static String title(String name) {
-		return name.substring(0, 1).toUpperCase(Locale.ROOT) + name.substring(1).toLowerCase(Locale.ROOT);
+	private Presets.Preset presetAt(int index) {
+		return index < 3 ? normal.get(Math.min(index, normal.size() - 1)) : hardcore;
 	}
 
-	private List<String> wrap(String text, int width) {
+	private void updateFocus(int mouseX, int mouseY, long now) {
+		if (mouseX != lastMouseX || mouseY != lastMouseY) {
+			if (lastMouseX >= 0.0) {
+				mouseLive = true;
+			}
+			lastMouseX = mouseX;
+			lastMouseY = mouseY;
+		}
+		if (chosen != null || !mouseLive) {
+			return;
+		}
+		int cards = count();
+		int[] target = rects(targetWeights(cards, focus));
+		int under = cardAt(mouseX, mouseY, target, cards);
+		if (under < 0) {
+			pending = -1;
+			if (focus >= 0) {
+				if (leftSince < 0L) {
+					leftSince = now;
+				} else if (now - leftSince >= LEAVE_NANOS) {
+					focus = -1;
+					leftSince = -1L;
+				}
+			}
+			return;
+		}
+		leftSince = -1L;
+		if (under == focus) {
+			pending = -1;
+		} else if (focus < 0) {
+			focus = under;
+			pending = -1;
+		} else if (pending != under) {
+			pending = under;
+			pendingSince = now;
+		} else if (now - pendingSince >= INTENT_NANOS) {
+			focus = under;
+			pending = -1;
+		}
+	}
+
+	private void animate(long now) {
+		float dt = Math.min(0.1F, (now - lastNanos) / 1.0E9F);
+		lastNanos = now;
+		float[] target = targetWeights(count(), focus);
+		boolean revealing = ringStart >= 0L && now - ringStart < 900_000_000L;
+		float half = revealing ? 0.1F : 0.07F;
+		float k = 1.0F - (float) Math.exp(-dt * 0.6931F / half);
+		for (int i = 0; i < 4; i++) {
+			weight[i] += (target[i] - weight[i]) * k;
+			float dimTarget = chosen != null ? (i == chosenIndex ? 0.0F : 1.0F) : focus >= 0 && focus != i ? 1.0F : 0.0F;
+			dim[i] += (dimTarget - dim[i]) * k;
+			lift[i] += ((focus == i ? 1.0F : 0.0F) - lift[i]) * k;
+		}
+	}
+
+	private static List<String> wrap(Font font, String text, int width) {
 		List<String> lines = new ArrayList<>();
 		StringBuilder line = new StringBuilder();
 		for (String word : text.split(" ")) {
 			String tryLine = line.isEmpty() ? word : line + " " + word;
-			if (LuceatFonts.width(this.font, LuceatFonts.quote(tryLine)) > width && !line.isEmpty()) {
+			if (LuceatFonts.width(font, LuceatFonts.quote(tryLine)) > width && !line.isEmpty()) {
 				lines.add(line.toString());
 				line = new StringBuilder(word);
 			} else {
@@ -248,25 +275,76 @@ public final class PresetPicker extends Screen {
 		return lines;
 	}
 
+	private static String[] split(String blurb) {
+		int cut = blurb.lastIndexOf(" - ");
+		return cut < 0 ? new String[] {blurb, ""} : new String[] {blurb.substring(0, cut), blurb.substring(cut + 3)};
+	}
+
+	private static String title(String name) {
+		return name.substring(0, 1).toUpperCase(Locale.ROOT) + name.substring(1).toLowerCase(Locale.ROOT);
+	}
+
+	private static int inset(int radius, int y, int top, int bottom) {
+		float dy;
+		if (y < top + radius) {
+			dy = top + radius - y - 0.5F;
+		} else if (y >= bottom - radius) {
+			dy = y - (bottom - radius) + 0.5F;
+		} else {
+			return 0;
+		}
+		if (dy >= radius) {
+			return radius;
+		}
+		return (int) Math.ceil(radius - Math.sqrt((double) radius * radius - (double) dy * dy));
+	}
+
+	private static void blitRounded(GuiGraphicsExtractor graphics, Identifier tex, int x0, int y0, int x1, int y1, int radius, float u0, float u1, float v0, float v1) {
+		float w = x1 - x0;
+		float h = y1 - y0;
+		int r = Math.min(radius, Math.min((x1 - x0) / 2, (y1 - y0) / 2));
+		for (int i = 0; i < r; i++) {
+			float dy = r - i - 0.5F;
+			int cut = Math.round(r - (float) Math.sqrt(Math.max(0.0F, r * r - dy * dy)));
+			if (x1 - cut <= x0 + cut) {
+				continue;
+			}
+			float ua = u0 + (u1 - u0) * cut / w;
+			float ub = u0 + (u1 - u0) * (w - cut) / w;
+			float va = v0 + (v1 - v0) * i / h;
+			float vb = v0 + (v1 - v0) * (i + 1) / h;
+			graphics.blit(tex, x0 + cut, y0 + i, x1 - cut, y0 + i + 1, ua, ub, va, vb);
+			float vc = v0 + (v1 - v0) * (h - i - 1) / h;
+			float vd = v0 + (v1 - v0) * (h - i) / h;
+			graphics.blit(tex, x0 + cut, y1 - i - 1, x1 - cut, y1 - i, ua, ub, vc, vd);
+		}
+		float vm0 = v0 + (v1 - v0) * r / h;
+		float vm1 = v0 + (v1 - v0) * (h - r) / h;
+		graphics.blit(tex, x0, y0 + r, x1, y1 - r, u0, u1, vm0, vm1);
+	}
+
+	private int pill(GuiGraphicsExtractor graphics, int x, int y, Component text, Icons.Icon icon, int fill, int border, int ink) {
+		int textW = LuceatFonts.width(this.font, text);
+		int w = 20 + (icon != null ? 14 : 0) + textW;
+		Rounded.draw(graphics, x, y, x + w, y + 18, 9, fill, border);
+		int tx = x + 10;
+		if (icon != null) {
+			Icons.sprite(graphics, tx, y + 3, 12, icon, ink);
+			tx += 14;
+		}
+		LuceatFonts.draw(graphics, this.font, text, tx, y + 5, ink, false);
+		return w;
+	}
+
 	@Override
 	public void extractRenderState(GuiGraphicsExtractor graphics, int mouseX, int mouseY, float partial) {
 		long now = System.nanoTime();
-		float targetTint = 0.0F;
-		int[] pre = layout();
-		int preCount = reveal() > 0.0F && hardcore != null ? 4 : 3;
-		for (int i = 0; i < preCount; i++) {
-			boolean over = chosen == null && LuceatLook.inside(mouseX, mouseY, pre[i * 2], cardTop(), pre[i * 2] + pre[i * 2 + 1], cardTop() + cardHeight());
-			hover[i] += ((over ? 1.0F : 0.0F) - hover[i]) * 0.22F;
-			if (over) {
-				targetTint = 1.0F;
-				tintColour = accent(i < 3 ? normal.get(Math.min(i, normal.size() - 1)) : hardcore);
-			}
-		}
-		tint += (targetTint - tint) * 0.12F;
+		updateFocus(mouseX, mouseY, now);
+		animate(now);
 		super.extractRenderState(graphics, mouseX, mouseY, partial);
 		PresetFilmstrips.step();
 		if (holding && holdProgress() >= 1.0F && hardcore != null && !unlocked) {
-			unlock();
+			unlock(now);
 		}
 		if (chosen != null && now - chosenAt > 380_000_000L) {
 			Presets.Preset preset = chosen;
@@ -277,158 +355,232 @@ public final class PresetPicker extends Screen {
 			onClose();
 			return;
 		}
-		Component heading = LuceatFonts.title("How much light do you want?");
 		float headIn = ease((now - openAt) / 500_000_000.0F);
 		float subIn = ease((now - openAt - 180_000_000L) / 500_000_000.0F);
-		int headAlpha = Math.round(255.0F * headIn);
-		int subAlpha = Math.round(255.0F * subIn);
-		if (headAlpha > 8) {
-			LuceatFonts.centred(graphics, this.font, heading, this.width / 2, 24 - Math.round((1.0F - headIn) * 8.0F), alpha(LuceatLook.TEXT, headAlpha), true);
+		int headY = Math.max(10, Math.round(this.height * 0.05F));
+		if (headIn > 0.03F) {
+			LuceatFonts.centred(graphics, this.font, LuceatFonts.title("How much light do you want?"), this.width / 2, headY - Math.round((1.0F - headIn) * 8.0F), alpha(LuceatLook.TEXT, Math.round(255.0F * headIn)), true);
 		}
-		if (subAlpha > 8) {
-			LuceatFonts.centred(graphics, this.font, LuceatFonts.body("You can change this any time in the settings"), this.width / 2, 42 - Math.round((1.0F - subIn) * 8.0F), alpha(LuceatLook.SOFT, subAlpha), true);
+		if (subIn > 0.03F) {
+			LuceatFonts.centred(graphics, this.font, LuceatFonts.body("You can change this any time in the settings"), this.width / 2, headY + 16 - Math.round((1.0F - subIn) * 8.0F), alpha(LuceatLook.SOFT, Math.round(255.0F * subIn)), true);
 		}
 
 		int[] layout = layout();
-		int count = reveal() > 0.0F && hardcore != null ? 4 : 3;
 		int top = cardTop();
-		int bottom = top + cardHeight();
+		int bottom = cardBottom();
+		int height = bottom - top;
+		int span = this.width - Math.round(this.width * 0.08F);
 		LuceatConfig live = LuceatConfig.get();
-		for (int i = 0; i < count; i++) {
-			Presets.Preset preset = i < 3 ? normal.get(Math.min(i, normal.size() - 1)) : hardcore;
+		for (int i = 0; i < 4; i++) {
 			int x0 = layout[i * 2];
-			int w = layout[i * 2 + 1];
-			if (w < 24) {
+			int x1 = layout[i * 2 + 1];
+			int w = x1 - x0;
+			if (w < 24 || i == 3 && hardcore == null) {
 				continue;
 			}
-			float h = hover[i];
-			boolean gold = preset.name().equalsIgnoreCase(recommended);
-			boolean hot = i == 3;
-			boolean current = preset.name().equalsIgnoreCase(live.preset) && live.presetChosen;
+			Presets.Preset preset = presetAt(i);
 			int colour = accent(preset);
-			int lift = -Math.round(h * 4.0F);
-			for (int g = 1; g <= 5; g++) {
-				graphics.fill(x0 - g, top + lift - g, x0 + w + g, bottom + lift + g, alpha(colour, Math.round(h * 26.0F / g)));
-			}
-			int border = LuceatLook.mix(hot ? FIRE : gold ? GOLD : current ? LuceatLook.ACCENT : LuceatLook.BORDER, colour, h);
-			LuceatLook.roundOutlined(graphics, x0, top + lift, x0 + w, bottom + lift, LuceatLook.mix(LuceatLook.CARD, LuceatLook.CARD_HOVER, h), border);
-			if (gold || hot) {
-				LuceatLook.round(graphics, x0 + 1, top + lift + 1, x0 + w - 1, top + lift + 3, border);
-			}
-			if (h > 0.02F || gold || hot) {
-				double sweep = (now / 1.8E9 + i * 0.23) % 1.0;
-				int sx = x0 + (int) (sweep * (w + 40)) - 20;
-				int from = Math.max(x0 + 5, sx - 14);
-				int to = Math.min(x0 + w - 5, sx + 14);
-				if (to > from) {
-					graphics.fill(from, top + lift, to, top + lift + 1, alpha(colour, Math.round(220.0F * Math.max(h, 0.55F))));
-				}
-			}
-			int pad = 8;
-			int imgW = w - pad * 2;
-			int imgH = imgW * 2 / 3;
-			int imgX = x0 + pad;
-			int imgY = top + lift + pad + 2;
+			boolean hot = i == 3;
+			boolean gold = preset.name().equalsIgnoreCase(recommended);
+			boolean current = preset.name().equalsIgnoreCase(live.preset) && live.presetChosen;
+			float h = q(lift[i]);
+			float inCard = ease((now - openAt - 120_000_000L - i * 110_000_000L) / 600_000_000.0F);
+			int rise = Math.round((1.0F - inCard) * 14.0F);
+			int y0 = top + rise;
+			int y1 = bottom + rise;
+			int r = Math.min(RADIUS, w / 2);
 			PresetFilmstrips.Strip strip = PresetFilmstrips.of(preset);
 			Identifier tex = strip.texture(now);
 			if (tex != null) {
-				graphics.blit(tex, imgX, imgY, imgX + imgW, imgY + imgH, 0.0F, 1.0F, 0.0F, 1.0F);
+				float aspect = w / (float) height;
+				float u0 = 0.0F;
+				float u1 = 1.0F;
+				float v0 = 0.0F;
+				float v1 = 1.0F;
+				if (aspect < IMAGE_ASPECT) {
+					float visible = aspect / IMAGE_ASPECT;
+					float centre = Math.max(visible / 2.0F, Math.min(1.0F - visible / 2.0F, 0.56F));
+					u0 = centre - visible / 2.0F;
+					u1 = centre + visible / 2.0F;
+				} else {
+					float visible = IMAGE_ASPECT / aspect;
+					v0 = (1.0F - visible) * 0.55F;
+					v1 = v0 + visible;
+				}
+				blitRounded(graphics, tex, x0, y0, x1, y1, r, u0, u1, v0, v1);
 			} else {
-				graphics.fill(imgX, imgY, imgX + imgW, imgY + imgH, 0xFF111116);
-				int dots = (int) (now / 400_000_000L % 4);
-				graphics.text(this.font, "Getting ready" + ".".repeat(dots), imgX + 8, imgY + imgH / 2 - 4, LuceatLook.MUTED, false);
+				Rounded.draw(graphics, x0, y0, x1, y1, r, 0xFF120A24, 0);
+				Rounded.draw(graphics, x0, y0, x1, y1, r, alpha(colour, 56), 0);
 			}
-			particles(graphics, i, imgX, imgY, imgX + imgW, imgY + imgH, colour, now);
-			outline(graphics, imgX - 1, imgY - 1, imgX + imgW + 1, imgY + imgH + 1, alpha(colour, 60 + Math.round(h * 120.0F)));
-			int y = imgY + imgH + 10;
-			long age = now - (i == 3 ? revealStart + 450_000_000L : openAt + 350_000_000L + i * 140_000_000L);
-			float inName = ease(age / 600_000_000.0F);
-			float inQuote = ease((age - 150_000_000L) / 750_000_000.0F);
-			float inAuthor = ease((age - 650_000_000L) / 700_000_000.0F);
+			float veil = q(1.0F - inCard);
+			if (veil > 0.0F) {
+				Rounded.draw(graphics, x0, y0, x1, y1, r, alpha(0x080511, Math.round(veil * 255.0F)), 0);
+			}
+			int scrimH = Math.round(height * 0.55F);
+			for (int ys = y1 - scrimH; ys < y1; ys += 3) {
+				float t = (ys - (y1 - scrimH)) / (float) scrimH;
+				int cut = inset(r, Math.min(ys + 2, y1 - 1), y0, y1);
+				graphics.fill(x0 + cut, ys, x1 - cut, Math.min(ys + 3, y1), alpha(0x06030E, Math.round(190.0F * t * t)));
+			}
+			float dimmed = q(dim[i]);
+			if (dimmed > 0.0F) {
+				Rounded.draw(graphics, x0, y0, x1, y1, r, alpha(0x06030E, Math.round(dimmed * 72.0F)), 0);
+			}
+			if (h > 0.0F || hot) {
+				embers(graphics, i, x0, y0, x1, y1, colour, hot ? 1.0F : h, now);
+			}
+			int rim;
+			if (hot) {
+				float swing = q((float) (0.5 + 0.5 * Math.sin(now / 1.2E9 + 1.0)));
+				rim = LuceatLook.mix(0xB0BE3FFF, 0xE0F4EAD2, swing);
+			} else if (current) {
+				rim = 0xCCC66BFF;
+			} else {
+				rim = LuceatLook.mix(0x58E4D6FF, alpha(colour, 210), h);
+			}
+			int rimAlpha = Math.min(255, Math.round((rim >>> 24) / 16.0F) * 16);
+			Rounded.draw(graphics, x0, y0, x1, y1, r, 0, (rimAlpha << 24) | (rim & 0xFFFFFF));
+
+			int pillX = x0 + 14;
+			int pillY = y0 + 14;
+			if (gold) {
+				pillX += pill(graphics, pillX, pillY, LuceatFonts.body("Recommended for you"), Icons.STAR, CREAM, 0, Glass.INK) + 6;
+			}
+			if (current) {
+				if (gold && w < 330) {
+					pillX = x0 + 14;
+					pillY += 24;
+				}
+				pill(graphics, pillX, pillY, LuceatFonts.body("Current"), Icons.CHECK, 0x88120A28, 0xCCC66BFF, LuceatLook.TEXT);
+			}
+			Component cost = LuceatFonts.body(preset.cost());
+			int costW = LuceatFonts.width(this.font, cost) + 20;
+			pill(graphics, x1 - 14 - costW, y0 + 14, cost, null, 0x88120A28, 0x70E4D6FF, LuceatLook.TEXT);
+
 			float out = chosen == null ? 0.0F : Math.min(1.0F, (now - chosenAt) / 300_000_000.0F);
-			out = out * out * out;
-			int nameAlpha = Math.round(255.0F * inName * (1.0F - out));
-			int nameLift = Math.round((1.0F - inName) * 6.0F);
-			int nameColour = hot ? FIRE : LuceatLook.mix(LuceatLook.TEXT, colour, h * 0.6F);
-			graphics.enableScissor(x0 + 2, top + lift, x0 + w - 2, bottom + lift);
-			if (nameAlpha > 8) {
-				LuceatFonts.draw(graphics, this.font, LuceatFonts.preset(preset.name(), title(preset.name())), x0 + pad, y + nameLift, alpha(nameColour, nameAlpha), true);
-				Component cost = LuceatFonts.body(preset.cost());
-				LuceatFonts.draw(graphics, this.font, cost, x0 + w - pad - LuceatFonts.width(this.font, cost), y + nameLift, alpha(LuceatLook.SOFT, nameAlpha), false);
-			}
-			y += 15;
-			String[] parts = split(preset.blurb());
-			int quoteAlpha = Math.round(255.0F * inQuote * (1.0F - out));
-			int quoteShift = -Math.round((1.0F - inQuote) * w * 0.7F + out * w);
-			int quoteColour = LuceatLook.mix(LuceatLook.SOFT, LuceatLook.TEXT, h * 0.55F);
-			for (String line : wrap("“" + parts[0] + "”", w - pad * 2)) {
-				if (y + 9 > bottom - 22) {
-					break;
-				}
-				if (quoteAlpha > 8) {
-					LuceatFonts.draw(graphics, this.font, LuceatFonts.quote(line), x0 + pad + quoteShift, y, alpha(quoteColour, quoteAlpha), false);
-				}
-				y += 12;
-			}
-			if (!parts[1].isEmpty() && y + 9 <= bottom - 22) {
-				int authorAlpha = Math.round(255.0F * inAuthor * (1.0F - out));
-				int authorShift = Math.round((1.0F - inAuthor) * w * 0.7F + out * w);
-				if (authorAlpha > 8) {
-					LuceatFonts.draw(graphics, this.font, LuceatFonts.quote(parts[1]), x0 + pad + 18 + authorShift, y + 2, alpha(LuceatLook.mix(LuceatLook.MUTED, colour, 0.5F), authorAlpha), false);
+			int textAlpha = Math.round(255.0F * inCard * (1.0F - out * out * out));
+			int nameY = y1 - 30;
+			graphics.enableScissor(x0 + 2, y0, x1 - 2, y1);
+			if (textAlpha > 8) {
+				Component name = LuceatFonts.preset(preset.name(), title(preset.name()));
+				LuceatFonts.draw(graphics, this.font, name, x0 + 18, nameY, alpha(LuceatLook.TEXT, textAlpha), true);
+				float quoteIn = ease((w / (float) span - 0.40F) / 0.08F);
+				if (quoteIn > 0.02F) {
+					String[] parts = split(preset.blurb());
+					List<String> lines = wrap(this.font, "“" + parts[0] + "”", w - 36);
+					int blockH = lines.size() * 12 + (parts[1].isEmpty() ? 0 : 14);
+					int qy = nameY - 10 - blockH;
+					int qa = Math.round(textAlpha * quoteIn);
+					for (String line : lines) {
+						LuceatFonts.draw(graphics, this.font, LuceatFonts.quote(line), x0 + 18, qy, alpha(LuceatLook.SOFT, qa), false);
+						qy += 12;
+					}
+					if (!parts[1].isEmpty()) {
+						LuceatFonts.draw(graphics, this.font, LuceatFonts.quote(parts[1]), x0 + 36, qy + 2, alpha(LuceatLook.mix(LuceatLook.MUTED, colour, 0.5F), qa), false);
+					}
 				}
 			}
 			graphics.disableScissor();
-			if (gold) {
-				Component tag = LuceatFonts.body("Recommended for you");
-				int tw = LuceatFonts.width(this.font, tag) + 12;
-				int tx = x0 + (w - tw) / 2;
-				LuceatLook.round(graphics, tx, bottom + lift - 20, tx + tw, bottom + lift - 6, GOLD);
-				LuceatFonts.draw(graphics, this.font, tag, tx + 6, bottom + lift - 17, 0xFF1A1405, false);
-			} else if (current) {
-				LuceatFonts.centred(graphics, this.font, LuceatFonts.body("Current"), x0 + w / 2, bottom + lift - 17, LuceatLook.ACCENT, false);
-			}
 			if (chosen != null && chosenIndex == i) {
-				float t = (now - chosenAt) / 380_000_000.0F;
-				for (int r = 0; r < 3; r++) {
-					int grow = Math.round(t * (30.0F + r * 14.0F));
-					outline(graphics, x0 - grow, top + lift - grow, x0 + w + grow, bottom + lift + grow, alpha(colour, Math.round((1.0F - t) * 200.0F / (r + 1))));
-				}
+				float t = Math.min(1.0F, (now - chosenAt) / 380_000_000.0F);
+				int grow = Math.round(t * 44.0F);
+				Rounded.draw(graphics, x0 - grow, y0 - grow, x1 + grow, y1 + grow, RADIUS, 0, alpha(colour, Math.round(q(1.0F - t) * 200.0F)));
 			}
 		}
-		drawCrack(graphics, now);
-		String gpu = HardwareHint.gpuName();
-		if (!gpu.isEmpty()) {
-			LuceatFonts.centred(graphics, this.font, LuceatFonts.body(gpu), this.width / 2, this.height - 30, LuceatLook.MUTED, false);
-		}
-		LuceatFonts.centred(graphics, this.font, LuceatFonts.body("Esc to skip"), this.width / 2, this.height - 16, LuceatLook.MUTED, false);
+		drawFissure(graphics, now);
+		drawFooter(graphics);
 	}
 
-	// a thin glowing split on the right edge that grows while you hold and pull
-	private void drawCrack(GuiGraphicsExtractor graphics, long now) {
-		if (unlocked || hardcore == null) {
+	private void embers(GuiGraphicsExtractor graphics, int index, int x0, int y0, int x1, int y1, int colour, float amount, long now) {
+		double t = now / 1.0E9;
+		int w = x1 - x0;
+		int h = y1 - y0;
+		for (int k = 0; k < 7; k++) {
+			float seed = hash(index, k);
+			float spread = hash(k, index + 9);
+			double phase = (t * (0.12 + 0.1 * seed) + seed) % 1.0;
+			int px = x0 + 14 + Math.round(spread * Math.max(1, w - 28));
+			int py = y1 - 20 - (int) (phase * h * 0.55);
+			float a = q((float) Math.sin(phase * Math.PI) * 0.8F * amount);
+			if (a <= 0.0F) {
+				continue;
+			}
+			Rounded.draw(graphics, px, py, px + 4, py + 4, 2, alpha(k % 2 == 0 ? colour : CREAM, Math.round(a * 230.0F)), 0);
+		}
+	}
+
+	private void drawFissure(GuiGraphicsExtractor graphics, long now) {
+		if (hardcore == null) {
 			return;
 		}
-		float p = holdProgress();
 		int mid = this.height / 2;
-		int half = 10 + Math.round(p * (this.height / 2 - 80));
-		int x = this.width - 4 - Math.round(p * 6.0F);
-		int colour = LuceatLook.mix(0x44FF5A3C, 0xFFFF5A3C, p);
-		graphics.fill(x, mid - half, x + 2, mid + half, colour);
-		if (p > 0.0F) {
-			int glow = LuceatLook.mix(0x00FF5A3C, 0x55FF5A3C, p);
-			graphics.fill(x - 6, mid - half, x, mid + half, glow);
+		if (unlocked) {
+			if (ringStart >= 0L && now - ringStart < RING_NANOS) {
+				float t = (now - ringStart) / (float) RING_NANOS;
+				int grow = Math.round(ease(t) * this.height * 0.3F);
+				int x = this.width - 6;
+				Rounded.draw(graphics, x - grow, mid - 60 - grow, x + 4, mid + 60 + grow, RADIUS, 0, alpha(MAGENTA, Math.round(q(1.0F - t) * 190.0F)));
+				if (now - ringStart < 60_000_000L) {
+					Rounded.draw(graphics, this.width - 36, mid - this.height / 3, this.width, mid + this.height / 3, 16, alpha(CREAM, 40), 0);
+				}
+			}
+			return;
 		}
+		float p = ease(holdProgress());
+		float pulse = holding ? 1.0F : 0.3F + 0.1F * (float) Math.sin(now / 1.0E9 * Math.PI * 2.0 * 0.4);
+		int half = 18 + Math.round(p * (this.height / 2 - 90));
+		int width = 2 + Math.round(p * 3.0F);
+		int x = this.width - 8 - Math.round(p * 6.0F);
+		float strength = Math.min(1.0F, holding ? 0.35F + 0.65F * p : pulse);
+		for (int g = 3; g >= 1; g--) {
+			int gw = width + g * 4;
+			Rounded.draw(graphics, x - gw / 2, mid - half - g * 2, x + width + gw / 2, mid + half + g * 2, gw / 2 + 1, alpha(MAGENTA, Math.round(q(strength * 0.22F * (4 - g)) * 255.0F)), 0);
+		}
+		Rounded.draw(graphics, x, mid - half, x + width, mid + half, Math.max(1, width / 2), alpha(MAGENTA, Math.round(q(strength) * 255.0F)), 0);
+		if (p > 0.45F) {
+			Rounded.draw(graphics, x + width / 2 - 1, mid - half + 4, x + width / 2 + 1, mid + half - 4, 1, alpha(CREAM, Math.round(q((p - 0.45F) / 0.55F) * 255.0F)), 0);
+		}
+	}
+
+	private void drawFooter(GuiGraphicsExtractor graphics) {
+		String gpu = HardwareHint.gpuName();
+		Component skip = LuceatFonts.body("Esc to skip");
+		Component name = LuceatFonts.body(gpu);
+		int skipW = LuceatFonts.width(this.font, skip);
+		int nameW = gpu.isEmpty() ? 0 : LuceatFonts.width(this.font, name) + 20;
+		int w = 24 + nameW + skipW;
+		int x0 = (this.width - w) / 2;
+		int y0 = this.height - 34;
+		Rounded.draw(graphics, x0, y0, x0 + w, y0 + 22, 11, 0x66120A28, 0x50E4D6FF);
+		int tx = x0 + 12;
+		if (!gpu.isEmpty()) {
+			LuceatFonts.draw(graphics, this.font, name, tx, y0 + 7, LuceatLook.SOFT, false);
+			tx += nameW - 10;
+			graphics.fill(tx, y0 + 5, tx + 1, y0 + 17, 0x44E4D6FF);
+			tx += 10;
+		}
+		LuceatFonts.draw(graphics, this.font, skip, tx, y0 + 7, LuceatLook.MUTED, false);
 	}
 
 	private boolean inCrackZone(double mx, double my) {
 		return !unlocked && hardcore != null && mx >= this.width - 28 && my >= 60 && my <= this.height - 60;
 	}
 
-	private void unlock() {
+	private void unlock(long now) {
 		holding = false;
 		unlocked = true;
-		revealStart = System.nanoTime();
+		ringStart = now;
+		focus = -1;
 		PresetFilmstrips.of(hardcore);
+	}
+
+	private void choose(int index) {
+		if (chosen != null || index < 0 || index >= count()) {
+			return;
+		}
+		chosen = presetAt(index);
+		chosenIndex = index;
+		chosenAt = System.nanoTime();
 	}
 
 	@Override
@@ -447,17 +599,10 @@ public final class PresetPicker extends Screen {
 			dragged = 0.0F;
 			return true;
 		}
-		int[] layout = layout();
-		int count = reveal() >= 1.0F && hardcore != null ? 4 : 3;
-		for (int i = 0; i < count; i++) {
-			int x0 = layout[i * 2];
-			int w = layout[i * 2 + 1];
-			if (LuceatLook.inside(mx, my, x0, cardTop(), x0 + w, cardTop() + cardHeight())) {
-				chosen = i < 3 ? normal.get(Math.min(i, normal.size() - 1)) : hardcore;
-				chosenIndex = i;
-				chosenAt = System.nanoTime();
-				return true;
-			}
+		int index = cardAt(mx, my, layout(), count());
+		if (index >= 0) {
+			choose(index);
+			return true;
 		}
 		return super.mouseClicked(event, doubleClick);
 	}
@@ -484,6 +629,29 @@ public final class PresetPicker extends Screen {
 
 	@Override
 	public boolean keyPressed(KeyEvent event) {
+		int key = event.key();
+		int cards = count();
+		if (key == GLFW.GLFW_KEY_LEFT || key == GLFW.GLFW_KEY_RIGHT) {
+			mouseLive = false;
+			int next = focus < 0 ? (key == GLFW.GLFW_KEY_LEFT ? cards - 1 : 0) : focus + (key == GLFW.GLFW_KEY_LEFT ? -1 : 1);
+			focus = Math.max(0, Math.min(cards - 1, next));
+			pending = -1;
+			return true;
+		}
+		if (key == GLFW.GLFW_KEY_ENTER || key == GLFW.GLFW_KEY_KP_ENTER) {
+			if (focus >= 0) {
+				choose(focus);
+			}
+			return true;
+		}
+		if (key >= GLFW.GLFW_KEY_1 && key <= GLFW.GLFW_KEY_4) {
+			choose(key - GLFW.GLFW_KEY_1);
+			return true;
+		}
+		if (key >= GLFW.GLFW_KEY_KP_1 && key <= GLFW.GLFW_KEY_KP_4) {
+			choose(key - GLFW.GLFW_KEY_KP_1);
+			return true;
+		}
 		return super.keyPressed(event);
 	}
 }

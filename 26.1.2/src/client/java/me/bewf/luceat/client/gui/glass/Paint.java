@@ -66,7 +66,16 @@ public final class Paint {
 		rows(s, x0, y0, x1, y1, r, y -> mix(top, bottom, (y - y0) / h), false);
 	}
 
+	public static void verticalCorners(Surface s, int x0, int y0, int x1, int y1, int rTop, int rBottom, int top, int bottom) {
+		float h = Math.max(1, y1 - y0);
+		rows(s, x0, y0, x1, y1, rTop, rBottom, y -> mix(top, bottom, (y - y0) / h), false);
+	}
+
 	public static void rows(Surface s, int lx0, int ly0, int lx1, int ly1, int lr, Rows colour, boolean flat) {
+		rows(s, lx0, ly0, lx1, ly1, lr, lr, colour, flat);
+	}
+
+	public static void rows(Surface s, int lx0, int ly0, int lx1, int ly1, int lrTop, int lrBottom, Rows colour, boolean flat) {
 		int k = s.scale();
 		int x0 = lx0 * k;
 		int y0 = ly0 * k;
@@ -75,14 +84,18 @@ public final class Paint {
 		if (x1 <= x0 || y1 <= y0) {
 			return;
 		}
-		int r = radius(lr * k, x0, y0, x1, y1);
-		float[] cov = r > 0 ? corner(r) : null;
-		for (int i = 0; i < r; i++) {
-			cornerRow(s, x0, x1, y0 + i, i, r, cov, colour.at((y0 + i + 0.5F) / k));
-			cornerRow(s, x0, x1, y1 - 1 - i, i, r, cov, colour.at((y1 - 1 - i + 0.5F) / k));
+		int rt = lrTop <= 0 ? 0 : radius(lrTop * k, x0, y0, x1, y1);
+		int rb = lrBottom <= 0 ? 0 : radius(lrBottom * k, x0, y0, x1, y1);
+		float[] covTop = rt > 0 ? corner(rt) : null;
+		float[] covBottom = rb > 0 ? corner(rb) : null;
+		for (int i = 0; i < rt; i++) {
+			cornerRow(s, x0, x1, y0 + i, i, rt, covTop, colour.at((y0 + i + 0.5F) / k));
 		}
-		int ys = y0 + r;
-		int end = y1 - r;
+		for (int i = 0; i < rb; i++) {
+			cornerRow(s, x0, x1, y1 - 1 - i, i, rb, covBottom, colour.at((y1 - 1 - i + 0.5F) / k));
+		}
+		int ys = y0 + rt;
+		int end = y1 - rb;
 		int band = flat ? Integer.MAX_VALUE : Math.max(1, (y1 - y0) / (k == 1 ? 90 : 360));
 		while (ys < end) {
 			int ye = flat ? end : (int) Math.min((long) end, (long) ys + band);
@@ -112,24 +125,37 @@ public final class Paint {
 
 	public static void outline(Surface s, int lx0, int ly0, int lx1, int ly1, int lr, Tint tint) {
 		int k = s.scale();
-		outlinePx(s, lx0 * k, ly0 * k, lx1 * k, ly1 * k, lr * k, k, tint);
+		outlinePx(s, lx0 * k, ly0 * k, lx1 * k, ly1 * k, lr * k, lr * k, k, tint);
 	}
 
-	private static void outlinePx(Surface s, int x0, int y0, int x1, int y1, int rr, int k, Tint tint) {
-		int r = radius(rr, x0, y0, x1, y1);
+	public static void outline(Surface s, int lx0, int ly0, int lx1, int ly1, int lrTop, int lrBottom, Tint tint) {
+		int k = s.scale();
+		outlinePx(s, lx0 * k, ly0 * k, lx1 * k, ly1 * k, lrTop * k, lrBottom * k, k, tint);
+	}
+
+	private static void outlinePx(Surface s, int x0, int y0, int x1, int y1, int rrTop, int rrBottom, int k, Tint tint) {
+		int rt = rrTop <= 0 ? 0 : radius(rrTop, x0, y0, x1, y1);
+		int rb = rrBottom <= 0 ? 0 : radius(rrBottom, x0, y0, x1, y1);
 		int chunk = 8 * k;
-		for (int x = x0 + r; x < x1 - r; x += chunk) {
-			int xe = Math.min(x + chunk, x1 - r);
-			float cx = (x + xe) * 0.5F / k;
-			s.fillPx(x, y0, xe, y0 + 1, tint.at(cx, y0 / (float) k));
-			s.fillPx(x, y1 - 1, xe, y1, tint.at(cx, (y1 - 1) / (float) k));
+		for (int x = x0 + rt; x < x1 - rt; x += chunk) {
+			int xe = Math.min(x + chunk, x1 - rt);
+			s.fillPx(x, y0, xe, y0 + 1, tint.at((x + xe) * 0.5F / k, y0 / (float) k));
 		}
-		for (int y = y0 + r; y < y1 - r; y += chunk) {
-			int ye = Math.min(y + chunk, y1 - r);
+		for (int x = x0 + rb; x < x1 - rb; x += chunk) {
+			int xe = Math.min(x + chunk, x1 - rb);
+			s.fillPx(x, y1 - 1, xe, y1, tint.at((x + xe) * 0.5F / k, (y1 - 1) / (float) k));
+		}
+		for (int y = y0 + Math.max(rt, 1); y < y1 - Math.max(rb, 1); y += chunk) {
+			int ye = Math.min(y + chunk, y1 - Math.max(rb, 1));
 			float cy = (y + ye) * 0.5F / k;
 			s.fillPx(x0, y, x0 + 1, ye, tint.at(x0 / (float) k, cy));
 			s.fillPx(x1 - 1, y, x1, ye, tint.at((x1 - 1) / (float) k, cy));
 		}
+		arcs(s, x0, y0, x1, y1, rt, true, k, tint);
+		arcs(s, x0, y0, x1, y1, rb, false, k, tint);
+	}
+
+	private static void arcs(Surface s, int x0, int y0, int x1, int y1, int r, boolean top, int k, Tint tint) {
 		for (int i = 0; i < r; i++) {
 			for (int x = 0; x < r; x++) {
 				float dx = r - (x + 0.5F);
@@ -139,10 +165,9 @@ public final class Paint {
 				float inner = Math.max(0.0F, Math.min(1.0F, r - 1 - dist + 0.5F));
 				float c = outer - inner;
 				if (c > 0.03F) {
-					plot(s, x0 + x, y0 + i, tint, c, k);
-					plot(s, x1 - 1 - x, y0 + i, tint, c, k);
-					plot(s, x0 + x, y1 - 1 - i, tint, c, k);
-					plot(s, x1 - 1 - x, y1 - 1 - i, tint, c, k);
+					int py = top ? y0 + i : y1 - 1 - i;
+					plot(s, x0 + x, py, tint, c, k);
+					plot(s, x1 - 1 - x, py, tint, c, k);
 				}
 			}
 		}
@@ -162,7 +187,27 @@ public final class Paint {
 		for (int i = 1; i <= steps; i++) {
 			float f = 1.0F - (float) i / (steps + 1);
 			int colour = alpha(argb, f * f / (k == 1 ? 1.0F : 1.0F));
-			outlinePx(s, lx0 * k - i, ly0 * k - i, lx1 * k + i, ly1 * k + i, lr * k + i, k, (x, y) -> colour);
+			outlinePx(s, lx0 * k - i, ly0 * k - i, lx1 * k + i, ly1 * k + i, lr * k + i, lr * k + i, k, (x, y) -> colour);
+		}
+	}
+
+	public static void bloom(Surface s, int lx0, int ly0, int lx1, int ly1, int lrTop, int lrBottom, int width, float power, Tint tint) {
+		int k = s.scale();
+		int steps = width * k;
+		for (int i = 0; i < steps; i++) {
+			float f = (float) Math.pow(1.0F - (float) i / steps, power);
+			int rt = Math.max(0, lrTop * k - i);
+			int rb = Math.max(0, lrBottom * k - i);
+			outlinePx(s, lx0 * k + i, ly0 * k + i, lx1 * k - i, ly1 * k - i, rt, rb, k, (x, y) -> alpha(tint.at(x, y), f));
+		}
+	}
+
+	public static void spread(Surface s, int lx0, int ly0, int lx1, int ly1, int lrTop, int lrBottom, int width, float power, Tint tint) {
+		int k = s.scale();
+		int steps = width * k;
+		for (int i = 1; i <= steps; i++) {
+			float f = (float) Math.pow(1.0F - (float) i / (steps + 1), power);
+			outlinePx(s, lx0 * k - i, ly0 * k - i, lx1 * k + i, ly1 * k + i, lrTop * k + i, lrBottom * k + i, k, (x, y) -> alpha(tint.at(x, y), f));
 		}
 	}
 

@@ -131,13 +131,15 @@ public final class Pane implements Surface {
 	public void drawTexts(GuiGraphicsExtractor graphics) {
 		net.minecraft.client.gui.Font font = Minecraft.getInstance().font;
 		for (Cmd cmd : texts) {
-			if (hide != null && cmd.x < hide[2] && cmd.x + cmd.width > hide[0] && cmd.y < hide[3] && cmd.y + 10 > hide[1]) {
+			int up = padTop(cmd.role);
+			int down = padBottom(cmd.role);
+			if (hide != null && cmd.x < hide[2] && cmd.x + cmd.width > hide[0] && cmd.y - up < hide[3] && cmd.y + down > hide[1]) {
 				continue;
 			}
-			int bx0 = cmd.clipped ? Math.max(cmd.cx0, cmd.x) : cmd.x;
-			int by0 = cmd.clipped ? Math.max(cmd.cy0, cmd.y) : cmd.y;
-			int bx1 = cmd.clipped ? Math.min(cmd.cx1, cmd.x + cmd.width) : cmd.x + cmd.width;
-			int by1 = cmd.clipped ? Math.min(cmd.cy1, cmd.y + 12) : cmd.y + 12;
+			int bx0 = cmd.clipped ? Math.max(cmd.cx0, cmd.x - 3) : cmd.x - 3;
+			int by0 = cmd.clipped ? Math.max(cmd.cy0, cmd.y - up) : cmd.y - up;
+			int bx1 = cmd.clipped ? Math.min(cmd.cx1, cmd.x + cmd.width + 5) : cmd.x + cmd.width + 5;
+			int by1 = cmd.clipped ? Math.min(cmd.cy1, cmd.y + down) : cmd.y + down;
 			List<int[]> pieces = new ArrayList<>();
 			pieces.add(new int[] {bx0, by0, bx1, by1});
 			for (Veil veil : veils) {
@@ -176,6 +178,24 @@ public final class Pane implements Surface {
 				graphics.disableScissor();
 			}
 		}
+	}
+
+	private static int padTop(Role role) {
+		return switch (role) {
+			case WORDMARK -> 14;
+			case HEADING -> 8;
+			case TITLE, QUOTE, POTATO, BALANCED, PHENOMENAL, HARDCORE -> 6;
+			default -> 4;
+		};
+	}
+
+	private static int padBottom(Role role) {
+		return switch (role) {
+			case WORDMARK -> 30;
+			case HEADING -> 20;
+			case TITLE, QUOTE, POTATO, BALANCED, PHENOMENAL, HARDCORE -> 16;
+			default -> 14;
+		};
 	}
 
 	public void release() {
@@ -396,7 +416,7 @@ public final class Pane implements Surface {
 	public void text(Role role, String text, int x, int y, int argb) {
 		Component component = Texts.of(role, text);
 		int width = Texts.width(role, text);
-		if (clipped && (x >= clipRect[2] || x + width <= clipRect[0] || y >= clipRect[3] || y + 10 <= clipRect[1])) {
+		if (clipped && (x >= clipRect[2] || x + width <= clipRect[0] || y - padTop(role) >= clipRect[3] || y + padBottom(role) <= clipRect[1])) {
 			return;
 		}
 		texts.add(new Cmd(role, component, x, y, argb, clipRect[0], clipRect[1], clipRect[2], clipRect[3], clipped, width, texts.size() + veils.size()));

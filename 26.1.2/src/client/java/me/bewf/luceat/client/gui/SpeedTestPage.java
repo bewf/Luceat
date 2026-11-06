@@ -289,8 +289,8 @@ public final class SpeedTestPage {
 		startBox = new int[] {x1 - startW, y0, x1, y0 + 26};
 		boolean startOver = inside(mouseX, mouseY, startBox);
 		Glass.button(s, startBox[0], startBox[1], startBox[2], startBox[3], !running, startOver ? 1.0F : 0.0F, 0.0F);
-		Icons.draw(s, startBox[0] + 13, startBox[1] + 8, running ? Icons.CLOSE : Icons.BOLT, 0xFFFFFFFF);
-		s.text(BODY, startLabel, startBox[0] + 30, startBox[1] + 9, running ? Glass.TEXT : 0xFFFFFFFF);
+		Icons.draw(s, startBox[0] + 13, startBox[1] + 8, running ? Icons.CLOSE : Icons.BOLT, running ? Glass.TEXT : Glass.INK);
+		s.text(BODY, startLabel, startBox[0] + 30, startBox[1] + 9, running ? Glass.TEXT : Glass.INK);
 
 		boolean canCopy = !running && !last.isEmpty();
 		String copyLabel = copied ? "Copied" : "Copy results";

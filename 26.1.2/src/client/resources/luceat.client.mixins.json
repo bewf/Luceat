@@ -9,6 +9,7 @@
     "DisplayNameMixin",
     "EntityRendererMixin",
     "ItemInHandRendererMixin",
+    "OptionsBlurMixin",
     "ParticleMixin",
     "PlayerTabOverlayMixin",
     "SkyHanniTabMixin",

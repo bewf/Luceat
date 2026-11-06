@@ -153,13 +153,13 @@ public final class ColourPicker {
 		}
 		px = x;
 		py = y;
-		LuceatLook.roundOutlined(graphics, x, y, x + WIDTH, y + HEIGHT, 0xFF1D1D24, LuceatLook.ACCENT_DIM);
-		graphics.text(font, "Pick a colour", x + 8, y + 7, LuceatLook.TEXT, false);
+		LuceatLook.roundOutlined(graphics, x, y, x + WIDTH, y + HEIGHT, LuceatLook.WINDOW, 0x99E4D6FF);
+		LuceatFonts.draw(graphics, font, LuceatFonts.body("Pick a colour"), x + 8, y + 7, LuceatLook.TEXT, false);
 		String done = "Done";
-		int dw = font.width(done) + 12;
+		int dw = LuceatFonts.width(font, LuceatFonts.body(done)) + 12;
 		boolean overDone = LuceatLook.inside(mx, my, x + WIDTH - dw - 6, y + 4, x + WIDTH - 6, y + 18);
-		LuceatLook.roundOutlined(graphics, x + WIDTH - dw - 6, y + 4, x + WIDTH - 6, y + 18, overDone ? LuceatLook.CARD_HOVER : LuceatLook.CARD, LuceatLook.ACCENT_DIM);
-		graphics.text(font, done, x + WIDTH - dw, y + 7, LuceatLook.TEXT, false);
+		LuceatLook.roundOutlined(graphics, x + WIDTH - dw - 6, y + 4, x + WIDTH - 6, y + 18, overDone ? LuceatLook.CARD_HOVER : LuceatLook.CARD, overDone ? 0xCCE4D6FF : LuceatLook.BORDER);
+		LuceatFonts.draw(graphics, font, LuceatFonts.body(done), x + WIDTH - dw, y + 7, LuceatLook.TEXT, false);
 
 		int sx = x + 8;
 		int sy = y + 24;
@@ -184,29 +184,26 @@ public final class ColourPicker {
 		graphics.fill(hx - 1, hy, hx + 15, hy + 1, 0xFF000000);
 
 		int wx = x + 166;
-		graphics.text(font, "Old", wx, sy, LuceatLook.MUTED, false);
-		graphics.fill(wx, sy + 11, wx + 40, sy + 33, 0xFF000000 | original);
-		graphics.text(font, "New", wx, sy + 38, LuceatLook.MUTED, false);
-		graphics.fill(wx, sy + 49, wx + 40, sy + 71, 0xFF000000 | current);
-		graphics.outline(wx, sy + 11, 40, 22, 0x55FFFFFF);
-		graphics.outline(wx, sy + 49, 40, 22, 0x55FFFFFF);
+		LuceatFonts.draw(graphics, font, LuceatFonts.body("Old"), wx, sy, LuceatLook.MUTED, false);
+		LuceatLook.swatch(graphics, wx, sy + 11, wx + 40, sy + 33, original, false);
+		LuceatFonts.draw(graphics, font, LuceatFonts.body("New"), wx, sy + 38, LuceatLook.MUTED, false);
+		LuceatLook.swatch(graphics, wx, sy + 49, wx + 40, sy + 71, current, false);
 
 		int fy = sy + SV_H + 8;
-		graphics.text(font, "Hex", x + 8, fy + 5, LuceatLook.SOFT, false);
+		LuceatFonts.draw(graphics, font, LuceatFonts.body("Hex"), x + 8, fy + 5, LuceatLook.SOFT, false);
 		hexInput.draw(graphics, font, x + 30, fy, x + 90, fy + 18, "#RRGGBB");
 		String[] names = {"R", "G", "B"};
 		for (int i = 0; i < 3; i++) {
 			int fx = x + 98 + i * 38;
-			graphics.text(font, names[i], fx, fy - 9, LuceatLook.MUTED, false);
+			LuceatFonts.draw(graphics, font, LuceatFonts.body(names[i]), fx, fy - 9, LuceatLook.MUTED, false);
 			channel[i].draw(graphics, font, fx, fy, fx + 34, fy + 18, "0");
 		}
 		int qy = fy + 26;
-		graphics.text(font, "Quick picks", x + 8, qy, LuceatLook.MUTED, false);
+		LuceatFonts.draw(graphics, font, LuceatFonts.body("Quick picks"), x + 8, qy, LuceatLook.MUTED, false);
 		for (int i = 0; i < QUICK.length; i++) {
 			int qx = x + 8 + i * 17;
-			graphics.fill(qx, qy + 11, qx + 15, qy + 26, 0xFF000000 | QUICK[i]);
 			boolean over = LuceatLook.inside(mx, my, qx, qy + 11, qx + 15, qy + 26);
-			graphics.outline(qx, qy + 11, 15, 15, over ? 0xFFFFFFFF : 0x44FFFFFF);
+			LuceatLook.swatch(graphics, qx, qy + 11, qx + 15, qy + 26, QUICK[i], over);
 		}
 	}
 

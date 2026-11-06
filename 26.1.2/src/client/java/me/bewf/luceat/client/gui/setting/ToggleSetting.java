@@ -27,7 +27,7 @@ public final class ToggleSetting extends Setting {
 		if (!reason.isEmpty()) {
 			return unavailable(reason);
 		}
-		String text = value() ? onText() : offText();
+		String text = onText();
 		return text != null ? text : help();
 	}
 

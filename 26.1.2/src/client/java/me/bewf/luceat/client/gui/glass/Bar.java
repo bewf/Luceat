@@ -3,7 +3,8 @@ package me.bewf.luceat.client.gui.glass;
 import static me.bewf.luceat.client.gui.glass.Paint.argb;
 
 public final class Bar {
-	public static final int HEIGHT = 58;
+	public static final int HEIGHT = 50;
+	private static final String TAGLINE = "Dynamic Lighting for Minecraft";
 
 	public record View(int x0, int y0, int x1, boolean compact, boolean tiny, String version, String preset, boolean on, float onAnim, boolean canUndo, float focus, float hoverPower, float hoverUndo, float hoverPreset, float hoverClose) {
 	}
@@ -46,18 +47,28 @@ public final class Bar {
 	}
 
 	private static int leftEnd(Surface s, View v) {
-		int textX = v.x0() + 84;
+		int textX = v.x0() + 72;
 		int x = textX;
 		if (!v.tiny()) {
 			for (int i = 0; i < 6; i++) {
-				x += s.width(Surface.Role.WORDMARK, "LUCEAT".substring(i, i + 1)) + 4;
+				x += s.width(Surface.Role.WORDMARK, "LUCEAT".substring(i, i + 1)) + 2;
 			}
 			x += 8;
 		}
 		if (!v.compact()) {
-			x = Math.max(x + s.width(Surface.Role.SMALL, v.version()), textX + s.width(Surface.Role.SMALL, "Dynamic Lighting Overhaul")) + 18;
+			x = Math.max(x + s.width(Surface.Role.SMALL, v.version()), textX + s.width(Surface.Role.SMALL, TAGLINE)) + 18;
 		} else if (!v.tiny()) {
 			x += 8;
+		}
+		return x;
+	}
+
+	public static int drawWordmark(Surface s, int x, int y, int colour) {
+		String word = "LUCEAT";
+		for (int i = 0; i < word.length(); i++) {
+			String c = word.substring(i, i + 1);
+			s.text(Surface.Role.WORDMARK, c, x, y, colour);
+			x += s.width(Surface.Role.WORDMARK, c) + 2;
 		}
 		return x;
 	}
@@ -65,20 +76,14 @@ public final class Bar {
 	public static Rects draw(Surface s, View v) {
 		Rects r = layout(s, v);
 		int cy = r.cy();
-		int textX = v.x0() + 84;
+		int textX = v.x0() + 72;
 		int x = textX;
 		if (!v.tiny()) {
-			String word = "LUCEAT";
-			for (int i = 0; i < word.length(); i++) {
-				String c = word.substring(i, i + 1);
-				s.text(Surface.Role.WORDMARK, c, x, v.compact() ? v.y0() + 15 : v.y0() + 9, Glass.TEXT);
-				x += s.width(Surface.Role.WORDMARK, c) + 4;
-			}
-			x += 8;
+			x = drawWordmark(s, x, v.compact() ? v.y0() + 14 : v.y0() + 7, Glass.TEXT) + 8;
 		}
 		if (!v.compact()) {
-			s.text(Surface.Role.SMALL, v.version(), x, v.y0() + 18, Glass.FAINT);
-			s.text(Surface.Role.SMALL, "Dynamic Lighting Overhaul", textX, v.y0() + 37, Glass.FAINT);
+			s.text(Surface.Role.SMALL, v.version(), x, v.y0() + 18, Glass.MUTED);
+			s.text(Surface.Role.SMALL, TAGLINE, textX, v.y0() + 30, Glass.MUTED);
 		}
 		int toggleX = r.power()[0] + 4;
 		Glass.toggle(s, toggleX, cy - 8, v.onAnim(), v.hoverPower());
@@ -91,6 +96,7 @@ public final class Bar {
 		Icons.draw(s, f[0] + 10, cy - 6, 12, Icons.SEARCH, Paint.mix(Glass.MUTED, Glass.PALE, v.focus()));
 
 		int[] p = r.preset();
+		Glass.pane(s, p[0], p[1], p[2], p[3], (p[3] - p[1]) / 2, v.hoverPreset(), 0.0F);
 		int pc = Paint.mix(Glass.SOFT, Glass.TEXT, v.hoverPreset());
 		if (v.tiny()) {
 			Icons.draw(s, p[0] + 8, cy - 7, 14, Icons.STAR, pc);
@@ -101,7 +107,8 @@ public final class Bar {
 		}
 
 		int[] u = r.undo();
-		int uc = v.canUndo() ? Paint.mix(Glass.SOFT, Glass.TEXT, v.hoverUndo()) : Glass.FAINT;
+		Glass.pane(s, u[0], u[1], u[2], u[3], (u[3] - u[1]) / 2, v.canUndo() ? v.hoverUndo() : 0.0F, 0.0F);
+		int uc = v.canUndo() ? Paint.mix(Glass.SOFT, Glass.TEXT, v.hoverUndo()) : Glass.MUTED;
 		if (v.tiny()) {
 			Icons.draw(s, u[0] + 8, cy - 7, 14, Icons.UNDO, uc);
 		} else {
@@ -114,6 +121,7 @@ public final class Bar {
 		Paint.vertical(s, dx, cy, dx + 1, cy + 11, 0, argb(46, 205, 187, 255), argb(0, 205, 187, 255));
 
 		int[] c = r.close();
+		Glass.pane(s, (c[0] + c[2]) / 2 - 14, cy - 14, (c[0] + c[2]) / 2 + 14, cy + 14, 14, v.hoverClose(), 0.0F);
 		Icons.draw(s, (c[0] + c[2]) / 2 - 8, cy - 8, 16, Icons.CLOSE, Paint.mix(Glass.SOFT, Glass.TEXT, v.hoverClose()));
 		return r;
 	}

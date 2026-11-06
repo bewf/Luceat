@@ -5,7 +5,7 @@ import net.minecraft.client.gui.GuiGraphicsExtractor;
 
 /**
  * Lays a Luceat screen out in its own units instead of Minecraft's GUI scale.
- * The unit size follows the window size, with a one step nudge when the player's GUI scale is far from it.
+ * The unit size follows the window size only, so the layout always has at least 760 by 430 units to work with.
  */
 public final class GuiFit {
 	private static int device = 0;
@@ -39,13 +39,7 @@ public final class GuiFit {
 		}
 		float fbWidth = screenWidth * (float) gui;
 		float fbHeight = screenHeight * (float) gui;
-		int natural = Math.max(1, Math.round(Math.min(fbWidth / 800.0F, fbHeight / 450.0F)));
-		int pick = natural;
-		if (gui - natural >= 2) {
-			pick++;
-		} else if (natural - gui >= 2) {
-			pick--;
-		}
+		int pick = (int) Math.floor(Math.min(fbWidth / 760.0F, fbHeight / 430.0F));
 		pixels = Math.max(1, Math.min(6, pick));
 		factor = pixels / (float) gui;
 		width = (int) Math.ceil(fbWidth / pixels);

@@ -112,6 +112,8 @@ public final class Icons {
 	public static final Icon USER = new Icon(LucideData.USER);
 	public static final Icon EXTERNAL = new Icon(LucideData.EXTERNAL);
 	public static final Icon MOVE = new Icon(LucideData.MOVE);
+	public static final Icon MOUSE_WHEEL = new Icon(LucideData.MOUSE_WHEEL);
+	public static final Icon MOUSE_DRAG = new Icon(LucideData.MOUSE_DRAG);
 	public static final Icon ZOOM = new Icon(LucideData.ZOOM);
 	public static final Icon CLOCK = new Icon(LucideData.CLOCK);
 	public static final Icon MOON = new Icon(LucideData.MOON);

@@ -121,6 +121,8 @@ public final class LightSpread {
 	private LightSpread() {
 	}
 
+	private static String renderer = "";
+
 	public static boolean supported() {
 		if (failed) {
 			return false;
@@ -129,13 +131,28 @@ public final class LightSpread {
 			try {
 				org.lwjgl.opengl.GLCapabilities caps = GL.getCapabilities();
 				boolean hardware = caps.OpenGL43 || (caps.GL_ARB_compute_shader && caps.GL_ARB_shader_image_load_store);
-				String vendor = String.valueOf(GL11.glGetString(GL11.GL_VENDOR)) + " " + GL11.glGetString(GL11.GL_RENDERER);
-				boolean intel = vendor.toLowerCase(java.util.Locale.ROOT).contains("intel") && !Boolean.getBoolean("luceat.forceSpread");
-				capable = hardware && !intel;
-				blocker = !hardware ? "needs OpenGL 4.3 or the compute extension" : intel ? "off on Intel graphics, the driver crashes" : "";
-				Luceat.LOGGER.info("Luceat light spreading: OpenGL 4.3 {}, compute {}, image load/store {}, Intel driver {}, so it is {}", caps.OpenGL43, caps.GL_ARB_compute_shader, caps.GL_ARB_shader_image_load_store, intel, capable ? "available" : "off");
+				renderer = String.valueOf(GL11.glGetString(GL11.GL_RENDERER)).trim();
+				String text = (GL11.glGetString(GL11.GL_VENDOR) + " " + renderer).toLowerCase(java.util.Locale.ROOT);
+				boolean forced = Boolean.getBoolean("luceat.forceSpread");
+				boolean limits = hardware && GL11.glGetInteger(GL43.GL_MAX_COMPUTE_WORK_GROUP_INVOCATIONS) >= 64 && GL11.glGetInteger(GL12.GL_MAX_3D_TEXTURE_SIZE) >= SIZE && GL11.glGetInteger(GL42.GL_MAX_IMAGE_UNITS) >= 2;
+				boolean software = text.contains("llvmpipe") || text.contains("softpipe") || text.contains("swrast") || text.contains("software") || text.contains("basic render") || text.contains("gdi generic");
+				boolean intel = text.contains("intel");
+				String reason = "";
+				if (!hardware) {
+					reason = "needs OpenGL 4.3 or the compute extension";
+				} else if (!limits) {
+					reason = "limits too low";
+				} else if (software) {
+					reason = "software renderer";
+				} else if (intel && !forced) {
+					reason = "driver crashes";
+				}
+				blocker = reason;
+				capable = reason.isEmpty();
+				Luceat.LOGGER.info("Luceat light spreading on {}: OpenGL 4.3 {}, compute {}, image load/store {}, limits {}, so it is {}", renderer, caps.OpenGL43, caps.GL_ARB_compute_shader, caps.GL_ARB_shader_image_load_store, limits, capable ? "available" : "off (" + reason + ")");
 			} catch (RuntimeException error) {
 				capable = false;
+				blocker = "limits too low";
 			}
 		}
 		return capable;
@@ -154,7 +171,12 @@ public final class LightSpread {
 		if (failed) {
 			return "Turned off after an error";
 		}
-		return reason.startsWith("off on Intel") ? "Not supported on Intel graphics" : "Needs OpenGL 4.3";
+		return switch (reason) {
+			case "driver crashes" -> "Not supported on this GPU";
+			case "software renderer" -> "Needs a real GPU";
+			case "limits too low" -> "GPU limits too low";
+			default -> "Needs OpenGL 4.3";
+		};
 	}
 
 	public static String blockerDetail() {
@@ -165,10 +187,13 @@ public final class LightSpread {
 		if (failed) {
 			return "A graphics error happened while spreading light, so Luceat turned it off for this session. Restart the game to try again.";
 		}
-		if (reason.startsWith("off on Intel")) {
-			return "Light around corners runs as a compute shader on OpenGL 4.3. Intel's graphics driver crashes on it, so Luceat keeps it off on Intel graphics.";
-		}
-		return "Light around corners runs as a compute shader, which needs OpenGL 4.3 or the compute shader extension. This graphics card or driver does not offer either.";
+		String card = renderer.isEmpty() ? "This graphics card" : renderer;
+		return switch (reason) {
+			case "driver crashes" -> "Light around corners runs as a compute shader. The graphics driver for " + card + " crashes on it, so Luceat keeps it off. Cards that lack OpenGL 4.3 compute support are turned off the same way.";
+			case "software renderer" -> "Light around corners runs as a compute shader and needs a real graphics card. " + card + " is a software renderer.";
+			case "limits too low" -> "Light around corners needs compute shader and 3D image limits that " + card + " does not offer.";
+			default -> "Light around corners runs as a compute shader, which needs OpenGL 4.3 or the compute shader extension. " + card + " does not offer either.";
+		};
 	}
 
 	public static long bytes() {

@@ -22,7 +22,7 @@ import net.minecraft.client.renderer.texture.DynamicTexture;
 import net.minecraft.resources.Identifier;
 
 public final class PreviewPanel {
-	private static final int TIME_W = 170;
+	private static final int TIME_W = 214;
 	private static final float NIGHT = 0.04F;
 	private static final int MAX_PIXELS = 1_800_000;
 	private static final float[] TIER_SCALE = {0.28F, 0.5F, 1.0F};
@@ -185,39 +185,46 @@ public final class PreviewPanel {
 		Icons.draw(s, left, rowTop - 6, 12, Icons.CAMERA, Glass.PALE);
 		s.text(Surface.Role.BODY, title, left + 18, Bar.textTop(rowTop), Glass.TEXT);
 		int noteRow = rowTop + 20;
-		boolean stacked = imageW < 340;
-		int bottomRow = imageY + imageH - 20;
-		int hintRow = stacked ? bottomRow - 24 : bottomRow;
-		if (note != null && !note.isEmpty() && noteRow + 8 < hintRow - 14) {
+		int bottomRow = imageY + imageH - 22;
+		int pillH = 28;
+		int dragW = s.width(Surface.Role.BODY, "Drag");
+		int scrollW = s.width(Surface.Role.BODY, "Scroll");
+		int hintW = 12 + 14 + 6 + dragW + 14 + 1 + 14 + 14 + 6 + scrollW + 12;
+		boolean stacked = imageW < hintW + TIME_W + 28 + 12;
+		int timeRow = bottomRow;
+		int hintRow = stacked ? bottomRow - pillH - 8 : bottomRow;
+		if (note != null && !note.isEmpty() && noteRow + 8 < hintRow - pillH / 2 - 6) {
 			String text = Glass.fit(s, Surface.Role.BODY, note, imageW - 28 - 18);
 			Icons.draw(s, left, noteRow - 6, 12, Icons.ALERT, Glass.WARN);
 			s.text(Surface.Role.BODY, text, left + 18, Bar.textTop(noteRow), Glass.WARN);
 		}
-		String[] labels = {"Drag to look", "Scroll to zoom"};
-		Icons.Icon[] icons = {Icons.MOVE, Icons.ZOOM};
-		int hx = left;
-		int hintLimit = stacked ? right : right - TIME_W - 16;
-		for (int i = 0; i < labels.length; i++) {
-			int hw = 14 + 6 + s.width(Surface.Role.BODY, labels[i]);
-			if (hx + hw > hintLimit) {
-				break;
-			}
-			Icons.draw(s, hx, hintRow - 7, 14, icons[i], Glass.SOFT);
-			s.text(Surface.Role.BODY, labels[i], hx + 20, Bar.textTop(hintRow), Glass.SOFT);
-			hx += hw + 18;
-		}
-		int timeX1 = right;
-		int timeX0 = timeX1 - TIME_W;
-		int timeRow = bottomRow;
-		String clock = time < 0.34F ? "Night" : time < 0.67F ? "Evening" : "Day";
+		Glass.pane(s, left, hintRow - pillH / 2, left + hintW, hintRow + pillH / 2, pillH / 2, 0.0F, 0.0F);
+		int hx = left + 12;
+		Icons.draw(s, hx, hintRow - 7, 14, Icons.MOUSE_DRAG, Glass.SOFT);
+		s.text(Surface.Role.BODY, "Drag", hx + 20, Bar.textTop(hintRow), Glass.SOFT);
+		int divX = hx + 20 + dragW + 14;
+		Paint.vertical(s, divX, hintRow - 8, divX + 1, hintRow, 0, Paint.argb(0, 205, 187, 255), Paint.argb(60, 205, 187, 255));
+		Paint.vertical(s, divX, hintRow, divX + 1, hintRow + 8, 0, Paint.argb(60, 205, 187, 255), Paint.argb(0, 205, 187, 255));
+		int sx = divX + 1 + 14;
+		Icons.draw(s, sx, hintRow - 7, 14, Icons.MOUSE_WHEEL, Glass.SOFT);
+		s.text(Surface.Role.BODY, "Scroll", sx + 20, Bar.textTop(hintRow), Glass.SOFT);
+
 		int labelW = Math.max(s.width(Surface.Role.BODY, "Night"), Math.max(s.width(Surface.Role.BODY, "Evening"), s.width(Surface.Role.BODY, "Day")));
-		Icons.draw(s, timeX0, timeRow - 7, 14, Icons.CLOCK, Glass.SOFT);
-		trackX0 = timeX0 + 14 + 10;
-		trackX1 = timeX1 - labelW - 12;
+		int columnW = labelW + 24;
+		int timeW = Math.min(TIME_W, imageW - 28);
+		int timeX1 = right;
+		int timeX0 = timeX1 - timeW;
+		Glass.pane(s, timeX0, timeRow - pillH / 2, timeX1, timeRow + pillH / 2, pillH / 2, 0.0F, 0.0F);
+		int columnX0 = timeX1 - columnW;
+		Paint.vertical(s, columnX0, timeRow - 8, columnX0 + 1, timeRow, 0, Paint.argb(0, 205, 187, 255), Paint.argb(60, 205, 187, 255));
+		Paint.vertical(s, columnX0, timeRow, columnX0 + 1, timeRow + 8, 0, Paint.argb(60, 205, 187, 255), Paint.argb(0, 205, 187, 255));
+		Icons.draw(s, timeX0 + 12, timeRow - 7, 14, Icons.CLOCK, Glass.SOFT);
+		trackX0 = timeX0 + 12 + 14 + 10;
+		trackX1 = columnX0 - 14;
 		trackY = timeRow;
-		boolean drag = draggingTime;
-		Glass.slider(s, trackX0, trackY, trackX1, time, hoverTime ? 1.0F : 0.0F, drag ? 1.0F : 0.0F);
-		s.text(Surface.Role.BODY, clock, timeX1 - labelW, Bar.textTop(timeRow), Glass.TEXT);
+		Glass.slider(s, trackX0, trackY, trackX1, time, hoverTime ? 1.0F : 0.0F, draggingTime ? 1.0F : 0.0F);
+		String clock = time < 0.34F ? "Night" : time < 0.67F ? "Evening" : "Day";
+		s.text(Surface.Role.BODY, clock, columnX0 + 1 + (columnW - 1 - s.width(Surface.Role.BODY, clock)) / 2, Bar.textTop(timeRow), Glass.TEXT);
 	}
 
 	public boolean overTime(double mx, double my) {

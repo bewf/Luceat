@@ -36,6 +36,10 @@ public final class DebugReport {
 	private DebugReport() {
 	}
 
+	public static boolean lambInstalled() {
+		return modVersion("lambdynlights") != null;
+	}
+
 	private static String modVersion(String id) {
 		return FabricLoader.getInstance().getModContainer(id).map(c -> c.getMetadata().getVersion().getFriendlyString()).orElse(null);
 	}

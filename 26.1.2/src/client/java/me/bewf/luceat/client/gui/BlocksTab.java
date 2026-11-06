@@ -29,7 +29,7 @@ import net.minecraft.world.level.block.state.BlockState;
 public final class BlocksTab {
 	private static final int ROW = 28;
 	private static final int GAP = 2;
-	private static final int BUILT_IN = 0xFF6FA8FF;
+	private static final int BUILT_IN = 0xFFC4BCE8;
 	private static final float[] FALLBACK = {1.0F, 0.7F, 0.35F};
 
 	private enum Filter {
@@ -324,14 +324,14 @@ public final class BlocksTab {
 		boolean free = !adding && !modOpen;
 		filterInput.draw(graphics, font, x0, y0, x1 - 70, y0 + 20, "Search blocks and items");
 		boolean addHover = free && LuceatLook.inside(mx, my, x1 - 64, y0, x1, y0 + 20);
-		LuceatLook.roundOutlined(graphics, x1 - 64, y0, x1, y0 + 20, adding ? LuceatLook.ACCENT_SOFT : addHover ? LuceatLook.CARD_HOVER : LuceatLook.CARD, adding ? LuceatLook.ACCENT : LuceatLook.BORDER);
+		LuceatLook.roundOutlined(graphics, x1 - 64, y0, x1, y0 + 20, adding ? 0x66BE3FFF : addHover ? LuceatLook.CARD_HOVER : LuceatLook.CARD, adding ? LuceatLook.ACCENT : addHover ? 0x80E4D6FF : LuceatLook.BORDER);
 		ink(graphics, "Add rule", x1 - 64 + (64 - inkWidth("Add rule")) / 2, y0 + 6, adding ? LuceatLook.ACCENT : LuceatLook.SOFT, false);
 		int cx = x0;
 		for (Filter filter : Filter.values()) {
 			int width = inkWidth(filter.label) + 14;
 			boolean on = filter == mode;
 			boolean over = free && LuceatLook.inside(mx, my, cx, y0 + 24, cx + width, y0 + 42);
-			LuceatLook.round(graphics, cx, y0 + 24, cx + width, y0 + 42, on ? LuceatLook.ACCENT : over ? LuceatLook.CARD_HOVER : LuceatLook.CARD);
+			LuceatLook.roundOutlined(graphics, cx, y0 + 24, cx + width, y0 + 42, on ? 0xB0BE3FFF : over ? LuceatLook.CARD_HOVER : LuceatLook.CARD, on ? 0xCCE4D6FF : over ? 0x80E4D6FF : LuceatLook.BORDER);
 			ink(graphics, filter.label, cx + 7, y0 + 29, on ? 0xFFFFFFFF : LuceatLook.SOFT, false);
 			cx += width + 4;
 		}
@@ -364,7 +364,7 @@ public final class BlocksTab {
 				BlockRule rule = BlockRules.get(entry.key);
 				boolean over = free && LuceatLook.inside(mx, my, x0, y, x1, y + ROW) && my >= top;
 				boolean isSelected = entry == selected;
-				LuceatLook.roundOutlined(graphics, x0, y, x1, y + ROW, isSelected ? 0xFF3A2160 : over ? LuceatLook.CARD_HOVER : LuceatLook.CARD, isSelected ? LuceatLook.ACCENT : over ? LuceatLook.CARD_HOVER : LuceatLook.CARD);
+				LuceatLook.roundOutlined(graphics, x0, y, x1, y + ROW, isSelected ? 0x66BE3FFF : over ? LuceatLook.CARD_HOVER : LuceatLook.CARD, isSelected ? 0xCCB28CFF : over ? 0x80E4D6FF : LuceatLook.BORDER);
 				if (!entry.stack.isEmpty()) {
 					graphics.fakeItem(entry.stack, x0 + 6, y + 6);
 				}
@@ -381,16 +381,15 @@ public final class BlocksTab {
 				ink(graphics, status, rx, y + 10, statusColour, false);
 				if (level > 0) {
 					rx -= 16;
-					LuceatLook.round(graphics, rx, y + 9, rx + 11, y + 20, pack(colour(entry)));
-					graphics.outline(rx, y + 9, 11, 11, 0x55FFFFFF);
+					LuceatLook.swatch(graphics, rx, y + 9, rx + 11, y + 20, pack(colour(entry)) & 0xFFFFFF, false);
 				}
 				if (builtIn(entry) || added) {
 					String badge = added ? "Yours" : "Built in";
 					int bw = inkWidth(badge) + 10;
 					rx -= bw + 6;
 					int colourBadge = added ? LuceatLook.ACCENT : BUILT_IN;
-					LuceatLook.roundOutlined(graphics, rx, y + 7, rx + bw, y + 21, 0xFF16161B, colourBadge);
-					ink(graphics, badge, rx + 5, y + 11, isSelected && !added ? 0xFFB9D4FF : colourBadge, false);
+					LuceatLook.tag(graphics, rx, y + 7, rx + bw, y + 21, colourBadge);
+					ink(graphics, badge, rx + 5, y + 11, added ? 0xFFD9C8FF : 0xFFE4E0F6, false);
 					if (free && LuceatLook.inside(mx, my, rx, y + 7, rx + bw, y + 21) && my >= top) {
 						String text = added ? "A rule you made." : "Comes with the game or Luceat.";
 						tip = font.split(Component.literal(text).withStyle(Style.EMPTY.withColor(0xDDDDE6)), 200);
@@ -754,8 +753,7 @@ public final class BlocksTab {
 			ink(graphics, "Colour", edX0, y + 3, LuceatLook.TEXT, false);
 			int sx = edX0 + 50;
 			boolean swatchOver = LuceatLook.inside(mx, my, sx, y, sx + 34, y + 16) && my >= edTop && my < edBottom;
-			LuceatLook.round(graphics, sx, y, sx + 34, y + 16, pack(rgb));
-			graphics.outline(sx, y, 34, 16, swatchOver ? 0xFFFFFFFF : 0x66FFFFFF);
+			LuceatLook.swatch(graphics, sx, y, sx + 34, y + 16, pack(rgb) & 0xFFFFFF, swatchOver);
 			hit(sx, y, sx + 34, y + 16, () -> {
 				picker.open(pack(colour(entry)) & 0xFFFFFF, rgbValue -> {
 					BlockRule edit = BlockRules.edit(entry.key);

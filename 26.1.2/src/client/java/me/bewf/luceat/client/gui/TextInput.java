@@ -323,7 +323,7 @@ public final class TextInput {
 	}
 
 	public void draw(GuiGraphicsExtractor graphics, Font font, int x0, int y0, int x1, int y1, String placeholder) {
-		LuceatLook.roundOutlined(graphics, x0, y0, x1, y1, LuceatLook.CARD, focused ? LuceatLook.ACCENT : LuceatLook.BORDER);
+		LuceatLook.roundOutlined(graphics, x0, y0, x1, y1, 0x6605030C, focused ? LuceatLook.ACCENT : LuceatLook.BORDER);
 		drawGlass(graphics, font, x0, y0, x1, y1, placeholder);
 	}
 }

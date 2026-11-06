@@ -358,6 +358,7 @@ public final class ShapeMasks {
 		List<Integer> bucket = BUCKETS.computeIfAbsent(hash, key -> new ArrayList<>(1));
 		for (int known : bucket) {
 			if (Arrays.equals(STORED.get(known), bytes)) {
+				Transmit.set(FLAG | extra | known, (bytes[VOXELS * 4] & 255) / 255.0F, (bytes[VOXELS * 4 + 1] & 255) / 255.0F, (bytes[VOXELS * 4 + 2] & 255) / 255.0F);
 				return FLAG | extra | known;
 			}
 		}
@@ -368,6 +369,7 @@ public final class ShapeMasks {
 		STORED.add(bytes);
 		bucket.add(index);
 		upload(index, bytes);
+		Transmit.set(FLAG | extra | index, (bytes[VOXELS * 4] & 255) / 255.0F, (bytes[VOXELS * 4 + 1] & 255) / 255.0F, (bytes[VOXELS * 4 + 2] & 255) / 255.0F);
 		return FLAG | extra | index;
 	}
 
