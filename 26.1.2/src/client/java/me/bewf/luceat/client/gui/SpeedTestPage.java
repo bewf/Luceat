@@ -21,13 +21,13 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 
 public final class SpeedTestPage {
-	private record Row(String label, String section, float millis, float percent) {
+	private record Row(String label, String section, float millis, float percent, boolean rebuilds, String shares) {
 	}
 
 	private static final Surface.Role BODY = Surface.Role.BODY;
 	private static final Surface.Role TITLE = Surface.Role.TITLE;
 	private static final Surface.Role HEADING = Surface.Role.HEADING;
-	private static final int ROW = 26;
+	private static final int ROW = 32;
 
 	private static List<Row> last = List.of();
 	private static Row lastMod;
@@ -59,6 +59,7 @@ public final class SpeedTestPage {
 	private int signature;
 	private int[] startBox = new int[4];
 	private int[] copyBox = new int[4];
+	private int[] skippedBox = new int[4];
 	private long copiedUntil;
 
 	public void tick() {
@@ -146,14 +147,14 @@ public final class SpeedTestPage {
 		running = false;
 		last = settingRows();
 		lastMod = modRow();
-		note = skipped.isEmpty() ? "" : "Skipped, off or unsupported here: " + String.join(", ", skipped);
+		note = skipped.isEmpty() ? "" : "Skipped: " + String.join(", ", skipped);
 	}
 
 	private Row modRow() {
 		for (Setting setting : all) {
 			PerfTest.Result result = perf.result(setting);
 			if (result != null && setting.id().equals("Luceat")) {
-				return new Row("Luceat", setting.section(), result.millis(), result.percent());
+				return new Row("Luceat", setting.section(), result.millis(), result.percent(), false, null);
 			}
 		}
 		return null;
@@ -164,10 +165,26 @@ public final class SpeedTestPage {
 		for (Setting setting : all) {
 			PerfTest.Result result = perf.result(setting);
 			if (result != null && !setting.id().equals("Luceat")) {
-				rows.add(new Row(setting.label(), setting.section(), result.millis(), result.percent()));
+				rows.add(new Row(setting.label(), setting.section(), result.millis(), result.percent(), setting.rebuildsShadows(), null));
 			}
 		}
 		rows.sort(Comparator.comparingDouble((Row row) -> row.percent()).reversed());
+		for (int i = 0; i < rows.size(); i++) {
+			Row row = rows.get(i);
+			if (row.percent() < 2.5F) {
+				continue;
+			}
+			Row closest = null;
+			for (Row other : rows) {
+				if (other != row && other.millis() < row.millis() && other.millis() >= row.millis() * 0.6F) {
+					closest = other;
+					break;
+				}
+			}
+			if (closest != null) {
+				rows.set(i, new Row(row.label(), row.section(), row.millis(), row.percent(), row.rebuilds(), "Shares its cost with " + closest.label()));
+			}
+		}
 		return rows;
 	}
 
@@ -268,7 +285,7 @@ public final class SpeedTestPage {
 		boolean copied = System.currentTimeMillis() < copiedUntil;
 		int gs = GuiFit.raster();
 		int sig = Objects.hash(x, y, w, h, gs, running, perf.progress(), queue.size(), rows.size(), mod == null ? 0 : mod.millis(), rows.isEmpty() ? 0 : rows.get(0).millis(), Math.round(scroll), (int) (fps / 4), note, copied,
-			inside(mouseX, mouseY, startBox), inside(mouseX, mouseY, copyBox), barDrag, perf.target() == null ? "" : perf.target().id());
+			inside(mouseX, mouseY, startBox), inside(mouseX, mouseY, copyBox), inside(mouseX, mouseY, skippedBox), barDrag, perf.target() == null ? "" : perf.target().id());
 		if (sig != signature || !pane.matches(x, y, w, h, gs)) {
 			signature = sig;
 			pane.begin(x, y, w, h, gs);
@@ -303,11 +320,12 @@ public final class SpeedTestPage {
 			s.text(BODY, copyLabel, copyBox[0] + 30, copyBox[1] + 9, copied ? Glass.GOOD : Glass.TEXT);
 		}
 
+		skippedBox = new int[4];
 		int ty = y0 + 36;
-		String hardware = RenderBackend.kind().label() + ", " + Runtime.getRuntime().availableProcessors() + " threads, " + String.format(Locale.ROOT, "%.0f fps now", fps);
+		String hardware = RenderBackend.kind().label() + ", " + Runtime.getRuntime().availableProcessors() + " threads, " + String.format(Locale.ROOT, "%.0f fps", fps);
 		s.text(BODY, hardware, x0, ty, Glass.MUTED);
 		ty += 16;
-		for (String line : Glass.wrap(s, BODY, "Finds which settings cost the most on this PC. It adds six test lights around you, so stand still where you can see terrain. Your settings come back afterwards.", x1 - x0, 3)) {
+		for (String line : Glass.wrap(s, BODY, "Toggles settings to find which costs the most frame time. Stand where you're lagging and click start. Your settings will return after the speed test.", x1 - x0, 3)) {
 			s.text(BODY, line, x0, ty, Glass.SOFT);
 			ty += 11;
 		}
@@ -322,7 +340,9 @@ public final class SpeedTestPage {
 			s.text(BODY, "Testing " + name, x0, ty + 16, Glass.MUTED);
 			ty += 34;
 		} else if (!note.isEmpty()) {
-			s.text(BODY, Glass.fit(s, BODY, note, x1 - x0), x0, ty, Glass.WARN);
+			String shownNote = Glass.fit(s, BODY, note, x1 - x0);
+			s.text(BODY, shownNote, x0, ty, Glass.WARN);
+			skippedBox = note.startsWith("Skipped:") ? new int[] {x0, ty - 2, x0 + Texts.width(BODY, shownNote), ty + 12} : new int[4];
 			ty += 18;
 		} else if (!stoppedNote.isEmpty()) {
 			s.text(BODY, Glass.fit(s, BODY, stoppedNote, x1 - x0), x0, ty, Glass.WARN);
@@ -330,29 +350,32 @@ public final class SpeedTestPage {
 		}
 
 		if (mod != null) {
-			int cardH = 54;
-			Paint.round(s, x0, ty, x1, ty + cardH, 12, Paint.argb(110, 40, 30, 90));
-			Paint.outline(s, x0, ty, x1, ty + cardH, 12, Paint.argb(80, 205, 187, 255));
-			s.text(BODY, "Whole mod", x0 + 14, ty + 10, Glass.MUTED);
-			s.text(TITLE, "Luceat", x0 + 14, ty + 24, Glass.TEXT);
+			s.text(TITLE, "Whole mod", x0, ty, Glass.TEXT);
 			Cost cost = Cost.fromShare(mod.percent());
 			String value = String.format(Locale.ROOT, "%.2f ms per frame, %.1f%% of a frame", mod.millis(), mod.percent());
-			Glass.right(s, BODY, value, x1 - 14, ty + 12, Glass.TEXT);
-			int bx0 = x0 + 120;
-			int bx1 = x1 - 14;
-			int by = ty + 34;
+			Glass.right(s, BODY, value, x1, ty + 2, Glass.TEXT);
+			int bx0 = x0 + 56;
+			int bx1 = x1;
+			int by = ty + 22;
 			Paint.round(s, bx0, by, bx1, by + 6, 3, Paint.argb(255, 30, 24, 52));
 			int fx = bx0 + Math.round((bx1 - bx0) * Math.max(0.0F, Math.min(1.0F, mod.percent() / 30.0F)));
 			if (fx > bx0 + 6) {
 				Paint.round(s, bx0, by, fx, by + 6, 3, cost.colour());
 			}
-			Glass.right(s, BODY, cost.label(), bx0 - 10, by - 2, cost.colour());
-			ty += cardH + 12;
+			Glass.right(s, BODY, cost.label(), bx0 - 10, by - 3, cost.colour());
+			ty += 44;
 		}
 
 		if (!running && !rows.isEmpty() && rows.get(0).percent() >= 2.5F) {
-			s.text(BODY, Glass.fit(s, BODY, "Biggest cost: " + rows.get(0).label() + ". Lower it first.", x1 - x0), x0, ty, Glass.GOOD);
-			ty += 18;
+			for (String line : Glass.wrap(s, BODY, "List is sorted from highest cost. Disable or lower the settings near the top for better performance.", x1 - x0, 2)) {
+				s.text(BODY, line, x0, ty, Glass.GOOD);
+				ty += 12;
+			}
+			if (rows.stream().anyMatch(Row::rebuilds)) {
+				s.text(BODY, Glass.fit(s, BODY, "* Changing this setting rebuilds shadow data, so its reading can run high.", x1 - x0), x0, ty, Glass.MUTED);
+				ty += 12;
+			}
+			ty += 6;
 		}
 
 		listTop = ty;
@@ -379,14 +402,15 @@ public final class SpeedTestPage {
 				continue;
 			}
 			boolean hot = i < 3 && row.percent() >= 2.5F;
-			Paint.round(s, x0, ry, x1, ry + ROW - 4, 9, Paint.argb(hot ? 84 : 44, 40, 30, 90));
-			if (hot) {
-				Paint.outline(s, x0, ry, x1, ry + ROW - 4, 9, Paint.argb(50, 205, 187, 255));
+			Paint.vertical(s, x0, ry + ROW - 3, x1, ry + ROW - 2, 0, Paint.argb(26, 205, 187, 255), Paint.argb(26, 205, 187, 255));
+			int cy = ry + 12;
+			String label = row.rebuilds() ? row.label() + " *" : row.label();
+			s.text(BODY, Glass.fit(s, BODY, label, labelWidth), x0 + 4, cy - 4, hot ? Glass.TEXT : Glass.SOFT);
+			if (row.shares() != null) {
+				s.text(Surface.Role.SMALL, Glass.fit(s, Surface.Role.SMALL, row.shares(), labelWidth + 40), x0 + 4, ry + 19, Glass.MUTED);
 			}
-			int cy = ry + (ROW - 4) / 2;
-			s.text(BODY, Glass.fit(s, BODY, row.label(), labelWidth), x0 + 12, cy - 4, hot ? Glass.TEXT : Glass.SOFT);
-			int bx0 = x0 + 12 + labelWidth + 10;
-			int bx1 = x1 - valueWidth - 20;
+			int bx0 = x0 + 4 + labelWidth + 10;
+			int bx1 = x1 - valueWidth - 12;
 			if (bx1 > bx0 + 10) {
 				Paint.round(s, bx0, cy - 3, bx1, cy + 3, 3, Paint.argb(255, 30, 24, 52));
 				int fx = bx0 + Math.round((bx1 - bx0) * Math.max(0.0F, Math.min(1.0F, row.percent() / top)));
@@ -395,7 +419,7 @@ public final class SpeedTestPage {
 				}
 			}
 			String value = String.format(Locale.ROOT, "%.2f ms  %.1f%%", row.millis(), row.percent());
-			Glass.right(s, BODY, value, x1 - 12, cy - 4, Glass.TEXT);
+			Glass.right(s, BODY, value, x1 - 4, cy - 4, Glass.TEXT);
 		}
 		s.unclip();
 		barX = x1 + 4;
@@ -406,6 +430,29 @@ public final class SpeedTestPage {
 			barThumbTop = listTop + Math.round((track - thumb) * (scroll / max));
 			int half = barDrag ? 3 : 2;
 			Paint.round(s, barX + 3 - half, barThumbTop, barX + 3 + half, barThumbTop + thumb, half, Paint.argb(barDrag ? 180 : 90, 205, 187, 255));
+		}
+		drawSkippedTip(s, x0, x1, mouseX, mouseY);
+	}
+
+	private void drawSkippedTip(Surface s, int x0, int x1, int mouseX, int mouseY) {
+		if (!inside(mouseX, mouseY, skippedBox)) {
+			return;
+		}
+		List<String> lines = Glass.wrap(s, BODY, "Left out of the test because the setting was off or this GPU does not support it.", Math.min(260, x1 - x0 - 24), 3);
+		int w = 0;
+		for (String line : lines) {
+			w = Math.max(w, Texts.width(BODY, line));
+		}
+		int h = lines.size() * 12 + 16;
+		int bx0 = Math.min(x1 - w - 24, Math.max(x0, skippedBox[0]));
+		int by0 = skippedBox[3] + 6;
+		s.veil(bx0 - 4, by0 - 4, bx0 + w + 28, by0 + h + 4);
+		Paint.round(s, bx0, by0, bx0 + w + 24, by0 + h, 10, Paint.argb(250, 30, 21, 66));
+		Paint.outline(s, bx0, by0, bx0 + w + 24, by0 + h, 10, Paint.argb(120, 226, 212, 255));
+		int ty = by0 + 8;
+		for (String line : lines) {
+			s.text(BODY, line, bx0 + 12, ty, Glass.TEXT);
+			ty += 12;
 		}
 	}
 
@@ -419,22 +466,22 @@ public final class SpeedTestPage {
 			lines.add("Run the speed test in the Luceat screen first.");
 			return lines;
 		}
-		lines.add("Luceat speed test, biggest costs first:");
+		lines.add("Try this while you're lagging");
+		lines.add("Luceat speed test");
+		lines.add(RenderBackend.kind().label() + ", " + Runtime.getRuntime().availableProcessors() + " threads");
 		if (modLine() != null) {
 			lines.add(modLine());
 		}
 		int count = Math.min(8, last.size());
 		for (int i = 0; i < count; i++) {
 			Row row = last.get(i);
-			lines.add(String.format(Locale.ROOT, "%d. %s (%s): %.2f ms, %.1f%% of a frame", i + 1, row.label(), row.section(), row.millis(), row.percent()));
+			lines.add(String.format(Locale.ROOT, "%d. %s (%s): %.2f ms, %.1f%%", i + 1, row.label(), row.section(), row.millis(), row.percent()));
 		}
-		Row first = last.get(0);
-		lines.add(first.percent() >= 2.5F ? "Biggest cost: " + first.label() + ". Lower it first." : "Nothing here costs much on this PC.");
 		return lines;
 	}
 
 	private String plainReport() {
-		StringBuilder text = new StringBuilder("Luceat speed test\n");
+		StringBuilder text = new StringBuilder("Try this while you're lagging\nLuceat speed test\n");
 		text.append(RenderBackend.kind().label()).append(", ").append(Runtime.getRuntime().availableProcessors()).append(" threads\n");
 		if (modLine() != null) {
 			text.append(modLine()).append('\n');

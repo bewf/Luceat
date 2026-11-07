@@ -11,6 +11,7 @@ public final class SliderSetting extends Setting {
 	private final String unit;
 	private final DoubleSupplier getter;
 	private final Consumer<Float> setter;
+	private float testHigh;
 
 	public SliderSetting(String section, String label, String help, Cost cost, boolean rebuildsShadows, float min, float max, float step, String unit, DoubleSupplier getter, Consumer<Float> setter) {
 		super(section, label, help, cost, rebuildsShadows);
@@ -45,8 +46,19 @@ public final class SliderSetting extends Setting {
 	}
 
 	@Override
+	public boolean testable() {
+		return cost() != Cost.NONE;
+	}
+
+	@Override
 	public Object snapshot() {
-		return value();
+		testHigh = value();
+		return testHigh;
+	}
+
+	@Override
+	public void useTestState(boolean high) {
+		setter.accept(high ? testHigh : Math.max(min, Math.min(max, 0.0F)));
 	}
 
 	@Override

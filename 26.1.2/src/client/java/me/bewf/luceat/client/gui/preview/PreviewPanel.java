@@ -177,8 +177,8 @@ public final class PreviewPanel {
 		Scene scene = spec.scene();
 		int left = imageX + 14;
 		int right = imageX + imageW - 14;
-		Paint.vertical(s, imageX, imageY, imageX + imageW, imageY + 40, 12, Paint.argb(120, 6, 4, 14), Paint.argb(0, 6, 4, 14));
-		Paint.vertical(s, imageX, imageY + imageH - 52, imageX + imageW, imageY + imageH, 12, Paint.argb(0, 6, 4, 14), Paint.argb(130, 6, 4, 14));
+		Paint.vertical(s, imageX, imageY, imageX + imageW, imageY + 30, 12, Paint.argb(54, 6, 4, 14), Paint.argb(0, 6, 4, 14));
+		Paint.vertical(s, imageX, imageY + imageH - 38, imageX + imageW, imageY + imageH, 12, Paint.argb(0, 6, 4, 14), Paint.argb(64, 6, 4, 14));
 		int rowTop = imageY + 19;
 		int fullReserve = 92;
 		String title = Glass.fit(s, Surface.Role.BODY, scene.title, imageW - 28 - 18 - fullReserve);

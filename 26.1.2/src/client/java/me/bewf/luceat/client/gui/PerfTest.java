@@ -13,11 +13,11 @@ import me.bewf.luceat.client.shadow.ShadowVolume;
 import net.minecraft.client.Minecraft;
 
 public final class PerfTest {
-	private static final int ROUNDS = 2;
-	private static final long WARM_NANOS = 300_000_000L;
-	private static final long SAMPLE_NANOS = 700_000_000L;
+	private static final int ROUNDS = 1;
+	private static final long WARM_NANOS = 220_000_000L;
+	private static final long SAMPLE_NANOS = 450_000_000L;
 	private static final int MIN_WARM = 2;
-	private static final int MIN_SAMPLE = 4;
+	private static final int MIN_SAMPLE = 3;
 	private static final int STEPS = ROUNDS * 2;
 
 	public record Result(float millis, float percent) {

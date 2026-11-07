@@ -56,6 +56,7 @@ public final class DebugReport {
 		graphics.add(new Row("OpenGL", HardwareHint.glVersion(), Glass.TEXT));
 		graphics.add(new Row("Renderer", RenderBackend.kind().label(), Glass.TEXT));
 		graphics.add(new Row("Light around corners", compute ? "Enabled" : "Disabled", compute ? Glass.GOOD : Glass.WARN, compute ? null : LightSpread.shortBlocker(), compute ? null : LightSpread.blockerDetail()));
+		graphics.add(new Row("Menu scale", GuiFit.raster() + " px per unit, GUI scale " + Math.round(net.minecraft.client.Minecraft.getInstance().getWindow().getGuiScale()), Glass.TEXT));
 		groups.add(new Group("Graphics", graphics));
 
 		ShaderVariant built = TerrainShaderPatch.built();
