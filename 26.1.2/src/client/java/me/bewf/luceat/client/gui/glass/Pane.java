@@ -419,7 +419,21 @@ public final class Pane implements Surface {
 		if (clipped && (x >= clipRect[2] || x + width <= clipRect[0] || y - padTop(role) >= clipRect[3] || y + padBottom(role) <= clipRect[1])) {
 			return;
 		}
-		texts.add(new Cmd(role, component, x, y, argb, clipRect[0], clipRect[1], clipRect[2], clipRect[3], clipped, width, texts.size() + veils.size()));
+		texts.add(new Cmd(role, component, x, y + drop(role), argb, clipRect[0], clipRect[1], clipRect[2], clipRect[3], clipped, width, texts.size() + veils.size()));
+	}
+
+	private static int drop(Role role) {
+		return switch (role) {
+			case WORDMARK -> 11;
+			case HEADING -> 4;
+			case TITLE -> 1;
+			default -> 0;
+		};
+	}
+
+	@Override
+	public void veil(int lx0, int ly0, int lx1, int ly1) {
+		veils.add(new Veil(lx0, ly0, lx1, ly1, texts.size() + veils.size()));
 	}
 
 	@Override

@@ -8,8 +8,8 @@ public final class Glass {
 	public static final int INK = 0xFF0B0713;
 	public static final int TEXT = 0xFFF1EEFA;
 	public static final int SOFT = 0xFFBDB6D6;
-	public static final int MUTED = 0xFF8A84A6;
-	public static final int FAINT = 0xFF8A84A6;
+	public static final int MUTED = 0xFFA6A0C6;
+	public static final int FAINT = 0xFF9690B6;
 	public static final int VIOLET = 0xFF7B63FF;
 	public static final int LAVENDER = 0xFFB28CFF;
 	public static final int PALE = 0xFFE4D6FF;
@@ -39,28 +39,36 @@ public final class Glass {
 
 	public static void slab(Surface s, int x0, int y0, int x1, int y1, int r) {
 		Paint.spread(s, x0, y0 + 6, x1, y1 + 6, r, r, 30, 2.2F, (x, y) -> argb(Math.round(84 * (0.55F + 0.45F * (1.0F - lit(x, y, x0, y0, x1, y1)))), 6, 3, 18));
-		Paint.vertical(s, x0, y0, x1, y1, r, argb(frosted ? 104 : 206, 98, 74, 196), argb(frosted ? 96 : 214, 38, 26, 92));
+		Paint.vertical(s, x0, y0, x1, y1, r, argb(frosted ? 126 : 214, 74, 54, 164), argb(frosted ? 120 : 222, 26, 17, 66));
 		Paint.vertical(s, x0 + 1, y0 + 1, x1 - 1, y0 + (y1 - y0) / 3, r - 1, argb(frosted ? 22 : 16, 255, 255, 255), argb(0, 255, 255, 255));
 		Paint.bloom(s, x0 + 1, y0 + 1, x1 - 1, y1 - 1, r - 1, r - 1, 34, 2.6F, (x, y) -> argb(Math.round(70 * (0.25F + 0.75F * lit(x, y, x0, y0, x1, y1))), 222, 208, 255));
 		Paint.outline(s, x0, y0, x1, y1, r, (x, y) -> argb(Math.round(255 * (0.12F + 0.56F * lit(x, y, x0, y0, x1, y1))), 222, 208, 255));
 	}
 
 	public static void panel(Surface s, int x0, int y0, int x1, int y1, int r) {
-		Paint.vertical(s, x0, y0, x1, y1, r, argb(frosted ? 30 : 40, 255, 255, 255), argb(frosted ? 16 : 26, 255, 255, 255));
-		Paint.bloom(s, x0 + 1, y0 + 1, x1 - 1, y1 - 1, r - 1, r - 1, 14, 2.4F, (x, y) -> argb(Math.round(38 * (0.2F + 0.8F * lit(x, y, x0, y0, x1, y1))), 230, 216, 255));
+		Paint.vertical(s, x0, y0, x1, y1, r, argb(frosted ? 78 : 96, 22, 13, 52), argb(frosted ? 58 : 76, 12, 7, 32));
+		Paint.vertical(s, x0 + 1, y0 + 1, x1 - 1, y0 + (y1 - y0) / 4, r - 1, argb(14, 214, 200, 255), argb(0, 214, 200, 255));
+		Paint.bloom(s, x0 + 1, y0 + 1, x1 - 1, y1 - 1, r - 1, r - 1, 14, 2.4F, (x, y) -> argb(Math.round(30 * (0.2F + 0.8F * lit(x, y, x0, y0, x1, y1))), 214, 200, 255));
 		Paint.outline(s, x0, y0, x1, y1, r, (x, y) -> argb(Math.round(255 * (0.08F + 0.34F * lit(x, y, x0, y0, x1, y1))), 222, 208, 255));
 	}
 
 	public static void tabTop(Surface s, int x0, int y0, int x1, int y1, int r, float a) {
-		Paint.verticalCorners(s, x0, y0, x1, y1, 0, r, argb(Math.round(30 * a), 255, 255, 255), argb(Math.round(10 * a), 255, 255, 255));
-		Paint.bloom(s, x0, y0, x1, y1, 0, r, 30, 1.6F, (x, y) -> argb(Math.round(84 * a), 232, 220, 255));
+		Paint.verticalCorners(s, x0, y0, x1, y1, 0, r, argb(Math.round(20 * a), 190, 172, 250), argb(Math.round(6 * a), 190, 172, 250));
+		Paint.bloom(s, x0, y0, x1, y1, 0, r, 30, 1.6F, (x, y) -> argb(Math.round(48 * a), 206, 190, 255));
 		Paint.outline(s, x0, y0, x1, y1, 0, r, (x, y) -> y < y0 + 1.5F ? 0 : argb(Math.round(a * 255 * (0.1F + 0.36F * lit(x, y, x0, y0, x1, y1))), 226, 212, 255));
 	}
 
 	public static void tabBottom(Surface s, int x0, int y0, int x1, int y1, int r, float a) {
-		Paint.verticalCorners(s, x0, y0, x1, y1, r, 0, argb(Math.round(10 * a), 255, 255, 255), argb(Math.round(30 * a), 255, 255, 255));
-		Paint.bloom(s, x0, y0, x1, y1, r, 0, 30, 1.6F, (x, y) -> argb(Math.round(84 * a), 232, 220, 255));
+		Paint.verticalCorners(s, x0, y0, x1, y1, r, 0, argb(Math.round(6 * a), 190, 172, 250), argb(Math.round(20 * a), 190, 172, 250));
+		Paint.bloom(s, x0, y0, x1, y1, r, 0, 30, 1.6F, (x, y) -> argb(Math.round(48 * a), 206, 190, 255));
 		Paint.outline(s, x0, y0, x1, y1, r, 0, (x, y) -> y > y1 - 1.5F ? 0 : argb(Math.round(a * 255 * (0.1F + 0.36F * lit(x, y, x0, y0, x1, y1))), 226, 212, 255));
+	}
+
+	public static void overlay(Surface s, int x0, int y0, int x1, int y1, int r, float a) {
+		Paint.spread(s, x0, y0 + 4, x1, y1 + 4, r, r, 26, 2.0F, (x, y) -> argb(Math.round(64 * a), 4, 2, 12));
+		Paint.vertical(s, x0, y0, x1, y1, r, argb(Math.round(112 * a), 38, 26, 88), argb(Math.round(124 * a), 20, 12, 54));
+		Paint.bloom(s, x0, y0, x1, y1, r, r, 28, 1.8F, (x, y) -> argb(Math.round(52 * a * (0.3F + 0.7F * lit(x, y, x0, y0, x1, y1))), 206, 190, 255));
+		Paint.outline(s, x0, y0, x1, y1, r, (x, y) -> argb(Math.round(a * 255 * (0.1F + 0.42F * lit(x, y, x0, y0, x1, y1))), 226, 212, 255));
 	}
 
 	public static void inset(Surface s, int x0, int y0, int x1, int y1, int r) {

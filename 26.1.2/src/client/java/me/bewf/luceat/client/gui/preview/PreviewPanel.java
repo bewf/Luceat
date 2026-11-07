@@ -189,10 +189,12 @@ public final class PreviewPanel {
 		int pillH = 28;
 		int dragW = s.width(Surface.Role.BODY, "Drag");
 		int scrollW = s.width(Surface.Role.BODY, "Scroll");
-		int hintW = 12 + 14 + 6 + dragW + 14 + 1 + 14 + 14 + 6 + scrollW + 12;
-		boolean stacked = imageW < hintW + TIME_W + 28 + 12;
+		int hintFull = 12 + 14 + 6 + dragW + 14 + 1 + 14 + 14 + 6 + scrollW + 12;
+		int hintIcons = 12 + 14 + 14 + 1 + 14 + 14 + 12;
+		boolean icons = imageW < hintFull + TIME_W + 28 + 10;
+		int hintW = icons ? hintIcons : hintFull;
 		int timeRow = bottomRow;
-		int hintRow = stacked ? bottomRow - pillH - 8 : bottomRow;
+		int hintRow = bottomRow;
 		if (note != null && !note.isEmpty() && noteRow + 8 < hintRow - pillH / 2 - 6) {
 			String text = Glass.fit(s, Surface.Role.BODY, note, imageW - 28 - 18);
 			Icons.draw(s, left, noteRow - 6, 12, Icons.ALERT, Glass.WARN);
@@ -201,17 +203,24 @@ public final class PreviewPanel {
 		Glass.pane(s, left, hintRow - pillH / 2, left + hintW, hintRow + pillH / 2, pillH / 2, 0.0F, 0.0F);
 		int hx = left + 12;
 		Icons.draw(s, hx, hintRow - 7, 14, Icons.MOUSE_DRAG, Glass.SOFT);
-		s.text(Surface.Role.BODY, "Drag", hx + 20, Bar.textTop(hintRow), Glass.SOFT);
-		int divX = hx + 20 + dragW + 14;
+		int divX;
+		if (icons) {
+			divX = hx + 14 + 14;
+		} else {
+			s.text(Surface.Role.BODY, "Drag", hx + 20, Bar.textTop(hintRow), Glass.SOFT);
+			divX = hx + 20 + dragW + 14;
+		}
 		Paint.vertical(s, divX, hintRow - 8, divX + 1, hintRow, 0, Paint.argb(0, 205, 187, 255), Paint.argb(60, 205, 187, 255));
 		Paint.vertical(s, divX, hintRow, divX + 1, hintRow + 8, 0, Paint.argb(60, 205, 187, 255), Paint.argb(0, 205, 187, 255));
 		int sx = divX + 1 + 14;
 		Icons.draw(s, sx, hintRow - 7, 14, Icons.MOUSE_WHEEL, Glass.SOFT);
-		s.text(Surface.Role.BODY, "Scroll", sx + 20, Bar.textTop(hintRow), Glass.SOFT);
+		if (!icons) {
+			s.text(Surface.Role.BODY, "Scroll", sx + 20, Bar.textTop(hintRow), Glass.SOFT);
+		}
 
 		int labelW = Math.max(s.width(Surface.Role.BODY, "Night"), Math.max(s.width(Surface.Role.BODY, "Evening"), s.width(Surface.Role.BODY, "Day")));
 		int columnW = labelW + 24;
-		int timeW = Math.min(TIME_W, imageW - 28);
+		int timeW = Math.max(120, Math.min(TIME_W, imageW - 28 - hintW - 10));
 		int timeX1 = right;
 		int timeX0 = timeX1 - timeW;
 		Glass.pane(s, timeX0, timeRow - pillH / 2, timeX1, timeRow + pillH / 2, pillH / 2, 0.0F, 0.0F);

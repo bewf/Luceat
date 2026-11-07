@@ -15,7 +15,7 @@ public final class LuceatLook {
 	public static final int BORDER = 0x44E4D6FF;
 	public static final int TEXT = 0xFFF1EEFA;
 	public static final int SOFT = 0xFFBDB6D6;
-	public static final int MUTED = 0xFF8A84A6;
+	public static final int MUTED = 0xFFB1ABCF;
 	public static final int GOOD = 0xFF5BE38A;
 	public static final int WARN = 0xFFF4EAD2;
 	public static final int ORANGE = 0xFFBE3FFF;

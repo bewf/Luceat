@@ -302,7 +302,7 @@ public final class TextInput {
 		graphics.enableScissor(x0 + 4, y0, x1 - 4, y1);
 		if (text.isEmpty() && !focused) {
 			lastOffset = 0;
-			LuceatFonts.draw(graphics, font, LuceatFonts.body(placeholder), x0 + 8, textY, 0xFF7C7596, false);
+			LuceatFonts.draw(graphics, font, LuceatFonts.body(placeholder), x0 + 8, textY, 0xFFB1ABCF, false);
 		} else {
 			int caretX = measure(font, text.substring(0, Math.min(caret, text.length())));
 			int visible = x1 - x0 - 16;

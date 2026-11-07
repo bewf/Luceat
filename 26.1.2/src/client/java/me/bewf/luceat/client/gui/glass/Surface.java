@@ -18,6 +18,9 @@ public interface Surface {
 		fillPx(x0 * s, y0 * s, x1 * s, y1 * s, argb);
 	}
 
+	default void veil(int x0, int y0, int x1, int y1) {
+	}
+
 	default void frost(int x0, int y0, int x1, int y1, int inner, int edge, int edgeWidth) {
 	}
 

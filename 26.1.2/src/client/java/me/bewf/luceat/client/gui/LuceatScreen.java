@@ -155,7 +155,16 @@ public final class LuceatScreen extends Screen {
 	private final Map<String, Tip> tips = new HashMap<>();
 	private Tip tipLast;
 	private String lastRowId = "";
+	private record GeneralRow(Setting setting, int y, int left, int right) {
+	}
+
+	private final List<GeneralRow> generalRows = new ArrayList<>();
 	private Setting descLast;
+	private Setting descAnchor;
+	private boolean descTop;
+	private boolean descOn;
+	private int descRowY = -1;
+	private int[] descRect;
 	private int aboutLogoX;
 	private int aboutLogoY;
 	private boolean aboutVisible;
@@ -396,6 +405,9 @@ public final class LuceatScreen extends Screen {
 			dirty = true;
 		}
 		hovered = search.focused() ? null : settingAt(mouseX, mouseY);
+		if (descOn && descRect != null && !search.focused() && mouseX >= descRect[0] && mouseX < descRect[2] && mouseY >= descRect[1] && mouseY < descRect[3]) {
+			hovered = descLast;
+		}
 		if (hovered != null) {
 			lastRowId = hovered.id();
 		}
@@ -407,7 +419,9 @@ public final class LuceatScreen extends Screen {
 				panel.setSpec(Scenes.forSetting(hovered.id()));
 			}
 			panel.setInteractive(dragging != null);
-			panel.place(previewLeft(), bodyTop, previewX1 - previewLeft(), bodyBottom - bodyTop);
+			float grow = anim("full", fullView ? 1.0F : 0.0F, 0.1F);
+			int imageLeft = Math.round(previewX0 + (contentX0 - previewX0) * grow);
+			panel.place(imageLeft, bodyTop, previewX1 - imageLeft, bodyBottom - bodyTop);
 		}
 		int sig = Objects.hash(LuceatConfig.get().asJson().hashCode(), section, search.text(), search.focused(), Math.round(scroll), dragging != null, perf.running(), perf.running() ? perf.progress() : 0, undo.size(), redo.size(),
 			flash != null && System.currentTimeMillis() < flashUntil, previewPage() ? panel.overlayHash() : 0, dropdownScroll, copiedNote != null && System.currentTimeMillis() < copiedUntil, LuceatConfig.get().enabled, perf.note(), fullView);
@@ -522,6 +536,7 @@ public final class LuceatScreen extends Screen {
 	private void rebuildContent(int mouseX, int mouseY, int gs) {
 		hits.clear();
 		tips.clear();
+		descRowY = -1;
 		barMax = 0;
 		content.begin(slabX0, slabY0, slabX1 - slabX0, slabY1 - slabY0, gs);
 		Surface s = content;
@@ -907,18 +922,16 @@ public final class LuceatScreen extends Screen {
 		return bodyTop + STRIP_HEIGHT;
 	}
 
-	private static final int DESC_H = 50;
-
 	private int footerTop() {
-		return bodyBottom - DESC_H;
+		return bodyBottom;
 	}
 
 	private int areaBottom() {
-		return footerTop() - 8;
+		return bodyBottom - 8;
 	}
 
 	private int maxScroll(List<Object> rows) {
-		return Math.max(0, totalHeight(rows) + STRIP_HEIGHT + 64 - (areaBottom() - areaTop()));
+		return Math.max(0, totalHeight(rows) + STRIP_HEIGHT + 20 - (areaBottom() - areaTop()));
 	}
 
 	private void drawResetIcon(Surface s, int cx, int cy, boolean enabled, float over) {
@@ -1062,7 +1075,7 @@ public final class LuceatScreen extends Screen {
 			s.text(BODY, "Nothing matches that.", listLeft, contentTop() + 8, Glass.MUTED);
 		}
 		drawStrip(s, title, settingsOf(rows), stick);
-		drawScrollbar(s, panelX1 - 17, contentTop() + 2, bottom - 4, max);
+		drawScrollbar(s, panelX1 - 17, bodyTop + 12, bottom - 2, max);
 		drawDescription(s);
 	}
 
@@ -1070,24 +1083,44 @@ public final class LuceatScreen extends Screen {
 		boolean show = hovered != null && !search.focused() && !hoverKey.startsWith("tip:");
 		if (show) {
 			descLast = hovered;
-		}
-		float a = anim("desc", show ? 1.0F : 0.0F, 0.06F);
-		int x0 = panelX0 + 10;
-		int x1 = panelRight() - 10;
-		int y1 = bodyBottom;
-		int y0 = footerTop();
-		Glass.tabBottom(s, x0, y0, x1, y1, 12, 1.0F);
-		int width = x1 - x0 - 32;
-		if (descLast != null && a > 0.02F) {
-			List<String> lines = Glass.wrap(s, BODY, descLast.describe(), width, 3);
-			int ty = y0 + 8 + (3 - lines.size()) * 6;
-			for (String line : lines) {
-				s.text(BODY, line, x0 + 16, ty, Paint.alpha(Glass.SOFT, a));
-				ty += 12;
+			if (hovered != descAnchor) {
+				descAnchor = hovered;
+				descTop = descRowY >= 0 && descRowY + ROW_HEIGHT / 2 > (bodyTop + bodyBottom) / 2;
 			}
 		}
-		if (a < 0.98F) {
-			s.text(BODY, "Hover a setting to see what it does when it is on.", x0 + 16, (y0 + y1) / 2 - 5, Paint.alpha(Glass.MUTED, 1.0F - a));
+		float a = anim("desc", show ? 1.0F : 0.0F, 0.05F);
+		descRect = null;
+		descOn = false;
+		if (descLast == null || a < 0.02F) {
+			return;
+		}
+		int x0 = panelX0 + 14;
+		int x1 = panelRight() - 14;
+		List<String> lines = Glass.wrap(s, BODY, descLast.describe(), x1 - x0 - 36, 4);
+		int h = lines.size() * 12 + 24;
+		int slide = Math.round((1.0F - a) * 10.0F);
+		int y0;
+		if (descTop) {
+			y0 = bodyTop + STRIP_HEIGHT + 4 - slide;
+		} else {
+			y0 = bodyBottom - 10 - h + slide;
+		}
+		int y1 = y0 + h;
+		if (a > 0.85F) {
+			s.frost(x0, y0, x1, y1, 2, 10, 20);
+		} else {
+			s.veil(x0, y0, x1, y1);
+		}
+		Glass.overlay(s, x0, y0, x1, y1, 14, a);
+		int ty = y0 + 12;
+		for (String line : lines) {
+			s.text(BODY, line, x0 + 18, ty, Paint.alpha(Glass.TEXT, a));
+			ty += 12;
+		}
+		if (a > 0.5F) {
+			descOn = true;
+			descRect = new int[] {x0, y0, x1, y1};
+			hit(x0, y0, x1, y1, "desc:card", null);
 		}
 	}
 
@@ -1112,6 +1145,7 @@ public final class LuceatScreen extends Screen {
 		int y0 = above < slabY0 + 8 ? tipLast.y1() + 6 : above;
 		int x1 = x0 + w;
 		int y1 = y0 + h;
+		s.veil(x0 - 8, y0 - 8, x1 + 8, y1 + 12);
 		Paint.spread(s, x0, y0 + 3, x1, y1 + 3, 10, 10, 8, 2.0F, (x, y) -> Paint.argb(Math.round(70 * a), 4, 2, 12));
 		Paint.vertical(s, x0, y0, x1, y1, 10, Paint.argb(Math.round(238 * a), 58, 44, 112), Paint.argb(Math.round(244 * a), 30, 22, 64));
 		Paint.outline(s, x0, y0, x1, y1, 10, (x, y) -> Paint.argb(Math.round(150 * a * (y < (y0 + y1) / 2 ? 1.0F : 0.5F)), 222, 208, 255));
@@ -1174,7 +1208,7 @@ public final class LuceatScreen extends Screen {
 	}
 
 	private int trackRight() {
-		return listRight - 56;
+		return listRight - 44;
 	}
 
 	private String costText(Setting setting) {
@@ -1218,6 +1252,9 @@ public final class LuceatScreen extends Screen {
 	private void drawRow(Surface s, Setting setting, int y, int height, int hitTop, int areaBottom, boolean first) {
 		String id = setting.id();
 		String rowKey = "row:" + id;
+		if (setting == hovered) {
+			descRowY = y;
+		}
 		float hover = hoverOf(rowKey);
 		float hoverAny = Math.max(hover, anim("h:ctl:" + id, hoverKey.endsWith(":" + id) ? 1.0F : 0.0F, 0.05F));
 		boolean flashing = setting == flash && System.currentTimeMillis() < flashUntil;
@@ -1463,10 +1500,7 @@ public final class LuceatScreen extends Screen {
 			notes.addAll(Glass.wrap(s, SMALL, note, width, 3));
 		}
 		List<String> fonts = Glass.wrap(s, SMALL, "Fonts: Redaction, Barlow Condensed, Instrument Serif, Huninn, Jersey 25, Birthstone and UnifrakturCook, used under the SIL Open Font License. The licences are in the mod file.", width, 3);
-		boolean lamb = DebugReport.lambInstalled();
-		String lambText = "LambDynamicLights is installed. Both mods light held items, so the light adds up twice. Turn one of them off.";
-		int lambH = lamb ? calloutHeight(s, width, lambText) + 10 : 0;
-		int footer = footerTop() - 12 - fonts.size() * 10 - 14 - notes.size() * 10 - lambH;
+		int footer = footerTop() - 12 - fonts.size() * 10 - 14 - notes.size() * 10;
 		int textTop = top + 84;
 		int available = (split ? footer - 6 : footer - 6 - 3 * ROW_HEIGHT) - textTop;
 		int y = textTop;
@@ -1491,8 +1525,10 @@ public final class LuceatScreen extends Screen {
 		listRight = x1 - 4;
 		int ry = split ? top : Math.min(y + 4, footer - 3 * ROW_HEIGHT - 6);
 		boolean first = true;
+		generalRows.clear();
 		for (Setting setting : settingsIn(LuceatSettings.GENERAL)) {
 			drawRow(s, setting, ry, ROW_HEIGHT, top - 6, footerTop() - 6, first);
+			generalRows.add(new GeneralRow(setting, ry, listLeft, listRight));
 			first = false;
 			ry += ROW_HEIGHT;
 		}
@@ -1500,9 +1536,6 @@ public final class LuceatScreen extends Screen {
 		listRight = savedRight;
 		int fy = footerTop() - 12 - fonts.size() * 10;
 		int ny = fy - 14 - notes.size() * 10;
-		if (lamb) {
-			drawCallout(s, x0 - 4, ny - lambH, width + 8, "LambDynamicLights found", lambText);
-		}
 		s.text(SMALL, "Renderer: " + RenderBackend.kind().label(), x0, ny, Glass.LAVENDER);
 		int line = ny + 12;
 		for (String text : notes) {
@@ -1683,6 +1716,9 @@ public final class LuceatScreen extends Screen {
 			return true;
 		}
 		search.focus(false);
+		if (descOn && descRect != null && mx >= descRect[0] && mx < descRect[2] && my >= descRect[1] && my < descRect[3]) {
+			return true;
+		}
 		if (inside(mx, my, header.close())) {
 			onClose();
 			return true;
@@ -1722,6 +1758,9 @@ public final class LuceatScreen extends Screen {
 				clickLink(top.key.charAt(5) - '0');
 				return true;
 			}
+			if (generalPage() && clickGeneral(mx, my)) {
+				return true;
+			}
 			if (stripReset(mx, my) || clickList(mx, my)) {
 				return true;
 			}
@@ -1745,6 +1784,22 @@ public final class LuceatScreen extends Screen {
 			return speed().click(mx, my, event.button()) || super.mouseClicked(event, doubleClick);
 		}
 		return super.mouseClicked(event, doubleClick);
+	}
+
+	private boolean clickGeneral(double mx, double my) {
+		for (GeneralRow row : generalRows) {
+			if (LuceatLook.inside(mx, my, row.left() - 10, row.y(), row.right() + 10, row.y() + ROW_HEIGHT)) {
+				int savedLeft = listLeft;
+				int savedRight = listRight;
+				listLeft = row.left();
+				listRight = row.right();
+				clickRow(row.setting(), row.y(), ROW_HEIGHT, mx, my);
+				listLeft = savedLeft;
+				listRight = savedRight;
+				return true;
+			}
+		}
+		return false;
 	}
 
 	private boolean clickList(double mx, double my) {

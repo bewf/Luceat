@@ -257,12 +257,12 @@ public final class PresetPicker extends Screen {
 		}
 	}
 
-	private static List<String> wrap(Font font, String text, int width) {
+	private static List<String> wrap(Font font, String text, int width, java.util.function.Function<String, Component> measure) {
 		List<String> lines = new ArrayList<>();
 		StringBuilder line = new StringBuilder();
 		for (String word : text.split(" ")) {
 			String tryLine = line.isEmpty() ? word : line + " " + word;
-			if (LuceatFonts.width(font, LuceatFonts.quote(tryLine)) > width && !line.isEmpty()) {
+			if (LuceatFonts.width(font, measure.apply(tryLine)) > width && !line.isEmpty()) {
 				lines.add(line.toString());
 				line = new StringBuilder(word);
 			} else {
@@ -323,16 +323,31 @@ public final class PresetPicker extends Screen {
 		graphics.blit(tex, x0, y0 + r, x1, y1 - r, u0, u1, vm0, vm1);
 	}
 
+	private static final float PILL_SCALE = 1.15F;
+	private static final float NAME_SCALE = 1.35F;
+	private static final float QUOTE_SCALE = 1.2F;
+
+	private int pillWidth(Component text, Icons.Icon icon) {
+		return 22 + (icon != null ? 15 : 0) + Math.round(LuceatFonts.width(this.font, text) * PILL_SCALE);
+	}
+
+	private void drawScaled(GuiGraphicsExtractor graphics, Component text, float x, float y, float scale, int colour, boolean shadow) {
+		graphics.pose().pushMatrix();
+		graphics.pose().translate(x, y);
+		graphics.pose().scale(scale, scale);
+		LuceatFonts.draw(graphics, this.font, text, 0, 0, colour, shadow);
+		graphics.pose().popMatrix();
+	}
+
 	private int pill(GuiGraphicsExtractor graphics, int x, int y, Component text, Icons.Icon icon, int fill, int border, int ink) {
-		int textW = LuceatFonts.width(this.font, text);
-		int w = 20 + (icon != null ? 14 : 0) + textW;
-		Rounded.draw(graphics, x, y, x + w, y + 18, 9, fill, border);
-		int tx = x + 10;
+		int w = pillWidth(text, icon);
+		Rounded.draw(graphics, x, y, x + w, y + 22, 11, fill, border);
+		int tx = x + 11;
 		if (icon != null) {
-			Icons.sprite(graphics, tx, y + 3, 12, icon, ink);
-			tx += 14;
+			Icons.sprite(graphics, tx, y + 4, 14, icon, ink);
+			tx += 15;
 		}
-		LuceatFonts.draw(graphics, this.font, text, tx, y + 5, ink, false);
+		drawScaled(graphics, text, tx, y + 5, PILL_SCALE, ink, false);
 		return w;
 	}
 
@@ -446,37 +461,43 @@ public final class PresetPicker extends Screen {
 			if (gold) {
 				pillX += pill(graphics, pillX, pillY, LuceatFonts.body("Recommended for you"), Icons.STAR, CREAM, 0, Glass.INK) + 6;
 			}
-			if (current) {
-				if (gold && w < 330) {
-					pillX = x0 + 14;
-					pillY += 24;
-				}
-				pill(graphics, pillX, pillY, LuceatFonts.body("Current"), Icons.CHECK, 0x88120A28, 0xCCC66BFF, LuceatLook.TEXT);
-			}
 			Component cost = LuceatFonts.body(preset.cost());
-			int costW = LuceatFonts.width(this.font, cost) + 20;
+			int costW = pillWidth(cost, null);
 			pill(graphics, x1 - 14 - costW, y0 + 14, cost, null, 0x88120A28, 0x70E4D6FF, LuceatLook.TEXT);
 
 			float out = chosen == null ? 0.0F : Math.min(1.0F, (now - chosenAt) / 300_000_000.0F);
 			int textAlpha = Math.round(255.0F * inCard * (1.0F - out * out * out));
-			int nameY = y1 - 30;
+			int nameY = y1 - 36;
 			graphics.enableScissor(x0 + 2, y0, x1 - 2, y1);
 			if (textAlpha > 8) {
 				Component name = LuceatFonts.preset(preset.name(), title(preset.name()));
-				LuceatFonts.draw(graphics, this.font, name, x0 + 18, nameY, alpha(LuceatLook.TEXT, textAlpha), true);
+				drawScaled(graphics, name, x0 + 18, nameY, NAME_SCALE, alpha(LuceatLook.TEXT, textAlpha), true);
+				if (current) {
+					Component here = LuceatFonts.body("Current");
+					int hereW = pillWidth(here, Icons.CHECK);
+					int nameEnd = x0 + 18 + Math.round(LuceatFonts.width(this.font, name) * NAME_SCALE) + 8;
+					int hereX = x1 - 14 - hereW;
+					int hereY = y1 - 14 - 22;
+					if (hereX < nameEnd) {
+						hereX = x0 + 14;
+						hereY = y0 + 14 + (gold ? 28 : 0);
+					}
+					pill(graphics, hereX, hereY, here, Icons.CHECK, 0x88120A28, 0xCCC66BFF, LuceatLook.TEXT);
+				}
 				float quoteIn = ease((w / (float) span - 0.40F) / 0.08F);
 				if (quoteIn > 0.02F) {
 					String[] parts = split(preset.blurb());
-					List<String> lines = wrap(this.font, "“" + parts[0] + "”", w - 36);
-					int blockH = lines.size() * 12 + (parts[1].isEmpty() ? 0 : 14);
-					int qy = nameY - 10 - blockH;
+					java.util.function.Function<String, Component> face = chunk -> LuceatFonts.preset(preset.name(), chunk);
+					List<String> lines = wrap(this.font, "“" + parts[0] + "”", Math.round((w - 36) / QUOTE_SCALE), face);
+					int blockH = lines.size() * 15 + (parts[1].isEmpty() ? 0 : 17);
+					int qy = nameY - 12 - blockH;
 					int qa = Math.round(textAlpha * quoteIn);
 					for (String line : lines) {
-						LuceatFonts.draw(graphics, this.font, LuceatFonts.quote(line), x0 + 18, qy, alpha(LuceatLook.SOFT, qa), false);
-						qy += 12;
+						drawScaled(graphics, face.apply(line), x0 + 18, qy, QUOTE_SCALE, alpha(LuceatLook.TEXT, qa), false);
+						qy += 15;
 					}
 					if (!parts[1].isEmpty()) {
-						LuceatFonts.draw(graphics, this.font, LuceatFonts.quote(parts[1]), x0 + 36, qy + 2, alpha(LuceatLook.mix(LuceatLook.MUTED, colour, 0.5F), qa), false);
+						drawScaled(graphics, face.apply(parts[1]), x0 + 36, qy + 2, QUOTE_SCALE, alpha(LuceatLook.mix(LuceatLook.SOFT, colour, 0.5F), qa), false);
 					}
 				}
 			}

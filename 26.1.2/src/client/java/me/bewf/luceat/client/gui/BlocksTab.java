@@ -376,7 +376,7 @@ public final class BlocksTab {
 				int level = effectiveLevel(entry);
 				boolean added = rule != null && rule.added;
 				String status = level > 0 ? "Level " + level : rule != null && !rule.enabled ? "Off" : "No light";
-				int statusColour = level > 0 ? isSelected ? 0xFFFFFFFF : LuceatLook.TEXT : rule != null && !rule.enabled ? LuceatLook.BAD : isSelected ? 0xFFDCCBF5 : 0xFF8E8EA0;
+				int statusColour = level > 0 ? isSelected ? 0xFFFFFFFF : LuceatLook.TEXT : rule != null && !rule.enabled ? LuceatLook.BAD : isSelected ? 0xFFEFE6FF : 0xFFC9C3E4;
 				rx -= inkWidth(status);
 				ink(graphics, status, rx, y + 10, statusColour, false);
 				if (level > 0) {
@@ -412,8 +412,8 @@ public final class BlocksTab {
 			barThumb = Math.max(24, barTrackH * barTrackH / (barTrackH + barMax));
 			barThumbTop = top + Math.round((barTrackH - barThumb) * (scroll / barMax));
 			boolean barOver = free && LuceatLook.inside(mx, my, x1 + 1, barThumbTop, x1 + 8, barThumbTop + barThumb);
-			LuceatLook.round(graphics, x1 + 3, top, x1 + 7, y1, 0x55120D20);
-			LuceatLook.round(graphics, x1 + 3, barThumbTop, x1 + 7, barThumbTop + barThumb, draggingBar ? LuceatLook.ACCENT : barOver ? 0xFF8F78E8 : LuceatLook.ACCENT_DIM);
+			LuceatLook.round(graphics, x1 + 3, top, x1 + 7, y1, 0x16CDBBFF);
+			LuceatLook.round(graphics, x1 + 3, barThumbTop, x1 + 7, barThumbTop + barThumb, draggingBar ? 0xB2CDBBFF : barOver ? 0x80CDBBFF : 0x4ECDBBFF);
 		}
 		if (tip != null) {
 			graphics.setTooltipForNextFrame(font, tip, Math.round(mx * factor), Math.round(my * factor));
