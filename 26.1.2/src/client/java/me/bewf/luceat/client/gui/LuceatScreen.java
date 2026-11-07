@@ -15,6 +15,7 @@ import me.bewf.luceat.client.gui.glass.Glass;
 import me.bewf.luceat.client.gui.glass.Icons;
 import me.bewf.luceat.client.gui.glass.LuceatBlur;
 import me.bewf.luceat.client.gui.glass.Motion;
+import me.bewf.luceat.client.gui.glass.Optics;
 import me.bewf.luceat.client.gui.glass.Paint;
 import me.bewf.luceat.client.gui.glass.Pane;
 import me.bewf.luceat.client.gui.glass.Surface;
@@ -160,10 +161,7 @@ public final class LuceatScreen extends Screen {
 
 	private final List<GeneralRow> generalRows = new ArrayList<>();
 	private Setting descLast;
-	private Setting descAnchor;
-	private boolean descTop;
 	private boolean descOn;
-	private int descRowY = -1;
 	private int[] descRect;
 	private int aboutLogoX;
 	private int aboutLogoY;
@@ -536,7 +534,6 @@ public final class LuceatScreen extends Screen {
 	private void rebuildContent(int mouseX, int mouseY, int gs) {
 		hits.clear();
 		tips.clear();
-		descRowY = -1;
 		barMax = 0;
 		content.begin(slabX0, slabY0, slabX1 - slabX0, slabY1 - slabY0, gs);
 		Surface s = content;
@@ -943,8 +940,7 @@ public final class LuceatScreen extends Screen {
 		int y0 = bodyTop;
 		int y1 = bodyTop + STRIP_HEIGHT;
 		if (stick > 0.02F) {
-			s.frost(panelX0 + 10, y0, panelX1 - 10, y1, 2, 10, 20);
-			Glass.tabTop(s, panelX0 + 10, y0, panelX1 - 10, y1, 12, stick);
+			s.lens(panelX0 + 10, y0, panelX1 - 10, y1, 0, 12, Optics.CLEAR, stick);
 		}
 		s.text(HEADING, title, listLeft, bodyTop + 11, Glass.TEXT);
 		int changed = changedCount(rows);
@@ -1083,10 +1079,6 @@ public final class LuceatScreen extends Screen {
 		boolean show = hovered != null && !search.focused() && !hoverKey.startsWith("tip:");
 		if (show) {
 			descLast = hovered;
-			if (hovered != descAnchor) {
-				descAnchor = hovered;
-				descTop = descRowY >= 0 && descRowY + ROW_HEIGHT / 2 > (bodyTop + bodyBottom) / 2;
-			}
 		}
 		float a = anim("desc", show ? 1.0F : 0.0F, 0.05F);
 		descRect = null;
@@ -1094,29 +1086,20 @@ public final class LuceatScreen extends Screen {
 		if (descLast == null || a < 0.02F) {
 			return;
 		}
-		int x0 = panelX0 + 14;
-		int x1 = panelRight() - 14;
-		List<String> lines = Glass.wrap(s, BODY, descLast.describe(), x1 - x0 - 36, 4);
+		int x0 = panelX0 + 10;
+		int x1 = panelRight() - 10;
+		List<String> lines = Glass.wrap(s, BODY, descLast.describe(), x1 - x0 - 32, 4);
 		int h = lines.size() * 12 + 24;
-		int slide = Math.round((1.0F - a) * 10.0F);
-		int y0;
-		if (descTop) {
-			y0 = bodyTop + STRIP_HEIGHT + 4 - slide;
-		} else {
-			y0 = bodyBottom - 10 - h + slide;
-		}
-		int y1 = y0 + h;
-		if (a > 0.85F) {
-			s.frost(x0, y0, x1, y1, 2, 10, 20);
-		} else {
-			s.veil(x0, y0, x1, y1);
-		}
-		Glass.overlay(s, x0, y0, x1, y1, 14, a);
+		int y1 = bodyBottom;
+		int y0 = y1 - h + Math.round((1.0F - a) * (1.0F - a) * h);
+		s.clip(panelX0, bodyTop, panelRight(), bodyBottom);
+		s.lens(x0, y0, x1, y1, 12, 0, Optics.DENSE, a);
 		int ty = y0 + 12;
 		for (String line : lines) {
-			s.text(BODY, line, x0 + 18, ty, Paint.alpha(Glass.TEXT, a));
+			s.text(BODY, line, x0 + 16, ty, Paint.alpha(Glass.TEXT, a));
 			ty += 12;
 		}
+		s.unclip();
 		if (a > 0.5F) {
 			descOn = true;
 			descRect = new int[] {x0, y0, x1, y1};
@@ -1252,9 +1235,6 @@ public final class LuceatScreen extends Screen {
 	private void drawRow(Surface s, Setting setting, int y, int height, int hitTop, int areaBottom, boolean first) {
 		String id = setting.id();
 		String rowKey = "row:" + id;
-		if (setting == hovered) {
-			descRowY = y;
-		}
 		float hover = hoverOf(rowKey);
 		float hoverAny = Math.max(hover, anim("h:ctl:" + id, hoverKey.endsWith(":" + id) ? 1.0F : 0.0F, 0.05F));
 		boolean flashing = setting == flash && System.currentTimeMillis() < flashUntil;

@@ -64,13 +64,6 @@ public final class Glass {
 		Paint.outline(s, x0, y0, x1, y1, r, 0, (x, y) -> y > y1 - 1.5F ? 0 : argb(Math.round(a * 255 * (0.1F + 0.36F * lit(x, y, x0, y0, x1, y1))), 226, 212, 255));
 	}
 
-	public static void overlay(Surface s, int x0, int y0, int x1, int y1, int r, float a) {
-		Paint.spread(s, x0, y0 + 4, x1, y1 + 4, r, r, 26, 2.0F, (x, y) -> argb(Math.round(64 * a), 4, 2, 12));
-		Paint.vertical(s, x0, y0, x1, y1, r, argb(Math.round(112 * a), 38, 26, 88), argb(Math.round(124 * a), 20, 12, 54));
-		Paint.bloom(s, x0, y0, x1, y1, r, r, 28, 1.8F, (x, y) -> argb(Math.round(52 * a * (0.3F + 0.7F * lit(x, y, x0, y0, x1, y1))), 206, 190, 255));
-		Paint.outline(s, x0, y0, x1, y1, r, (x, y) -> argb(Math.round(a * 255 * (0.1F + 0.42F * lit(x, y, x0, y0, x1, y1))), 226, 212, 255));
-	}
-
 	public static void inset(Surface s, int x0, int y0, int x1, int y1, int r) {
 		Paint.round(s, x0, y0, x1, y1, r, argb(110, 5, 3, 12));
 		Paint.outline(s, x0, y0, x1, y1, r, (x, y) -> y < (y0 + y1) / 2 ? argb(80, 0, 0, 0) : argb(26, 205, 187, 255));

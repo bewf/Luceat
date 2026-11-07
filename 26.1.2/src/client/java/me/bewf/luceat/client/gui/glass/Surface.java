@@ -21,6 +21,9 @@ public interface Surface {
 	default void veil(int x0, int y0, int x1, int y1) {
 	}
 
+	default void lens(int x0, int y0, int x1, int y1, int rTop, int rBottom, Optics.Look look, float strength) {
+	}
+
 	default void frost(int x0, int y0, int x1, int y1, int inner, int edge, int edgeWidth) {
 	}
 

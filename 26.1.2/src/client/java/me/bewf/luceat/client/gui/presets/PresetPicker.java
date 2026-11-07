@@ -48,6 +48,8 @@ public final class PresetPicker extends Screen {
 	private final float[] weight = {1.0F / 3.0F, 1.0F / 3.0F, 1.0F / 3.0F, 0.0F};
 	private final float[] dim = new float[4];
 	private final float[] lift = new float[4];
+	private final float[] weightVel = new float[4];
+	private final float[] liftVel = new float[4];
 	private int focus = -1;
 	private int pending = -1;
 	private long pendingSince;
@@ -77,7 +79,7 @@ public final class PresetPicker extends Screen {
 
 	@Override
 	protected void init() {
-		LuceatBlur.activate(true);
+		LuceatBlur.activate(false);
 	}
 
 	@Override
@@ -105,6 +107,10 @@ public final class PresetPicker extends Screen {
 
 	private static int alpha(int rgb, int a) {
 		return (Math.max(0, Math.min(255, a)) << 24) | (rgb & 0xFFFFFF);
+	}
+
+	private static int fadeArgb(int argb, float f) {
+		return (Math.round((argb >>> 24) * Math.max(0.0F, Math.min(1.0F, f))) << 24) | (argb & 0xFFFFFF);
 	}
 
 	private static float q(float value) {
@@ -197,6 +203,15 @@ public final class PresetPicker extends Screen {
 		return -1;
 	}
 
+	private boolean inGroup(double mx, double my, int[] r, int cards) {
+		return my >= cardTop() && my <= cardBottom() && mx >= r[0] && mx < r[(cards - 1) * 2 + 1];
+	}
+
+	private int stableWidth(int index, int cards) {
+		int[] r = rects(targetWeights(cards, index));
+		return r[index * 2 + 1] - r[index * 2];
+	}
+
 	private Presets.Preset presetAt(int index) {
 		return index < 3 ? normal.get(Math.min(index, normal.size() - 1)) : hardcore;
 	}
@@ -215,6 +230,11 @@ public final class PresetPicker extends Screen {
 		int cards = count();
 		int[] target = rects(targetWeights(cards, focus));
 		int under = cardAt(mouseX, mouseY, target, cards);
+		if (under < 0 && focus >= 0 && inGroup(mouseX, mouseY, target, cards)) {
+			pending = -1;
+			leftSince = -1L;
+			return;
+		}
 		if (under < 0) {
 			pending = -1;
 			if (focus >= 0) {
@@ -247,13 +267,22 @@ public final class PresetPicker extends Screen {
 		lastNanos = now;
 		float[] target = targetWeights(count(), focus);
 		boolean revealing = ringStart >= 0L && now - ringStart < 900_000_000L;
-		float half = revealing ? 0.1F : 0.07F;
-		float k = 1.0F - (float) Math.exp(-dt * 0.6931F / half);
+		float omega = revealing ? 14.0F : 19.0F;
+		int steps = Math.max(1, (int) Math.ceil(dt / 0.008F));
+		float h = dt / steps;
+		for (int s = 0; s < steps; s++) {
+			for (int i = 0; i < 4; i++) {
+				weightVel[i] += (omega * omega * (target[i] - weight[i]) - 2.0F * omega * weightVel[i]) * h;
+				weight[i] = Math.max(0.0F, weight[i] + weightVel[i] * h);
+				float liftTarget = focus == i ? 1.0F : 0.0F;
+				liftVel[i] += (omega * omega * (liftTarget - lift[i]) - 2.0F * omega * liftVel[i]) * h;
+				lift[i] = Math.max(0.0F, Math.min(1.0F, lift[i] + liftVel[i] * h));
+			}
+		}
+		float k = 1.0F - (float) Math.exp(-dt * 0.6931F / 0.07F);
 		for (int i = 0; i < 4; i++) {
-			weight[i] += (target[i] - weight[i]) * k;
 			float dimTarget = chosen != null ? (i == chosenIndex ? 0.0F : 1.0F) : focus >= 0 && focus != i ? 1.0F : 0.0F;
 			dim[i] += (dimTarget - dim[i]) * k;
-			lift[i] += ((focus == i ? 1.0F : 0.0F) - lift[i]) * k;
 		}
 	}
 
@@ -347,7 +376,7 @@ public final class PresetPicker extends Screen {
 			Icons.sprite(graphics, tx, y + 4, 14, icon, ink);
 			tx += 15;
 		}
-		drawScaled(graphics, text, tx, y + 5, PILL_SCALE, ink, false);
+		drawScaled(graphics, text, tx, y + 6, PILL_SCALE, ink, false);
 		return w;
 	}
 
@@ -384,7 +413,11 @@ public final class PresetPicker extends Screen {
 		int top = cardTop();
 		int bottom = cardBottom();
 		int height = bottom - top;
-		int span = this.width - Math.round(this.width * 0.08F);
+		int[] settledRects = rects(targetWeights(count(), focus));
+		int[] settledWidths = new int[4];
+		for (int k = 0; k < 4; k++) {
+			settledWidths[k] = settledRects[k * 2 + 1] - settledRects[k * 2];
+		}
 		LuceatConfig live = LuceatConfig.get();
 		for (int i = 0; i < 4; i++) {
 			int x0 = layout[i * 2];
@@ -463,7 +496,11 @@ public final class PresetPicker extends Screen {
 			}
 			Component cost = LuceatFonts.body(preset.cost());
 			int costW = pillWidth(cost, null);
-			pill(graphics, x1 - 14 - costW, y0 + 14, cost, null, 0x88120A28, 0x70E4D6FF, LuceatLook.TEXT);
+			int costX = x1 - 14 - costW;
+			float costIn = q((costX - pillX - 4) / 16.0F);
+			if (costIn > 0.0F) {
+				pill(graphics, costX, y0 + 14, cost, null, fadeArgb(0x88120A28, costIn), fadeArgb(0x70E4D6FF, costIn), fadeArgb(LuceatLook.TEXT, costIn));
+			}
 
 			float out = chosen == null ? 0.0F : Math.min(1.0F, (now - chosenAt) / 300_000_000.0F);
 			int textAlpha = Math.round(255.0F * inCard * (1.0F - out * out * out));
@@ -478,17 +515,17 @@ public final class PresetPicker extends Screen {
 					int nameEnd = x0 + 18 + Math.round(LuceatFonts.width(this.font, name) * NAME_SCALE) + 8;
 					int hereX = x1 - 14 - hereW;
 					int hereY = y1 - 14 - 22;
-					if (hereX < nameEnd) {
+					if (x0 + settledWidths[i] - 14 - hereW < nameEnd) {
 						hereX = x0 + 14;
 						hereY = y0 + 14 + (gold ? 28 : 0);
 					}
 					pill(graphics, hereX, hereY, here, Icons.CHECK, 0x88120A28, 0xCCC66BFF, LuceatLook.TEXT);
 				}
-				float quoteIn = ease((w / (float) span - 0.40F) / 0.08F);
+				float quoteIn = ease((lift[i] - 0.35F) / 0.45F);
 				if (quoteIn > 0.02F) {
 					String[] parts = split(preset.blurb());
 					java.util.function.Function<String, Component> face = chunk -> LuceatFonts.preset(preset.name(), chunk);
-					List<String> lines = wrap(this.font, "“" + parts[0] + "”", Math.round((w - 36) / QUOTE_SCALE), face);
+					List<String> lines = wrap(this.font, "“" + parts[0] + "”", Math.round((stableWidth(i, count()) - 36) / QUOTE_SCALE), face);
 					int blockH = lines.size() * 15 + (parts[1].isEmpty() ? 0 : 17);
 					int qy = nameY - 12 - blockH;
 					int qa = Math.round(textAlpha * quoteIn);
