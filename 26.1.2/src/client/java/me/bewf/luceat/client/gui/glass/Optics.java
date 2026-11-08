@@ -7,8 +7,8 @@ public final class Optics {
 	public record Look(float blur, float body, float refract, float depth, float dispersion, int tint, float rim, float shade, float glow, float lightX, float lightY) {
 	}
 
-	public static final Look CLEAR = new Look(1.4F, 0.0F, 4.5F, 11.0F, 0.3F, 0x2A0F0A22, 0.95F, 0.55F, 0.2F, -0.62F, -0.78F);
-	public static final Look DENSE = new Look(1.6F, 0.75F, 4.0F, 11.0F, 0.25F, 0x660F0A22, 0.95F, 0.55F, 0.2F, -0.62F, -0.78F);
+	public static final Look CLEAR = new Look(6.0F, 1.0F, 4.5F, 11.0F, 0.3F, 0x2A0F0A22, 0.95F, 0.55F, 0.2F, -0.62F, -0.78F);
+	public static final Look DENSE = new Look(6.0F, 1.0F, 4.0F, 11.0F, 0.25F, 0x660F0A22, 0.95F, 0.55F, 0.2F, -0.62F, -0.78F);
 
 	private static final int LUT = 256;
 	private static final float[] LIT_RIM = new float[LUT];

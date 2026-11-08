@@ -21,6 +21,8 @@ public final class Texts {
 			case BALANCED -> LuceatFonts.preset("balanced", text);
 			case PHENOMENAL -> LuceatFonts.preset("phenomenal", text);
 			case HARDCORE -> LuceatFonts.preset("hardcore", text);
+			case PLAIN -> Component.literal(text);
+			case OVERSAMPLED -> LuceatFonts.oversampled(text);
 		};
 	}
 

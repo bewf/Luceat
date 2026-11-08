@@ -37,6 +37,8 @@ public interface Surface {
 		POTATO,
 		BALANCED,
 		PHENOMENAL,
-		HARDCORE
+		HARDCORE,
+		PLAIN,
+		OVERSAMPLED
 	}
 }

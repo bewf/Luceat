@@ -54,6 +54,10 @@ public final class LuceatFonts {
 		return Component.literal(text).withStyle(styled("body"));
 	}
 
+	public static Component oversampled(String text) {
+		return Component.literal(text).withStyle(styled("test"));
+	}
+
 	public static Component quote(String text) {
 		return Component.literal(text).withStyle(styled("quote"));
 	}

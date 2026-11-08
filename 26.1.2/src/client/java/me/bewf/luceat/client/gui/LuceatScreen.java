@@ -58,6 +58,7 @@ public final class LuceatScreen extends Screen {
 	private static final int ROW_HEIGHT = 46;
 	private static final int HEAD_HEIGHT = 30;
 	private static final int STRIP_HEIGHT = 38;
+	private static final int OVERSCROLL = 110;
 	private static final int HEADER_HEIGHT = 50;
 	private static String lastSection;
 	private static float lastScroll;
@@ -928,7 +929,7 @@ public final class LuceatScreen extends Screen {
 	}
 
 	private int maxScroll(List<Object> rows) {
-		return Math.max(0, totalHeight(rows) + STRIP_HEIGHT + 20 - (areaBottom() - areaTop()));
+		return Math.max(0, totalHeight(rows) + STRIP_HEIGHT + 20 + OVERSCROLL - (areaBottom() - areaTop()));
 	}
 
 	private void drawResetIcon(Surface s, int cx, int cy, boolean enabled, float over) {
@@ -1071,7 +1072,7 @@ public final class LuceatScreen extends Screen {
 			s.text(BODY, "Nothing matches that.", listLeft, contentTop() + 8, Glass.MUTED);
 		}
 		drawStrip(s, title, settingsOf(rows), stick);
-		drawScrollbar(s, panelX1 - 17, bodyTop + 12, bottom - 2, max);
+		drawScrollbar(s, panelX1 - 9, bodyTop + 12, bottom - 2, max);
 		drawDescription(s);
 	}
 
@@ -1408,7 +1409,7 @@ public final class LuceatScreen extends Screen {
 		int end = drawDebug(s, shift);
 		s.unclip();
 		pageMax = Math.max(0, end + shift - (footerTop() - 12));
-		drawScrollbar(s, contentX1 - 10, bodyTop + 2, footerTop() - 8, pageMax);
+		drawScrollbar(s, contentX1 - 6, bodyTop + 2, footerTop() - 8, pageMax);
 	}
 
 	private void viewHit(int x0, int y0, int x1, int y1, String key) {
@@ -1581,6 +1582,13 @@ public final class LuceatScreen extends Screen {
 			bx += bw + 8;
 		}
 		int end = by + 24;
+		String sample = "The quick brown fox jumps over the lazy dog 0123456789";
+		int sy = end + 36;
+		s.text(BODY, "Text test: vanilla font, Luceat font, Luceat font at 2x oversample", x, sy, Glass.MUTED);
+		s.text(Surface.Role.PLAIN, sample, x, sy + 16, Glass.TEXT);
+		s.text(BODY, sample, x, sy + 32, Glass.TEXT);
+		s.text(Surface.Role.OVERSAMPLED, sample, x, sy + 48, Glass.TEXT);
+		end = sy + 62;
 		if (copiedNote != null && System.currentTimeMillis() < copiedUntil) {
 			s.text(BODY, copiedNote, x, by + 32, Glass.GOOD);
 			end += 20;

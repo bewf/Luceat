@@ -23,9 +23,10 @@ import net.minecraft.resources.Identifier;
 
 public final class PreviewPanel {
 	private static final int TIME_W = 214;
+	private static final int MIN_TIME_W = 140;
 	private static final float NIGHT = 0.04F;
 	private static final int MAX_PIXELS = 1_800_000;
-	private static final float[] TIER_SCALE = {0.28F, 0.5F, 1.0F};
+	private static final float MOVE_BUDGET_MS = 70.0F;
 
 	private static final class Target {
 		final Identifier id;
@@ -83,6 +84,7 @@ public final class PreviewPanel {
 	private int lastBase;
 	private long submittedAt;
 	private long lastRenderMillis;
+	private float msPerPixel;
 	private boolean interactive;
 	private int imageX;
 	private int imageY;
@@ -175,8 +177,10 @@ public final class PreviewPanel {
 			return;
 		}
 		Scene scene = spec.scene();
-		int left = imageX + 14;
+		int fadeUnits = Math.min(imageW / 2, Math.round(Math.max(48.0F, imageW * 0.14F)));
+		int left = imageX + Math.max(14, Math.round(fadeUnits * 0.7F));
 		int right = imageX + imageW - 14;
+		int avail = right - left;
 		Paint.vertical(s, imageX, imageY, imageX + imageW, imageY + 30, 12, Paint.argb(54, 6, 4, 14), Paint.argb(0, 6, 4, 14));
 		Paint.vertical(s, imageX, imageY + imageH - 38, imageX + imageW, imageY + imageH, 12, Paint.argb(0, 6, 4, 14), Paint.argb(64, 6, 4, 14));
 		int rowTop = imageY + 19;
@@ -187,40 +191,46 @@ public final class PreviewPanel {
 		int noteRow = rowTop + 20;
 		int bottomRow = imageY + imageH - 22;
 		int pillH = 28;
-		int dragW = s.width(Surface.Role.BODY, "Drag");
-		int scrollW = s.width(Surface.Role.BODY, "Scroll");
-		int hintFull = 12 + 14 + 6 + dragW + 14 + 1 + 14 + 14 + 6 + scrollW + 12;
-		int hintIcons = 12 + 14 + 14 + 1 + 14 + 14 + 12;
-		boolean icons = imageW < hintFull + TIME_W + 28 + 10;
-		int hintW = icons ? hintIcons : hintFull;
+		String zoomLong = "Scroll to zoom";
+		String moveLong = "Drag to move";
+		String zoomShort = "Zoom";
+		String moveShort = "Move";
+		int hintLong = 12 + 14 + 6 + s.width(Surface.Role.BODY, zoomLong) + 14 + 1 + 14 + 14 + 6 + s.width(Surface.Role.BODY, moveLong) + 12;
+		int hintShort = 12 + 14 + 6 + s.width(Surface.Role.BODY, zoomShort) + 14 + 1 + 14 + 14 + 6 + s.width(Surface.Role.BODY, moveShort) + 12;
+		boolean shortLabels = hintLong > avail;
+		boolean icons = hintShort > avail;
+		int hintW = icons ? 12 + 14 + 14 + 1 + 14 + 14 + 12 : shortLabels ? hintShort : hintLong;
+		boolean stacked = hintW + 10 + MIN_TIME_W > avail;
 		int timeRow = bottomRow;
-		int hintRow = bottomRow;
+		int hintRow = stacked ? bottomRow - pillH - 8 : bottomRow;
 		if (note != null && !note.isEmpty() && noteRow + 8 < hintRow - pillH / 2 - 6) {
 			String text = Glass.fit(s, Surface.Role.BODY, note, imageW - 28 - 18);
 			Icons.draw(s, left, noteRow - 6, 12, Icons.ALERT, Glass.WARN);
 			s.text(Surface.Role.BODY, text, left + 18, Bar.textTop(noteRow), Glass.WARN);
 		}
+		String zoomLabel = shortLabels ? zoomShort : zoomLong;
+		String moveLabel = shortLabels ? moveShort : moveLong;
 		Glass.pane(s, left, hintRow - pillH / 2, left + hintW, hintRow + pillH / 2, pillH / 2, 0.0F, 0.0F);
 		int hx = left + 12;
-		Icons.draw(s, hx, hintRow - 7, 14, Icons.MOUSE_DRAG, Glass.SOFT);
+		Icons.draw(s, hx, hintRow - 7, 14, Icons.MOUSE_WHEEL, Glass.SOFT);
 		int divX;
 		if (icons) {
 			divX = hx + 14 + 14;
 		} else {
-			s.text(Surface.Role.BODY, "Drag", hx + 20, Bar.textTop(hintRow), Glass.SOFT);
-			divX = hx + 20 + dragW + 14;
+			s.text(Surface.Role.BODY, zoomLabel, hx + 20, Bar.textTop(hintRow), Glass.SOFT);
+			divX = hx + 20 + s.width(Surface.Role.BODY, zoomLabel) + 14;
 		}
 		Paint.vertical(s, divX, hintRow - 8, divX + 1, hintRow, 0, Paint.argb(0, 205, 187, 255), Paint.argb(60, 205, 187, 255));
 		Paint.vertical(s, divX, hintRow, divX + 1, hintRow + 8, 0, Paint.argb(60, 205, 187, 255), Paint.argb(0, 205, 187, 255));
 		int sx = divX + 1 + 14;
-		Icons.draw(s, sx, hintRow - 7, 14, Icons.MOUSE_WHEEL, Glass.SOFT);
+		Icons.draw(s, sx, hintRow - 7, 14, Icons.MOUSE_DRAG, Glass.SOFT);
 		if (!icons) {
-			s.text(Surface.Role.BODY, "Scroll", sx + 20, Bar.textTop(hintRow), Glass.SOFT);
+			s.text(Surface.Role.BODY, moveLabel, sx + 20, Bar.textTop(hintRow), Glass.SOFT);
 		}
 
 		int labelW = Math.max(s.width(Surface.Role.BODY, "Night"), Math.max(s.width(Surface.Role.BODY, "Evening"), s.width(Surface.Role.BODY, "Day")));
 		int columnW = labelW + 24;
-		int timeW = Math.max(120, Math.min(TIME_W, imageW - 28 - hintW - 10));
+		int timeW = stacked ? Math.max(MIN_TIME_W, Math.min(TIME_W, avail)) : Math.max(MIN_TIME_W, Math.min(TIME_W, avail - hintW - 10));
 		int timeX1 = right;
 		int timeX0 = timeX1 - timeW;
 		Glass.pane(s, timeX0, timeRow - pillH / 2, timeX1, timeRow + pillH / 2, pillH / 2, 0.0F, 0.0F);
@@ -332,7 +342,7 @@ public final class PreviewPanel {
 		double[] eye = scene.eye;
 		double[] target = PreviewRenderer.lookTarget(scene, lookYaw, lookPitch);
 		double fov = PreviewRenderer.zoomFov(scene.fov, zoom);
-		float quality = TIER_SCALE[tier];
+		float quality = tier == 2 ? 1.0F : tier == 1 ? Math.max(0.85F, moveScale(ow, oh)) : moveScale(ow, oh);
 		int tw = Math.max(48, Math.round(ow * quality));
 		int th = Math.max(36, Math.round(oh * quality));
 		int radius = Math.round(12.0F * gs);
@@ -343,6 +353,14 @@ public final class PreviewPanel {
 		submittedAt = System.nanoTime();
 		inFlight = true;
 		worker.submit(request);
+	}
+
+	private float moveScale(int ow, int oh) {
+		if (msPerPixel <= 0.0F) {
+			return 0.6F;
+		}
+		float fitted = (float) Math.sqrt(MOVE_BUDGET_MS / (msPerPixel * ow * oh));
+		return Math.max(0.5F, Math.min(0.85F, fitted));
 	}
 
 	public long lastRenderMillis() {
