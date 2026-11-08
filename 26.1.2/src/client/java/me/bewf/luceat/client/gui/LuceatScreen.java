@@ -481,7 +481,7 @@ public final class LuceatScreen extends Screen {
 	private void buildChrome(Surface s, boolean panelNow) {
 		Glass.backdrop(s, fit.width(), fit.height());
 		Glass.slab(s, slabX0, slabY0, slabX1, slabY1, 16);
-		s.lens(slabX0 + 16, slabY0, slabX1 - 16, slabY0 + HEADER_HEIGHT, 0, 14, Optics.CLEAR, 1.0F);
+		s.lens(slabX0, slabY0, slabX1, slabY0 + HEADER_HEIGHT, 16, 14, Optics.CLEAR, 1.0F);
 		if (panelNow) {
 			Glass.panel(s, panelX0, bodyTop, panelRight(), bodyBottom, 12);
 		}
@@ -941,7 +941,7 @@ public final class LuceatScreen extends Screen {
 		int y0 = bodyTop;
 		int y1 = bodyTop + STRIP_HEIGHT;
 		if (stick > 0.02F) {
-			s.lens(panelX0 + 10, y0, panelX1 - 10, y1, 0, 12, Optics.CLEAR, stick);
+			s.lens(panelX0, y0, panelX1, y1, 12, 12, Optics.CLEAR, stick);
 		}
 		s.text(HEADING, title, listLeft, bodyTop + 11, Glass.TEXT);
 		int changed = changedCount(rows);
@@ -1087,14 +1087,14 @@ public final class LuceatScreen extends Screen {
 		if (descLast == null || a < 0.02F) {
 			return;
 		}
-		int x0 = panelX0 + 10;
-		int x1 = panelRight() - 10;
+		int x0 = panelX0;
+		int x1 = panelRight();
 		List<String> lines = Glass.wrap(s, BODY, descLast.describe(), x1 - x0 - 32, 4);
 		int h = lines.size() * 12 + 24;
 		int y1 = bodyBottom;
 		int y0 = y1 - h + Math.round((1.0F - a) * (1.0F - a) * h);
 		s.clip(panelX0, bodyTop, panelRight(), bodyBottom);
-		s.lens(x0, y0, x1, y1, 12, 0, Optics.DENSE, a);
+		s.lens(x0, y0, x1, y1, 12, 12, Optics.DENSE, a);
 		int ty = y0 + 12;
 		for (String line : lines) {
 			s.text(BODY, line, x0 + 16, ty, Paint.alpha(Glass.TEXT, a));

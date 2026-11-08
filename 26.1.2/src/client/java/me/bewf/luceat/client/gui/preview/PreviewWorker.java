@@ -115,6 +115,7 @@ final class PreviewWorker {
 		int[] pixels = tw == ow && th == oh ? traced : upscale(traced, tw, th, ow, oh);
 		float pixelsPerUnit = request.radius() / 12.0F;
 		PreviewMask.rim(pixels, ow, oh, traced, tw, th, Math.round(26.0F * pixelsPerUnit), 6.0F, pixelsPerUnit);
+		PreviewMask.scrim(pixels, ow, oh, Math.round(34.0F * pixelsPerUnit), Math.round(44.0F * pixelsPerUnit), 90, 110);
 		PreviewMask.apply(pixels, ow, oh, request.radius(), request.fade(), false);
 		return new Result(request, pixels, tracer);
 	}

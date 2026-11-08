@@ -7,8 +7,8 @@ public final class Optics {
 	public record Look(float blur, float body, float refract, float depth, float dispersion, int tint, float rim, float shade, float glow, float lightX, float lightY) {
 	}
 
-	public static final Look CLEAR = new Look(6.0F, 1.0F, 4.5F, 11.0F, 0.3F, 0x2A0F0A22, 0.95F, 0.55F, 0.2F, -0.62F, -0.78F);
-	public static final Look DENSE = new Look(6.0F, 1.0F, 4.0F, 11.0F, 0.25F, 0x660F0A22, 0.95F, 0.55F, 0.2F, -0.62F, -0.78F);
+	public static final Look CLEAR = new Look(6.0F, 1.0F, 4.5F, 11.0F, 0.3F, 0x3A140E2C, 0.9F, 0.1F, 0.16F, -0.62F, -0.78F);
+	public static final Look DENSE = new Look(6.0F, 1.0F, 4.0F, 11.0F, 0.25F, 0x48120C28, 0.9F, 0.1F, 0.16F, -0.62F, -0.78F);
 
 	private static final int LUT = 256;
 	private static final float[] LIT_RIM = new float[LUT];
@@ -81,6 +81,40 @@ public final class Optics {
 		CACHE[slot] = new Entry(params, hash, out);
 	}
 
+	public static void shadow(int[] px, int pw, int ph, int x0, int y0, int x1, int y1, int rTop, int rBottom, int k, int clipX0, int clipY0, int clipX1, int clipY1) {
+		int size = 14 * k;
+		int feather = Math.max(1, 8 * k);
+		for (int side = 0; side < 2; side++) {
+			boolean below = side == 0;
+			if ((below ? rBottom : rTop) <= 0) {
+				continue;
+			}
+			for (int i = 0; i < size; i++) {
+				int y = below ? y1 + i : y0 - 1 - i;
+				if (y < Math.max(0, clipY0) || y >= Math.min(ph, clipY1)) {
+					continue;
+				}
+				float d = (i + 0.5F) / size;
+				float base = 0.34F * (1.0F - d) * (1.0F - d);
+				for (int x = Math.max(Math.max(0, x0), clipX0); x < Math.min(Math.min(pw, x1), clipX1); x++) {
+					float edge = Math.min(smooth((x - x0) / (float) feather), smooth((x1 - 1 - x) / (float) feather));
+					float a = base * edge;
+					if (a < 0.004F) {
+						continue;
+					}
+					int p = px[y * pw + x];
+					float a0 = (p >>> 24) / 255.0F;
+					float oa = a + a0 * (1.0F - a);
+					float keep = a0 * (1.0F - a);
+					int r = Math.round((4.0F * a + ((p >> 16) & 255) * keep) / oa);
+					int g = Math.round((2.0F * a + ((p >> 8) & 255) * keep) / oa);
+					int b = Math.round((14.0F * a + (p & 255) * keep) / oa);
+					px[y * pw + x] = Math.round(oa * 255.0F) << 24 | clamp(r) << 16 | clamp(g) << 8 | clamp(b);
+				}
+			}
+		}
+	}
+
 	private static void render(int[] px, int pw, int ph, int x0, int y0, int x1, int y1, int rTop, int rBottom, int k, Look look, float strength, int clipX0, int clipY0, int clipX1, int clipY1) {
 		int ax0 = Math.max(Math.max(0, x0), clipX0);
 		int ay0 = Math.max(Math.max(0, y0), clipY0);
@@ -141,7 +175,7 @@ public final class Optics {
 				sharp[3][i] = sb * inv;
 			}
 		}
-		int softR = Math.max(1, Math.round(look.blur()));
+		int softR = Math.max(1, Math.round(look.blur() * 0.62F));
 		float[][] soft = new float[4][];
 		for (int c = 0; c < 4; c++) {
 			soft[c] = blur(sharp[c], cw, ch, softR);
@@ -297,7 +331,7 @@ public final class Optics {
 					blue = sb + (bb - sb) * blurW;
 				}
 
-				float ta = tintA * (0.75F + 0.25F * (1.0F - t));
+				float ta = Math.min(0.9F, tintA * (1.2F - 0.35F * (py / h)));
 				float oa = ta + a * (1.0F - ta);
 				if (oa > 0.001F) {
 					float keep = a * (1.0F - ta);
@@ -318,7 +352,7 @@ public final class Optics {
 					if (facing > 0.0F) {
 						sheen = look.rim() * LIT_RIM[li] * rimProfile[bi] * attach;
 						glow = look.glow() * LIT_GLOW[li] * glowProfile[bi] * attach;
-						reflect = look.glow() * 0.55F * LIT_REFLECT[li] * reflectProfile[bi] * attach;
+						
 					} else {
 						sheen = look.rim() * AWAY_RIM[li] * rimProfile[bi] * attach;
 						shade = Math.min(0.85F, look.shade() * AWAY_SHADE[li] * shadeProfile[bi] * attach);
@@ -389,7 +423,7 @@ public final class Optics {
 
 	private static float[] blur(float[] source, int w, int h, int radius) {
 		float[] current = source;
-		for (int pass = 0; pass < 2; pass++) {
+		for (int pass = 0; pass < 3; pass++) {
 			float[] across = new float[w * h];
 			for (int y = 0; y < h; y++) {
 				float sum = 0.0F;

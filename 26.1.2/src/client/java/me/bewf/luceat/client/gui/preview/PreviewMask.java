@@ -24,6 +24,31 @@ final class PreviewMask {
 	}
 
 
+	static void scrim(int[] pixels, int width, int height, int top, int bottom, int topAlpha, int bottomAlpha) {
+		for (int y = 0; y < height; y++) {
+			float a = 0.0F;
+			if (y < top) {
+				float t = 1.0F - y / (float) top;
+				a = topAlpha / 255.0F * t * t;
+			}
+			int fromBottom = height - 1 - y;
+			if (fromBottom < bottom) {
+				float t = 1.0F - fromBottom / (float) bottom;
+				a = Math.max(a, bottomAlpha / 255.0F * t * t);
+			}
+			if (a <= 0.001F) {
+				continue;
+			}
+			for (int x = 0; x < width; x++) {
+				int p = pixels[x + y * width];
+				int r = Math.round(((p >> 16) & 255) * (1.0F - a) + 6 * a);
+				int g = Math.round(((p >> 8) & 255) * (1.0F - a) + 4 * a);
+				int b = Math.round((p & 255) * (1.0F - a) + 14 * a);
+				pixels[x + y * width] = (p & 0xFF000000) | r << 16 | g << 8 | b;
+			}
+		}
+	}
+
 	static void rim(int[] pixels, int width, int height, int[] traced, int tw, int th, int band, float blurUnits, float pixelsPerUnit) {
 		if (band < 2 || blurUnits <= 0.0F) {
 			return;

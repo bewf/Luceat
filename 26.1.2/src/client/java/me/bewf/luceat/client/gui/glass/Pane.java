@@ -302,6 +302,7 @@ public final class Pane implements Surface {
 		int x1 = lx1 * scale - ox * scale;
 		int y1 = ly1 * scale - oy * scale;
 		veils.add(new Veil(lx0, ly0, lx1, ly1, texts.size() + veils.size()));
+		Optics.shadow(pixels, pw, ph, x0, y0, x1, y1, rTop * scale, rBottom * scale, scale, clipX0, clipY0, clipX1, clipY1);
 		Optics.lens(pixels, pw, ph, x0, y0, x1, y1, rTop * scale, rBottom * scale, scale, look, strength, clipX0, clipY0, clipX1, clipY1);
 		minRow = Math.min(minRow, Math.max(Math.max(0, y0), clipY0));
 		maxRow = Math.max(maxRow, Math.min(Math.min(ph - 1, y1 - 1), clipY1 - 1));

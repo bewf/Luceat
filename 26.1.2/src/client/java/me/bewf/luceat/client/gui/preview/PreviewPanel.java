@@ -23,7 +23,6 @@ import net.minecraft.resources.Identifier;
 
 public final class PreviewPanel {
 	private static final int TIME_W = 214;
-	private static final int MIN_TIME_W = 140;
 	private static final float NIGHT = 0.04F;
 	private static final int MAX_PIXELS = 1_800_000;
 	private static final float MOVE_BUDGET_MS = 70.0F;
@@ -178,11 +177,9 @@ public final class PreviewPanel {
 		}
 		Scene scene = spec.scene();
 		int fadeUnits = Math.min(imageW / 2, Math.round(Math.max(48.0F, imageW * 0.14F)));
-		int left = imageX + Math.max(14, Math.round(fadeUnits * 0.7F));
+		int left = imageX + Math.max(14, Math.round(fadeUnits * 0.5F));
 		int right = imageX + imageW - 14;
 		int avail = right - left;
-		Paint.vertical(s, imageX, imageY, imageX + imageW, imageY + 30, 12, Paint.argb(54, 6, 4, 14), Paint.argb(0, 6, 4, 14));
-		Paint.vertical(s, imageX, imageY + imageH - 38, imageX + imageW, imageY + imageH, 12, Paint.argb(0, 6, 4, 14), Paint.argb(64, 6, 4, 14));
 		int rowTop = imageY + 19;
 		int fullReserve = 92;
 		String title = Glass.fit(s, Surface.Role.BODY, scene.title, imageW - 28 - 18 - fullReserve);
@@ -191,46 +188,49 @@ public final class PreviewPanel {
 		int noteRow = rowTop + 20;
 		int bottomRow = imageY + imageH - 22;
 		int pillH = 28;
-		String zoomLong = "Scroll to zoom";
-		String moveLong = "Drag to move";
-		String zoomShort = "Zoom";
-		String moveShort = "Move";
-		int hintLong = 12 + 14 + 6 + s.width(Surface.Role.BODY, zoomLong) + 14 + 1 + 14 + 14 + 6 + s.width(Surface.Role.BODY, moveLong) + 12;
-		int hintShort = 12 + 14 + 6 + s.width(Surface.Role.BODY, zoomShort) + 14 + 1 + 14 + 14 + 6 + s.width(Surface.Role.BODY, moveShort) + 12;
-		boolean shortLabels = hintLong > avail;
-		boolean icons = hintShort > avail;
-		int hintW = icons ? 12 + 14 + 14 + 1 + 14 + 14 + 12 : shortLabels ? hintShort : hintLong;
-		boolean stacked = hintW + 10 + MIN_TIME_W > avail;
+		int gap = 8;
+		int timeLabelW = Math.max(s.width(Surface.Role.BODY, "Night"), Math.max(s.width(Surface.Role.BODY, "Evening"), s.width(Surface.Role.BODY, "Day")));
+		int minTime = 12 + 14 + 10 + 36 + 14 + timeLabelW + 24;
+		String[][] labelSets = {{"Scroll to zoom", "Drag to move"}, {"Zoom", "Move"}, {"", ""}};
+		int hintW = 0;
+		String zoomLabel = "";
+		String moveLabel = "";
+		for (int i = 0; i < labelSets.length; i++) {
+			zoomLabel = labelSets[i][0];
+			moveLabel = labelSets[i][1];
+			int zoomW = zoomLabel.isEmpty() ? 0 : s.width(Surface.Role.BODY, zoomLabel) + 6;
+			int moveW = moveLabel.isEmpty() ? 0 : s.width(Surface.Role.BODY, moveLabel) + 6;
+			hintW = 12 + 14 + zoomW + 12 + 1 + 12 + 14 + moveW + 12;
+			if (hintW + gap + minTime <= avail) {
+				break;
+			}
+		}
+		int hintRow = bottomRow;
 		int timeRow = bottomRow;
-		int hintRow = stacked ? bottomRow - pillH - 8 : bottomRow;
 		if (note != null && !note.isEmpty() && noteRow + 8 < hintRow - pillH / 2 - 6) {
 			String text = Glass.fit(s, Surface.Role.BODY, note, imageW - 28 - 18);
 			Icons.draw(s, left, noteRow - 6, 12, Icons.ALERT, Glass.WARN);
 			s.text(Surface.Role.BODY, text, left + 18, Bar.textTop(noteRow), Glass.WARN);
 		}
-		String zoomLabel = shortLabels ? zoomShort : zoomLong;
-		String moveLabel = shortLabels ? moveShort : moveLong;
 		Glass.pane(s, left, hintRow - pillH / 2, left + hintW, hintRow + pillH / 2, pillH / 2, 0.0F, 0.0F);
 		int hx = left + 12;
 		Icons.draw(s, hx, hintRow - 7, 14, Icons.MOUSE_WHEEL, Glass.SOFT);
-		int divX;
-		if (icons) {
-			divX = hx + 14 + 14;
-		} else {
+		int divX = hx + 14 + 12;
+		if (!zoomLabel.isEmpty()) {
 			s.text(Surface.Role.BODY, zoomLabel, hx + 20, Bar.textTop(hintRow), Glass.SOFT);
-			divX = hx + 20 + s.width(Surface.Role.BODY, zoomLabel) + 14;
+			divX = hx + 20 + s.width(Surface.Role.BODY, zoomLabel) + 12;
 		}
 		Paint.vertical(s, divX, hintRow - 8, divX + 1, hintRow, 0, Paint.argb(0, 205, 187, 255), Paint.argb(60, 205, 187, 255));
 		Paint.vertical(s, divX, hintRow, divX + 1, hintRow + 8, 0, Paint.argb(60, 205, 187, 255), Paint.argb(0, 205, 187, 255));
-		int sx = divX + 1 + 14;
+		int sx = divX + 1 + 12;
 		Icons.draw(s, sx, hintRow - 7, 14, Icons.MOUSE_DRAG, Glass.SOFT);
-		if (!icons) {
+		if (!moveLabel.isEmpty()) {
 			s.text(Surface.Role.BODY, moveLabel, sx + 20, Bar.textTop(hintRow), Glass.SOFT);
 		}
 
 		int labelW = Math.max(s.width(Surface.Role.BODY, "Night"), Math.max(s.width(Surface.Role.BODY, "Evening"), s.width(Surface.Role.BODY, "Day")));
-		int columnW = labelW + 24;
-		int timeW = stacked ? Math.max(MIN_TIME_W, Math.min(TIME_W, avail)) : Math.max(MIN_TIME_W, Math.min(TIME_W, avail - hintW - 10));
+		int columnW = labelW + 22;
+		int timeW = Math.max(minTime, Math.min(TIME_W, avail - hintW - gap));
 		int timeX1 = right;
 		int timeX0 = timeX1 - timeW;
 		Glass.pane(s, timeX0, timeRow - pillH / 2, timeX1, timeRow + pillH / 2, pillH / 2, 0.0F, 0.0F);
