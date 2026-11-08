@@ -481,7 +481,7 @@ public final class LuceatScreen extends Screen {
 	private void buildChrome(Surface s, boolean panelNow) {
 		Glass.backdrop(s, fit.width(), fit.height());
 		Glass.slab(s, slabX0, slabY0, slabX1, slabY1, 16);
-		Glass.divider(s, slabX0 + 18, slabX1 - 18, slabY0 + HEADER_HEIGHT);
+		s.lens(slabX0 + 16, slabY0, slabX1 - 16, slabY0 + HEADER_HEIGHT, 0, 14, Optics.CLEAR, 1.0F);
 		if (panelNow) {
 			Glass.panel(s, panelX0, bodyTop, panelRight(), bodyBottom, 12);
 		}
