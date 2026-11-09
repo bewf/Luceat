@@ -98,6 +98,7 @@ public final class SpeedTestPage {
 				queue.add(setting);
 			}
 		}
+		queue.sort(Comparator.comparing((Setting setting) -> !setting.id().equals("Luceat")));
 		perf.forget();
 		skipped.clear();
 		total = queue.size();
@@ -371,10 +372,6 @@ public final class SpeedTestPage {
 				s.text(BODY, line, x0, ty, Glass.GOOD);
 				ty += 12;
 			}
-			if (rows.stream().anyMatch(Row::rebuilds)) {
-				s.text(BODY, Glass.fit(s, BODY, "* Changing this setting rebuilds shadow data, so its reading can run high.", x1 - x0), x0, ty, Glass.MUTED);
-				ty += 12;
-			}
 			ty += 6;
 		}
 
@@ -404,7 +401,7 @@ public final class SpeedTestPage {
 			boolean hot = i < 3 && row.percent() >= 2.5F;
 			Paint.vertical(s, x0, ry + ROW - 3, x1, ry + ROW - 2, 0, Paint.argb(26, 205, 187, 255), Paint.argb(26, 205, 187, 255));
 			int cy = ry + 12;
-			String label = row.rebuilds() ? row.label() + " *" : row.label();
+			String label = row.label();
 			s.text(BODY, Glass.fit(s, BODY, label, labelWidth), x0 + 4, cy - 4, hot ? Glass.TEXT : Glass.SOFT);
 			if (row.shares() != null) {
 				s.text(Surface.Role.SMALL, Glass.fit(s, Surface.Role.SMALL, row.shares(), labelWidth + 40), x0 + 4, ry + 19, Glass.MUTED);

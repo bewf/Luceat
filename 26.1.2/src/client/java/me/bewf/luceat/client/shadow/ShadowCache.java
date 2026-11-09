@@ -95,6 +95,18 @@ public final class ShadowCache {
 		return n;
 	}
 
+	public static boolean busy() {
+		if (!JOBS.isEmpty() || !RESULTS.isEmpty()) {
+			return true;
+		}
+		for (int slot = 0; slot < SLOTS; slot++) {
+			if (building[slot]) {
+				return true;
+			}
+		}
+		return false;
+	}
+
 	public static long bytes() {
 		return texture == 0 ? 0L : (long) ATLAS * ATLAS * ATLAS * 4L;
 	}
@@ -174,7 +186,9 @@ public final class ShadowCache {
 			distance[slot] = away;
 			bySlot.put(key, slot);
 		}
-		upload();
+		boolean slow = Stats.frameMillis() > 40.0F;
+		upload(slow ? UPLOADS_PER_FRAME * 3 : UPLOADS_PER_FRAME);
+		int jobCap = slow ? JOBS_PER_FRAME * 2 : JOBS_PER_FRAME;
 		int jobs = 0;
 		for (int c = 0; c < candidates; c++) {
 			int index = (int) (order[c] & 0xFFFFFFFFL);
@@ -184,7 +198,7 @@ public final class ShadowCache {
 			}
 			int slot = found;
 			int signature = signature(slot);
-			if (signature != -1 && !building[slot] && (!ready[slot] || signature != builtSignature[slot]) && jobs < JOBS_PER_FRAME && JOBS.size() < QUEUE_LIMIT) {
+			if (signature != -1 && !building[slot] && (!ready[slot] || signature != builtSignature[slot]) && jobs < jobCap && JOBS.size() < QUEUE_LIMIT) {
 				building[slot] = true;
 				JOBS.add(new Job(slot, generation[slot], signature, lightX[slot], lightY[slot], lightZ[slot]));
 				jobs++;
@@ -283,7 +297,7 @@ public final class ShadowCache {
 		}
 	}
 
-	private static void upload() {
+	private static void upload(int cap) {
 		Result result = RESULTS.poll();
 		if (result == null) {
 			return;
@@ -297,7 +311,7 @@ public final class ShadowCache {
 		GL13.glActiveTexture(GL13.GL_TEXTURE0 + UNIT);
 		GL11.glBindTexture(GL12.GL_TEXTURE_3D, texture);
 		int done = 0;
-		while (result != null && done < UPLOADS_PER_FRAME) {
+		while (result != null && done < cap) {
 			Job job = result.job();
 			int slot = job.slot();
 			if (generation[slot] == job.generation() && used[slot]) {
@@ -314,7 +328,7 @@ public final class ShadowCache {
 				builtSignature[slot] = job.signature();
 				done++;
 			}
-			result = done < UPLOADS_PER_FRAME ? RESULTS.poll() : null;
+			result = done < cap ? RESULTS.poll() : null;
 		}
 		GL13.glActiveTexture(previousUnit);
 		for (int i = 0; i < UNPACK.length; i++) {

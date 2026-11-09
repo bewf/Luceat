@@ -9,6 +9,7 @@ public final class ChoiceSetting<E extends Enum<E>> extends Setting {
 	private final Supplier<E> getter;
 	private final Consumer<E> setter;
 	private String[] notes = new String[0];
+	private int home;
 
 	public ChoiceSetting(String section, String label, String help, Cost cost, boolean rebuildsShadows, E[] values, String[] names, Supplier<E> getter, Consumer<E> setter) {
 		super(section, label, help, cost, rebuildsShadows);
@@ -65,12 +66,13 @@ public final class ChoiceSetting<E extends Enum<E>> extends Setting {
 
 	@Override
 	public Object snapshot() {
-		return index();
+		home = index();
+		return home;
 	}
 
 	@Override
 	public void useTestState(boolean high) {
-		choose(high ? values.length - 1 : 0);
+		choose(high ? home : 0);
 	}
 
 	@Override
