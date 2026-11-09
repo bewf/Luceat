@@ -7,7 +7,8 @@ public final class Stats {
 	public static final int GRID = 3;
 	public static final int BUFFER = 4;
 	public static final int SPREAD = 5;
-	public static final String[] NAMES = {"collecting lights", "shadow block map", "placed lights", "light grid", "light buffer", "light spreading"};
+	public static final int CACHE = 6;
+	public static final String[] NAMES = {"collecting lights", "shadow block map", "placed lights", "light grid", "light buffer", "light spreading", "shadow cache"};
 
 	private static final float[] millis = new float[NAMES.length];
 	private static float frame;

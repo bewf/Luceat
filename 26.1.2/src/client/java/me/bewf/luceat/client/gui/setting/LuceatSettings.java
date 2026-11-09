@@ -83,6 +83,10 @@ public final class LuceatSettings {
 		all.add(new ToggleSetting(SHADOWS, "Shadows",
 			"Makes lights cast shadows, so light stops at blocks.",
 			Cost.HIGH, false, () -> c.shadows, value -> c.shadows = value));
+		all.add(new ChoiceSetting<>(SHADOWS, "Shadow method",
+			"Sets how placed lights cast shadows. Click to change.",
+			Cost.MEDIUM, false, ShadowQuality.values(), new String[]{"Off", "Fast", "Fancy"}, () -> c.placedShadows, value -> c.placedShadows = value)
+			.withNotes("Placed lights shine without shadows.", "Placed lights cast soft shadows from a stored copy of the blocks around them. Edges are about a block wide.", "The strongest lights near you cast sharp shadows worked out per pixel. The rest use the stored copy. Costs the most."));
 		all.add(new SliderSetting(SHADOWS, "Shadow darkness",
 			"Sets how dark shadows get. At zero light ignores walls.",
 			Cost.NONE, false, 0.0F, 1.0F, 0.05F, "", () -> c.shadowStrength, value -> c.shadowStrength = value));
@@ -187,7 +191,7 @@ public final class LuceatSettings {
 			"Sets how far Luceat looks for lights. Lights past it fade out.",
 			Cost.LOW, false, 16.0F, 128.0F, 8.0F, " blocks", () -> c.lightRange, value -> c.lightRange = Math.round(value)));
 		all.add(new SliderSetting(PERFORMANCE, "Lights with shadows",
-			"Sets how many of the strongest nearby lights cast shadows. The rest still shine, without shadows.",
+			"Sets how many of the strongest lights get sharp shadows worked out per pixel. Placed lights follow the Shadow method setting.",
 			Cost.HIGH, false, 0.0F, 12.0F, 1.0F, "", () -> c.shadowedLights, value -> c.shadowedLights = Math.round(value)));
 		all.add(new SliderSetting(PERFORMANCE, "Shadow distance",
 			"Fades shadows out past this distance. Lower is faster.",
@@ -267,6 +271,7 @@ public final class LuceatSettings {
 			{"Sun shadow strength", "Sun Shadow Darkness", "How dark sun shadows are."},
 			{"Water light patterns", "Water Patterns", "Moving streaks of sunlight show on pool and sea floors."},
 			{"Shadows", "Light Shadows", "Lights cast shadows. Blocks stop their light."},
+			{"Shadow method", "Shadow Method", "How placed lights cast shadows."},
 			{"Shadow darkness", "Shadow Darkness", "How dark shadows from lights get."},
 			{"Keep lights out of walls", "Keep Out of Walls", "A light stuck inside a wall moves out, so the wall doesn't go dark."},
 			{"Soft edges", "Soft Shadows", "How blurry shadow edges are. Higher looks softer and costs more."},

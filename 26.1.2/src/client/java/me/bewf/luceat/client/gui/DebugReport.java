@@ -18,6 +18,7 @@ import me.bewf.luceat.client.light.Stats;
 import me.bewf.luceat.client.shader.ShaderVariant;
 import me.bewf.luceat.client.shader.TerrainShaderPatch;
 import me.bewf.luceat.client.shadow.PatternAtlas;
+import me.bewf.luceat.client.shadow.ShadowCache;
 import me.bewf.luceat.client.shadow.ShadowVolume;
 import me.bewf.luceat.client.shadow.ShapeMasks;
 
@@ -119,7 +120,7 @@ public final class DebugReport {
 		}
 		LuceatConfig config = LuceatConfig.get();
 		out.append("\nSettings\npreset: ").append(config.preset).append('\n');
-		out.append("shadows: ").append(config.shadows).append(", lights with shadows: ").append(config.shadowedLights).append('\n');
+		out.append("shadows: ").append(config.shadows).append(", lights with shadows: ").append(config.shadowedLights).append(", shadow method: ").append(config.placedShadows).append(", stored volumes: ").append(ShadowCache.readySlots()).append('/').append(ShadowCache.SLOTS).append('\n');
 		out.append("max lights: ").append(config.maxLights).append(", max brightness: ").append(config.maxBrightness).append('\n');
 		return out.toString();
 	}

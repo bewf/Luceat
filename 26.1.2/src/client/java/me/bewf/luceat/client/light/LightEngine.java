@@ -8,6 +8,7 @@ import me.bewf.luceat.client.compat.RenderBackend;
 import me.bewf.luceat.client.config.LuceatConfig;
 import me.bewf.luceat.client.config.ShaderPackMode;
 import me.bewf.luceat.client.shadow.PatternAtlas;
+import me.bewf.luceat.client.shadow.ShadowCache;
 import me.bewf.luceat.client.shadow.ShadowVolume;
 import me.bewf.luceat.client.shadow.ShapeMasks;
 import me.bewf.luceat.client.shader.ShaderVariant;
@@ -78,6 +79,7 @@ public final class LightEngine {
 			long gridStart = System.nanoTime();
 			LightGrid.update(lights, camera);
 			Stats.record(Stats.GRID, System.nanoTime() - gridStart);
+			ShadowCache.update(lights, camera);
 			long bufferStart = System.nanoTime();
 			BUFFER.update(lights, camera);
 			Stats.record(Stats.BUFFER, System.nanoTime() - bufferStart);
@@ -92,6 +94,7 @@ public final class LightEngine {
 		BUFFER.bind(program);
 		LightGrid.bind(program);
 		ShadowVolume.bind(program);
+		ShadowCache.bind(program);
 		ShaderVariant bound = TerrainShaderPatch.built();
 		if (bound != null && bound.spread()) {
 			LightSpread.bind(program);

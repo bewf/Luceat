@@ -36,6 +36,7 @@ public final class Presets {
 				c.thinShadows = false;
 				c.plantShadows = false;
 				c.foliageShadows = ShadowQuality.OFF;
+				c.placedShadows = ShadowQuality.FAST;
 				c.glassTint = false;
 				c.flicker = 0.25F;
 				c.shadowedLights = 0;
@@ -73,6 +74,7 @@ public final class Presets {
 				c.thinShadows = true;
 				c.plantShadows = true;
 				c.foliageShadows = ShadowQuality.FANCY;
+				c.placedShadows = ShadowQuality.FAST;
 				c.glassTint = true;
 				c.flicker = 0.25F;
 				c.shadowedLights = 2;
@@ -113,6 +115,7 @@ public final class Presets {
 				c.thinShadows = true;
 				c.plantShadows = true;
 				c.foliageShadows = ShadowQuality.FANCY;
+				c.placedShadows = ShadowQuality.FAST;
 				c.glassTint = true;
 				c.flicker = 0.3F;
 				c.shadowedLights = 6;
@@ -150,6 +153,7 @@ public final class Presets {
 				c.thinShadows = true;
 				c.plantShadows = true;
 				c.foliageShadows = ShadowQuality.FANCY;
+				c.placedShadows = ShadowQuality.FANCY;
 				c.glassTint = true;
 				c.flicker = 0.5F;
 				c.shadowedLights = 12;

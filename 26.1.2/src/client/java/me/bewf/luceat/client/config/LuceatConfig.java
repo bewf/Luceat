@@ -68,6 +68,7 @@ public final class LuceatConfig {
 	public boolean thinShadows = true;
 	public boolean plantShadows = true;
 	public ShadowQuality foliageShadows = ShadowQuality.FANCY;
+	public ShadowQuality placedShadows = ShadowQuality.FAST;
 	public boolean glassTint = true;
 	public float cutoutOpacity = 0.9F;
 
@@ -208,6 +209,9 @@ public final class LuceatConfig {
 		}
 		if (foliageShadows == null) {
 			foliageShadows = ShadowQuality.FANCY;
+		}
+		if (placedShadows == null) {
+			placedShadows = ShadowQuality.FAST;
 		}
 	}
 }

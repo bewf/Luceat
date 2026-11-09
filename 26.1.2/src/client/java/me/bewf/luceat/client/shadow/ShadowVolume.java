@@ -54,6 +54,8 @@ public final class ShadowVolume {
 	private static final int[] cellZ = new int[TOTAL];
 	private static final boolean[] valid = new boolean[TOTAL];
 	private static final long[] sums = new long[TOTAL];
+	private static final int[] stamps = new int[TOTAL];
+	private static final short[] mirror = new short[DIMENSION * DIMENSION * DIMENSION];
 	private static final Set<Long> dirty = new HashSet<>();
 	private static final ByteBuffer cellData = BufferUtils.createByteBuffer(CELL_SIZE * CELL_SIZE * CELL_SIZE * 2).order(ByteOrder.nativeOrder());
 	private static final ByteBuffer shineData = BufferUtils.createByteBuffer(CELL_SIZE * CELL_SIZE * CELL_SIZE);
@@ -122,6 +124,46 @@ public final class ShadowVolume {
 		Shine.clear();
 		PatternAtlas.clear();
 		PlacedLights.clear();
+		ShadowCache.reset();
+	}
+
+	public static short mirrorId(int x, int y, int z) {
+		return mirrorAt(Math.floorMod(x, DIMENSION), Math.floorMod(y, DIMENSION), Math.floorMod(z, DIMENSION));
+	}
+
+	public static short mirrorAt(int x, int y, int z) {
+		return mirror[(z * DIMENSION + y) * DIMENSION + x];
+	}
+
+	public static int signature(int x0, int y0, int z0, int x1, int y1, int z1) {
+		int signature = 17;
+		for (int cz = Math.floorDiv(z0, CELL_SIZE); cz <= Math.floorDiv(z1, CELL_SIZE); cz++) {
+			for (int cy = Math.floorDiv(y0, CELL_SIZE); cy <= Math.floorDiv(y1, CELL_SIZE); cy++) {
+				for (int cx = Math.floorDiv(x0, CELL_SIZE); cx <= Math.floorDiv(x1, CELL_SIZE); cx++) {
+					if (!holds(cx, cy, cz)) {
+						return -1;
+					}
+					signature = signature * 31 + stamps[index(cx, cy, cz)];
+				}
+			}
+		}
+		return signature == -1 ? 0 : signature;
+	}
+
+	private static void mirrorCell(int cx, int cy, int cz, ByteBuffer ids) {
+		int baseX = Math.floorMod(cx, CELLS) * CELL_SIZE;
+		int baseY = Math.floorMod(cy, CELLS) * CELL_SIZE;
+		int baseZ = Math.floorMod(cz, CELLS) * CELL_SIZE;
+		int at = 0;
+		for (int z = 0; z < CELL_SIZE; z++) {
+			for (int y = 0; y < CELL_SIZE; y++) {
+				int row = ((baseZ + z) * DIMENSION + baseY + y) * DIMENSION + baseX;
+				for (int x = 0; x < CELL_SIZE; x++) {
+					mirror[row + x] = ids.getShort(at);
+					at += 2;
+				}
+			}
+		}
 	}
 
 	public static void markDirty(BlockPos pos) {
@@ -358,6 +400,8 @@ public final class ShadowVolume {
 			return true;
 		}
 		sums[slot] = hash;
+		stamps[slot]++;
+		mirrorCell(cx, cy, cz, ids);
 		revision++;
 		GL12.glTexSubImage3D(
 			GL12.GL_TEXTURE_3D, 0,
