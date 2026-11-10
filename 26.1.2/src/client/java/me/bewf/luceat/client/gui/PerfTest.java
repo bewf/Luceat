@@ -18,9 +18,11 @@ public final class PerfTest {
 	private static final long WARM_NANOS = 220_000_000L;
 	private static final long SAMPLE_NANOS = 450_000_000L;
 	private static final long SAMPLE_LIMIT_NANOS = 2_500_000_000L;
-	private static final long SETTLE_LIMIT_NANOS = 6_000_000_000L;
+	private static final long SETTLE_LIMIT_NANOS = 3_500_000_000L;
 	private static final int MIN_WARM = 2;
 	private static final int MIN_SAMPLE = 6;
+	private static final int SLOW_SAMPLE = 3;
+	private static final double SLOW_FRAME = 50.0;
 	private static final int MAX_SAMPLE = 16;
 	private static final int SETTLE_FRAMES = 3;
 	private static final int STEPS = 3;
@@ -60,6 +62,7 @@ public final class PerfTest {
 	private boolean prepSpread;
 	private int seenCount;
 	private long lastCall;
+	private double recent;
 	private String note = "";
 
 	public boolean running() {
@@ -179,6 +182,7 @@ public final class PerfTest {
 		target.useTestState(false);
 		applied(target);
 		TestLoad.set(true);
+		me.bewf.luceat.client.shader.VariantWatcher.hold(true);
 		rewarm(now);
 		lastCall = 0L;
 		seenCount = FrameClock.count();
@@ -193,6 +197,7 @@ public final class PerfTest {
 			snapshot = null;
 			phase = Phase.IDLE;
 			TestLoad.set(false);
+			me.bewf.luceat.client.shader.VariantWatcher.hold(false);
 		}
 	}
 
@@ -232,11 +237,12 @@ public final class PerfTest {
 		if (millis < 0.0) {
 			return;
 		}
+		recent = millis;
 		frames++;
 		if (phase == Phase.WARM) {
 			long waited = now - phaseStart;
 			boolean quiet = settled();
-			if (frames >= MIN_WARM && waited >= WARM_NANOS && (quiet || waited >= SETTLE_LIMIT_NANOS)) {
+			if (frames >= (recent > SLOW_FRAME ? 1 : MIN_WARM) && waited >= WARM_NANOS && (quiet || waited >= SETTLE_LIMIT_NANOS)) {
 				phase = Phase.SAMPLE;
 				frames = 0;
 				windowCount = 0;
@@ -246,7 +252,7 @@ public final class PerfTest {
 		}
 		take(millis);
 		long taken = now - phaseStart;
-		if (windowCount < MIN_SAMPLE || taken < SAMPLE_NANOS) {
+		if (windowCount < (recent > SLOW_FRAME ? SLOW_SAMPLE : MIN_SAMPLE) || taken < SAMPLE_NANOS) {
 			return;
 		}
 		double[] stats = summary();
@@ -269,7 +275,7 @@ public final class PerfTest {
 		double high = levels[1];
 		double difference = Math.abs(high - low);
 		double drift = Math.abs(levels[0] - levels[2]);
-		boolean steady = drift <= Math.max(0.6, difference * 0.5) && (reference <= 0.0 || difference <= reference * 1.25 + 0.5);
+		boolean steady = drift <= Math.max(0.6, Math.max(difference * 0.5, Math.max(high, low) * 0.06)) && (reference <= 0.0 || difference <= reference * 1.25 + 0.5);
 		if (!steady && attempt == 0) {
 			attempt = 1;
 			firstDifference = difference;
@@ -294,6 +300,7 @@ public final class PerfTest {
 		note = "";
 		phase = Phase.IDLE;
 		TestLoad.set(false);
+		me.bewf.luceat.client.shader.VariantWatcher.hold(false);
 	}
 
 	public int progress() {

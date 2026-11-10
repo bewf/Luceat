@@ -5,8 +5,14 @@ import net.minecraft.client.Minecraft;
 public final class VariantWatcher {
 	private static ShaderVariant asked;
 	private static int stable;
+	private static boolean held;
 
 	private VariantWatcher() {
+	}
+
+	public static void hold(boolean value) {
+		held = value;
+		stable = 0;
 	}
 
 	public static boolean satisfies(boolean rays, boolean spread) {
@@ -36,11 +42,11 @@ public final class VariantWatcher {
 			stable = 0;
 			return;
 		}
-		if (client.screen != null || wanted == asked) {
+		if (held || wanted == asked) {
 			stable = 0;
 			return;
 		}
-		if (++stable < 10) {
+		if (++stable < 4) {
 			return;
 		}
 		asked = wanted;
