@@ -48,6 +48,7 @@ public final class TerrainShaderPatch {
 #endif
 
 			vec3 luceatSpec;
+			float luceatShade = 0.0;
 			uniform sampler2D @PATTERNS@;
 			uniform sampler2D @SHAPES@;
 
@@ -348,10 +349,37 @@ public final class TerrainShaderPatch {
 			    }
 			    vec3 sun = u_LuceatSun.xyz;
 			    float facing = dot(normal, sun);
+			    vec3 absNormal = abs(normal);
+			    bool leafy = max(absNormal.x, max(absNormal.y, absNormal.z)) < 0.9;
+			    float lit = leafy ? 0.75 : facing;
+			    float strength = u_LuceatSun2.x;
+			    float base = strength * power * fadeOut;
 			    vec3 result = vec3(0.0);
-			    if (u_LuceatSun2.x > 0.0 && facing > 0.0 && u_LuceatMore.w > 0.5) {
-			        vec3 seen = luceatVisibility(pos, normal, pos + sun * 48.0, 56);
-			        result -= baseColor.rgb * (vec3(1.0) - seen) * (u_LuceatSun2.x * power * facing * fadeOut);
+			    if (strength > 0.0 && u_LuceatMore.w > 0.5) {
+			        if (lit > 0.0) {
+			            vec3 seen = luceatVisibility(pos, normal, pos + sun * 48.0, 56);
+			            float blocked = 1.0 - dot(seen, vec3(0.3333333));
+			            if (blocked > 0.02 && u_LuceatMore.w > 0.6) {
+			                float noise = fract(52.9829189 * fract(dot(gl_FragCoord.xy, vec2(0.06711056, 0.00583715))));
+			                float turn = noise * 6.2831853;
+			                vec3 sideA = normalize(cross(sun, vec3(0.0, 0.0, 1.0)));
+			                vec3 sideB = cross(sun, sideA);
+			                vec3 spread = (sideA * cos(turn) + sideB * sin(turn)) * 1.7;
+			                vec3 first = luceatVisibility(pos, normal, pos + sun * 48.0 + spread, 40);
+			                vec3 second = luceatVisibility(pos, normal, pos + sun * 48.0 - spread, 40);
+			                seen = (seen + first + second) * 0.3333333;
+			            }
+			            float grip = base * lit;
+			            vec3 dark = vec3(1.0) - seen;
+			            result -= baseColor.rgb * dark * vec3(1.0, 0.94, 0.82) * grip;
+			            float low = 1.0 - smoothstep(0.1, 0.5, sun.y);
+			            result += baseColor.rgb * (dot(seen, vec3(0.3333333)) * grip) * vec3(1.0, 0.62, 0.28) * (0.05 + 0.1 * low);
+			            luceatShade = clamp(dot(dark, vec3(0.3333333)) * grip * 1.2, 0.0, 1.0);
+			        } else {
+			            float away = 1.0 - smoothstep(-0.2, 0.2, facing);
+			            result -= baseColor.rgb * vec3(1.0, 0.94, 0.82) * (base * 0.5 * (1.0 - smoothstep(-0.4, 0.1, facing)));
+			            luceatShade = clamp(away * base * 1.2, 0.0, 1.0);
+			        }
 			    }
 			    if (u_LuceatSun2.z > 0.5) {
 			        ivec3 cell = ivec3(floor(pos + u_LuceatCamFrac.xyz + normal * 0.5)) + u_LuceatCamBlock.xyz;
@@ -405,7 +433,7 @@ public final class TerrainShaderPatch {
 			}
 
 			vec3 luceatLight(vec3 pos, vec3 normal, vec4 vertexColor, vec4 baseColor) {
-			    float exposure = max(baseColor.r, max(baseColor.g, baseColor.b));
+			    float exposure = max(baseColor.r, max(baseColor.g, baseColor.b)) * (1.0 - 0.6 * luceatShade);
 			    float fade = 1.0 - u_LuceatOptions.x * smoothstep(0.25, 0.95, exposure);
 			    luceatSpec = vec3(0.0);
 			    if (fade <= 0.01 || u_LuceatState.x < 0.5) {
@@ -662,7 +690,7 @@ public final class TerrainShaderPatch {
 		String lighting = defines + FRAGMENT_LIGHTING;
 		String patched = replaceOnce(source, "flat in uint v_Material;", "flat in uint v_Material;\n" + lighting);
 		patched = replaceOnce(patched, "color *= v_Color;", "vec3 luceatAlbedo = color.rgb;\n    vec3 luceatFaceNormal = luceatNormal(v_LuceatPos);\n    color *= v_Color;");
-		return replaceOnce(patched, "fragColor = _linearFog(", "color.rgb += luceatAlbedo * luceatLight(v_LuceatPos, luceatFaceNormal, v_Color, v_LuceatBase);\n    color.rgb += luceatAlbedo * luceatSun(v_LuceatPos, luceatFaceNormal, v_LuceatBase);\n    color.rgb = max(color.rgb, vec3(0.0));\n    color.rgb += luceatSpec;\n\n    fragColor = _linearFog(");
+		return replaceOnce(patched, "fragColor = _linearFog(", "vec3 luceatSunTerm = luceatSun(v_LuceatPos, luceatFaceNormal, v_LuceatBase);\n    color.rgb += luceatAlbedo * luceatLight(v_LuceatPos, luceatFaceNormal, v_Color, v_LuceatBase);\n    color.rgb += luceatAlbedo * luceatSunTerm;\n    color.rgb = max(color.rgb, vec3(0.0));\n    color.rgb += luceatSpec;\n\n    fragColor = _linearFog(");
 	}
 
 	private static String replaceOnce(String source, String anchor, String replacement) {
