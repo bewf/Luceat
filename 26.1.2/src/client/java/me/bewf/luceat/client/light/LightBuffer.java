@@ -12,6 +12,7 @@ import me.bewf.luceat.client.config.LuceatConfig;
 import me.bewf.luceat.client.config.ShadowQuality;
 import me.bewf.luceat.client.shadow.ShadowCache;
 import me.bewf.luceat.client.shadow.ShadowVolume;
+import me.bewf.luceat.client.shadow.SunCache;
 
 import net.minecraft.world.phys.Vec3;
 
@@ -20,7 +21,7 @@ public final class LightBuffer {
 	public static final int BINDING = 7;
 	public static final String BLOCK_NAME = "LuceatLights";
 
-	private static final int HEADER = 160;
+	private static final int HEADER = 176;
 	private static final int SIZE = HEADER + MAX_LIGHTS * 32;
 
 	private final ByteBuffer scratch = BufferUtils.createByteBuffer(SIZE);
@@ -46,6 +47,7 @@ public final class LightBuffer {
 		for (int i = 0; i < 8; i++) {
 			this.scratch.putFloat(i == 7 ? slotCap(config) : sun[i]);
 		}
+		this.scratch.putInt(SunCache.originX()).putInt(SunCache.originY()).putInt(SunCache.originZ()).putInt(SunCache.ready() ? 1 : 0);
 		for (int i = 0; i < MAX_LIGHTS; i++) {
 			if (i < count) {
 				LightSource light = lights.get(i);

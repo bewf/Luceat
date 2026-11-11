@@ -125,6 +125,7 @@ public final class ShadowVolume {
 		PatternAtlas.clear();
 		PlacedLights.clear();
 		ShadowCache.reset();
+		SunCache.reset();
 	}
 
 	public static short mirrorId(int x, int y, int z) {
@@ -148,6 +149,18 @@ public final class ShadowVolume {
 			}
 		}
 		return signature == -1 ? 0 : signature;
+	}
+
+	public static int looseSignature(int x0, int y0, int z0, int x1, int y1, int z1) {
+		int signature = 17;
+		for (int cz = Math.floorDiv(z0, CELL_SIZE); cz <= Math.floorDiv(z1, CELL_SIZE); cz++) {
+			for (int cy = Math.floorDiv(y0, CELL_SIZE); cy <= Math.floorDiv(y1, CELL_SIZE); cy++) {
+				for (int cx = Math.floorDiv(x0, CELL_SIZE); cx <= Math.floorDiv(x1, CELL_SIZE); cx++) {
+					signature = signature * 31 + (holds(cx, cy, cz) ? stamps[index(cx, cy, cz)] + 1 : 0);
+				}
+			}
+		}
+		return signature;
 	}
 
 	private static void mirrorCell(int cx, int cy, int cz, ByteBuffer ids) {

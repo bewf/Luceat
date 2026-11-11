@@ -11,6 +11,7 @@ import me.bewf.luceat.client.shadow.PatternAtlas;
 import me.bewf.luceat.client.shadow.ShadowCache;
 import me.bewf.luceat.client.shadow.ShadowVolume;
 import me.bewf.luceat.client.shadow.ShapeMasks;
+import me.bewf.luceat.client.shadow.SunCache;
 import me.bewf.luceat.client.shader.ShaderVariant;
 import me.bewf.luceat.client.shader.TerrainShaderPatch;
 
@@ -80,6 +81,7 @@ public final class LightEngine {
 			LightGrid.update(lights, camera);
 			Stats.record(Stats.GRID, System.nanoTime() - gridStart);
 			ShadowCache.update(lights, camera);
+			SunCache.update(minecraft.level, camera);
 			long bufferStart = System.nanoTime();
 			BUFFER.update(lights, camera);
 			Stats.record(Stats.BUFFER, System.nanoTime() - bufferStart);
@@ -95,6 +97,7 @@ public final class LightEngine {
 		LightGrid.bind(program);
 		ShadowVolume.bind(program);
 		ShadowCache.bind(program);
+		SunCache.bind(program);
 		ShaderVariant bound = TerrainShaderPatch.built();
 		if (bound != null && bound.spread()) {
 			LightSpread.bind(program);

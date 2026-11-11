@@ -28,7 +28,7 @@ public final class SunLight {
 		out[2] = 0.0F;
 		out[3] = power;
 		out[4] = config.sunShadows ? config.sunShadowStrength : 0.0F;
-		out[5] = Math.max(16.0F, Math.min(config.shadowDistance, 64.0F));
+		out[5] = Math.max(16.0F, Math.min(config.shadowDistance, me.bewf.luceat.client.shadow.SunCache.REACH_LIMIT));
 		out[6] = config.caustics ? 1.0F : 0.0F;
 		return out;
 	}

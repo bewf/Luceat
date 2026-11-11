@@ -6,6 +6,7 @@ import me.bewf.luceat.client.light.LightGrid;
 import me.bewf.luceat.client.light.LightSpread;
 import me.bewf.luceat.client.shadow.PatternAtlas;
 import me.bewf.luceat.client.shadow.ShadowCache;
+import me.bewf.luceat.client.shadow.SunCache;
 import me.bewf.luceat.client.shadow.ShapeMasks;
 import me.bewf.luceat.client.shadow.ShadowVolume;
 
@@ -32,6 +33,7 @@ public final class TerrainShaderPatch {
 			    ivec4 u_LuceatGridOrigin;
 			    vec4 u_LuceatSun;
 			    vec4 u_LuceatSun2;
+			    ivec4 u_LuceatSunOrigin;
 			    vec4 u_LuceatPosRadius[@LIGHTS@];
 			    vec4 u_LuceatColor[@LIGHTS@];
 			};
@@ -42,6 +44,7 @@ public final class TerrainShaderPatch {
 			uniform sampler3D @BRICKS@;
 #ifdef LUCEAT_RAYS
 			uniform sampler3D @CACHE@;
+			uniform sampler3D @SUNVOL@;
 #endif
 #ifdef LUCEAT_SPREAD
 			uniform sampler3D @SPREAD@;
@@ -357,9 +360,15 @@ public final class TerrainShaderPatch {
 			    vec3 result = vec3(0.0);
 			    if (strength > 0.0 && u_LuceatMore.w > 0.5) {
 			        if (lit > 0.0) {
-			            vec3 seen = luceatVisibility(pos, normal, pos + sun * 48.0, 56);
+			            float dist = length(pos);
+			            bool volume = u_LuceatSunOrigin.w != 0;
+			            float closeBlend = volume ? 1.0 - smoothstep(@SUN_NEAR_A@, @SUN_NEAR_B@, dist) : 1.0;
+			            vec3 seen = vec3(1.0);
+			            if (closeBlend > 0.001) {
+			                seen = luceatVisibility(pos, normal, pos + sun * 48.0, 56);
+			            }
 			            float blocked = 1.0 - dot(seen, vec3(0.3333333));
-			            if (blocked > 0.02 && u_LuceatMore.w > 0.6) {
+			            if (closeBlend > 0.001 && blocked > 0.02 && u_LuceatMore.w > 0.6) {
 			                float noise = fract(52.9829189 * fract(dot(gl_FragCoord.xy, vec2(0.06711056, 0.00583715))));
 			                float turn = noise * 6.2831853;
 			                vec3 sideA = normalize(cross(sun, vec3(0.0, 0.0, 1.0)));
@@ -368,6 +377,14 @@ public final class TerrainShaderPatch {
 			                vec3 first = luceatVisibility(pos, normal, pos + sun * 48.0 + spread, 40);
 			                vec3 second = luceatVisibility(pos, normal, pos + sun * 48.0 - spread, 40);
 			                seen = (seen + first + second) * 0.3333333;
+			            }
+			            if (volume && closeBlend < 0.999) {
+			                vec3 rel = pos + u_LuceatCamFrac.xyz + vec3(u_LuceatCamBlock.xyz - u_LuceatSunOrigin.xyz) + normal * 0.6;
+			                vec3 span = vec3(@SUN_X@.0, @SUN_Y@.0, @SUN_Z@.0);
+			                vec3 edge = min(rel, span - rel);
+			                float inside = smoothstep(0.0, 6.0, min(edge.x, min(edge.y, edge.z)));
+			                vec3 distant = mix(vec3(1.0), texture(@SUNVOL@, rel / span).rgb, inside);
+			                seen = mix(distant, seen, closeBlend);
 			            }
 			            float grip = base * lit;
 			            vec3 dark = vec3(1.0) - seen;
@@ -629,6 +646,12 @@ public final class TerrainShaderPatch {
 			.replace("@SHINE@", ShadowVolume.SHINE_SAMPLER)
 			.replace("@BRICKS@", ShadowVolume.BRICK_SAMPLER)
 			.replace("@CACHE@", ShadowCache.SAMPLER)
+			.replace("@SUNVOL@", SunCache.SAMPLER)
+			.replace("@SUN_X@", Integer.toString(SunCache.SIDE_X))
+			.replace("@SUN_Y@", Integer.toString(SunCache.SIDE_Y))
+			.replace("@SUN_Z@", Integer.toString(SunCache.SIDE_Z))
+			.replace("@SUN_NEAR_A@", "5.0")
+			.replace("@SUN_NEAR_B@", "11.0")
 			.replace("@CACHE_HALF@", ShadowCache.HALF + ".0")
 			.replace("@CACHE_SIDE@", ShadowCache.SIDE + ".0")
 			.replace("@CACHE_INV@", Float.toString(1.0F / ShadowCache.ATLAS))
