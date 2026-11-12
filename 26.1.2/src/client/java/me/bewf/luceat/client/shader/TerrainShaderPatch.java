@@ -363,9 +363,10 @@ public final class TerrainShaderPatch {
 			            float dist = length(pos);
 			            bool volume = u_LuceatSunOrigin.w != 0;
 			            float closeBlend = volume ? 1.0 - smoothstep(@SUN_NEAR_A@, @SUN_NEAR_B@, dist) : 1.0;
+			            float runLength = volume ? @SUN_RUN@ : 48.0;
 			            vec3 seen = vec3(1.0);
 			            if (closeBlend > 0.001) {
-			                seen = luceatVisibility(pos, normal, pos + sun * 48.0, 56);
+			                seen = luceatVisibility(pos, normal, pos + sun * runLength, volume ? @SUN_STEPS@ : 56);
 			            }
 			            float blocked = 1.0 - dot(seen, vec3(0.3333333));
 			            if (closeBlend > 0.001 && blocked > 0.02 && u_LuceatMore.w > 0.6) {
@@ -373,18 +374,27 @@ public final class TerrainShaderPatch {
 			                float turn = noise * 6.2831853;
 			                vec3 sideA = normalize(cross(sun, vec3(0.0, 0.0, 1.0)));
 			                vec3 sideB = cross(sun, sideA);
-			                vec3 spread = (sideA * cos(turn) + sideB * sin(turn)) * 1.7;
-			                vec3 first = luceatVisibility(pos, normal, pos + sun * 48.0 + spread, 40);
-			                vec3 second = luceatVisibility(pos, normal, pos + sun * 48.0 - spread, 40);
+			                vec3 spread = (sideA * cos(turn) + sideB * sin(turn)) * (runLength * 0.0354);
+			                vec3 first = luceatVisibility(pos, normal, pos + sun * runLength + spread, volume ? @SUN_STEPS@ : 40);
+			                vec3 second = luceatVisibility(pos, normal, pos + sun * runLength - spread, volume ? @SUN_STEPS@ : 40);
 			                seen = (seen + first + second) * 0.3333333;
 			            }
-			            if (volume && closeBlend < 0.999) {
-			                vec3 rel = pos + u_LuceatCamFrac.xyz + vec3(u_LuceatCamBlock.xyz - u_LuceatSunOrigin.xyz) + normal * 0.6;
+			            if (volume) {
 			                vec3 span = vec3(@SUN_X@.0, @SUN_Y@.0, @SUN_Z@.0);
-			                vec3 edge = min(rel, span - rel);
-			                float inside = smoothstep(0.0, 6.0, min(edge.x, min(edge.y, edge.z)));
-			                vec3 distant = mix(vec3(1.0), texture(@SUNVOL@, rel / span).rgb, inside);
-			                seen = mix(distant, seen, closeBlend);
+			                vec3 shift = vec3(u_LuceatCamBlock.xyz - u_LuceatSunOrigin.xyz) + u_LuceatCamFrac.xyz;
+			                if (closeBlend > 0.001) {
+			                    vec3 reachRel = pos + shift + sun * (runLength + 0.5);
+			                    vec3 reachEdge = min(reachRel, span - reachRel);
+			                    float reachIn = smoothstep(0.0, 6.0, min(reachEdge.x, min(reachEdge.y, reachEdge.z)));
+			                    seen *= mix(vec3(1.0), texture(@SUNVOL@, reachRel / span).rgb, reachIn);
+			                }
+			                if (closeBlend < 0.999) {
+			                    vec3 rel = pos + shift + normal * 0.6;
+			                    vec3 edge = min(rel, span - rel);
+			                    float inside = smoothstep(0.0, 6.0, min(edge.x, min(edge.y, edge.z)));
+			                    vec3 distant = mix(vec3(1.0), texture(@SUNVOL@, rel / span).rgb, inside);
+			                    seen = mix(distant, seen, closeBlend);
+			                }
 			            }
 			            float grip = base * lit;
 			            vec3 dark = vec3(1.0) - seen;
@@ -442,6 +452,11 @@ public final class TerrainShaderPatch {
 			    return k <= 4 ? a[k - 1] : b[k - 5];
 			}
 			#endif
+
+			float luceatRamp(float x, float low, float inverseWidth) {
+			    float t = clamp((x - low) * inverseWidth, 0.0, 1.0);
+			    return t * t * (3.0 - 2.0 * t);
+			}
 
 			vec3 luceatSoft(vec3 x, float cap) {
 			    float knee = cap * 0.7;
@@ -508,6 +523,7 @@ public final class TerrainShaderPatch {
 			        return vec3(0.0);
 			    }
 			    sumPower = max(sumPower, 1.0e-4);
+			    float invSum = 1.0 / sumPower;
 			#ifdef LUCEAT_RAYS
 			    int fullRank = int(ceil(budget - 0.01));
 			    float fullCut = 0.0;
@@ -520,6 +536,8 @@ public final class TerrainShaderPatch {
 			    float cheapEdge = max(cheap, cheapCut);
 			    float fullLow = fullCut > full ? 0.9 * fullCut : 0.6 * full;
 			    float cheapLow = cheapCut > cheap ? 0.9 * cheapCut : 0.6 * cheap;
+			    float fullInv = 1.0 / max(fullEdge - fullLow, 1.0e-6);
+			    float cheapInv = 1.0 / max(cheapEdge - cheapLow, 1.0e-6);
 			#endif
 			    vec3 total = vec3(0.0);
 			    vec3 shiny = vec3(0.0);
@@ -550,13 +568,15 @@ public final class TerrainShaderPatch {
 			            int i = int(id) - 1;
 			            vec4 light = u_LuceatPosRadius[i];
 			            vec3 toLight = light.xyz - pos;
-			            float dist = length(toLight);
-			            float level = clamp((light.w - dayCut - dist) / 15.0, 0.0, 1.0);
-			            float bounceLevel = bounce > 0.001 ? clamp(((light.w - dayCut) * 1.2 - dist) / 18.0, 0.0, 1.0) : 0.0;
+			            float away2 = dot(toLight, toLight);
+			            float invDist = inversesqrt(max(away2, 1.0e-8));
+			            float dist = away2 * invDist;
+			            float level = clamp((light.w - dayCut - dist) * 0.0666667, 0.0, 1.0);
+			            float bounceLevel = bounce > 0.001 ? clamp(((light.w - dayCut) * 1.2 - dist) * 0.0555556, 0.0, 1.0) : 0.0;
 			            if (level <= 0.0 && bounceLevel <= 0.0) {
 			                continue;
 			            }
-			            vec3 dirToLight = toLight / max(dist, 1.0e-4);
+			            vec3 dirToLight = toLight * invDist;
 			            float ndotl = dot(normal, dirToLight);
 			            float facing = mix(1.0, smoothstep(-0.35, 0.15, ndotl), u_LuceatOptions.y);
 			            int flags = int(u_LuceatColor[i].w + 0.5);
@@ -572,13 +592,13 @@ public final class TerrainShaderPatch {
 			                strength *= mix(1.0, vanillaOpen, smoothstep(0.0, 2.0, expected));
 			            }
 			            float curved = level / (4.0 - 3.0 * level);
-			            float share = curved * max(tint.r, max(tint.g, tint.b)) / sumPower;
+			            float share = curved * max(tint.r, max(tint.g, tint.b)) * invSum;
 #ifdef LUCEAT_RAYS
 			            bool shadowAny = shadowFade > 0.01 && !noShadow;
 			            bool storedOn = shadowAny && stored >= 0;
 			            bool marchOn = shadowAny && budget > 0.5 && (stored < 0 || fancy);
-			            float wFull = marchOn ? smoothstep(fullLow, fullEdge, share) : 0.0;
-			            float wCheap = marchOn && stored < 0 ? smoothstep(cheapLow, cheapEdge, share) : 0.0;
+			            float wFull = marchOn ? luceatRamp(share, fullLow, fullInv) : 0.0;
+			            float wCheap = marchOn && stored < 0 ? luceatRamp(share, cheapLow, cheapInv) : 0.0;
 			            vec3 kept = storedOn ? luceatCached(pos, normal, light.xyz, stored) : vec3(1.0);
 #endif
 			            if (level > 0.0 && facing > 0.0) {
@@ -650,8 +670,10 @@ public final class TerrainShaderPatch {
 			.replace("@SUN_X@", Integer.toString(SunCache.SIDE_X))
 			.replace("@SUN_Y@", Integer.toString(SunCache.SIDE_Y))
 			.replace("@SUN_Z@", Integer.toString(SunCache.SIDE_Z))
-			.replace("@SUN_NEAR_A@", "5.0")
-			.replace("@SUN_NEAR_B@", "11.0")
+			.replace("@SUN_NEAR_A@", "4.0")
+			.replace("@SUN_NEAR_B@", "9.0")
+			.replace("@SUN_RUN@", "12.0")
+			.replace("@SUN_STEPS@", "32")
 			.replace("@CACHE_HALF@", ShadowCache.HALF + ".0")
 			.replace("@CACHE_SIDE@", ShadowCache.SIDE + ".0")
 			.replace("@CACHE_INV@", Float.toString(1.0F / ShadowCache.ATLAS))
