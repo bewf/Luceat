@@ -576,14 +576,22 @@ public final class TerrainShaderPatch {
 			            if (level <= 0.0 && bounceLevel <= 0.0) {
 			                continue;
 			            }
+			            vec4 colour = u_LuceatColor[i];
+			            vec3 tint = colour.rgb;
+			            float curved = level / (4.0 - 3.0 * level);
+			            float share = curved * max(tint.r, max(tint.g, tint.b)) * invSum;
+			            float keep = level > 0.0 ? luceatRamp(share, 0.006, 71.4286) : 1.0;
+			            if (keep <= 0.0) {
+			                continue;
+			            }
+			            curved *= keep;
 			            vec3 dirToLight = toLight * invDist;
 			            float ndotl = dot(normal, dirToLight);
 			            float facing = mix(1.0, smoothstep(-0.35, 0.15, ndotl), u_LuceatOptions.y);
-			            int flags = int(u_LuceatColor[i].w + 0.5);
+			            int flags = int(colour.w + 0.5);
 			            bool placed = (flags & 1) != 0;
 			            bool noShadow = (flags & 2) != 0;
 			            int stored = (flags >> 6) - 1;
-			            vec3 tint = u_LuceatColor[i].rgb;
 			            float strength = placed ? u_LuceatExtra.x : 1.0;
 			            int vanillaReach = (flags >> 2) & 15;
 			            if (placed && vanillaReach > 0) {
@@ -591,8 +599,6 @@ public final class TerrainShaderPatch {
 			                float expected = float(vanillaReach) - (gap.x + gap.y + gap.z) - 1.0;
 			                strength *= mix(1.0, vanillaOpen, smoothstep(0.0, 2.0, expected));
 			            }
-			            float curved = level / (4.0 - 3.0 * level);
-			            float share = curved * max(tint.r, max(tint.g, tint.b)) * invSum;
 #ifdef LUCEAT_RAYS
 			            bool shadowAny = shadowFade > 0.01 && !noShadow;
 			            bool storedOn = shadowAny && stored >= 0;
