@@ -1,25 +1,22 @@
-# Luceat
+<h1>
+  <img src="https://github.com/bewf/Luceat/raw/monorepo/assets/luceat-logo-transparent-1024-trimmed.png"
+       width="160"
+       align="right" />
+  Luceat
+</h1>
+Client-side dynamic lighting for. Lights are shaded on the GPU.
 
-Client-side dynamic lighting for Minecraft Java on Fabric. Lights are shaded on the GPU, so moving a light never rebuilds chunks.
-
-Requires Sodium. Status: early development.
+Sodium is an optional addition. The mod is currently in **early development**.
 
 ## Using it
 
-Press J in game, or type `/luceat`, to open the settings. `/luceat perf` shows which settings cost the most on your computer.
-
+Press J in game, or type `/luceat`, to open the settings. `/luceat perf` to run a performance test, showing you which settings cost the most.
 ## Versions
-
-Every Minecraft version has its own folder with its own build.
 
 | Folder | Minecraft | Status |
 | --- | --- | --- |
 | [26.1.2](26.1.2) | 26.1.2 | In development |
 
-To build one, open its folder and run `./gradlew build`. The jar ends up in `build/libs`.
-
-The mod version is set once, in `version.properties` at the repository root. Every build reads it for the jar name and `fabric.mod.json`, and the in-game version text comes from there too.
 
 ## License
-
-##### Code licensed under [ARR](https://github.com/bewf/luceat/blob/main/LICENSE.md). Unmodified redistribution **in free modpacks** is permitted with credit. See the [full license](https://github.com/bewf/luceat/blob/main/LICENSE.md) on GitHub for details.
+coᴅᴇ ʟɪᴄᴇɴsᴇᴅ ᴜɴᴅᴇʀ [ARR](ʜᴛᴛᴘs://ɢɪᴛʜᴜʙ.ᴄᴏᴍ/ʙᴇᴡғ/ʟᴜᴄᴇᴀᴛ/ʙʟᴏʙ/ᴍᴀɪɴ/LICENSE.ᴍᴅ). uɴᴍᴏᴅɪғɪᴇᴅ ʀᴇᴅɪsᴛʀɪʙᴜᴛɪᴏɴ **ɪɴ ғʀᴇᴇ ᴍᴏᴅᴘᴀᴄᴋs** ɪs ᴘᴇʀᴍɪᴛᴛᴇᴅ ᴡɪᴛʜ ᴄʀᴇᴅɪᴛ. sᴇᴇ ᴛʜᴇ [ғᴜʟʟ ʟɪᴄᴇɴsᴇ](ʜᴛᴛᴘs://ɢɪᴛʜᴜʙ.ᴄᴏᴍ/ʙᴇᴡғ/ʟᴜᴄᴇᴀᴛ/ʙʟᴏʙ/ᴍᴀɪɴ/LICENSE.ᴍᴅ) ᴏɴ gɪᴛhᴜʙ ғᴏʀ ᴅᴇᴛᴀɪʟs.
