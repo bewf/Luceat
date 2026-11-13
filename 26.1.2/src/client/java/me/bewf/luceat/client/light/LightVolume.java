@@ -47,6 +47,7 @@ public final class LightVolume {
 	private static final int CHECK_INTERVAL = 8;
 	private static final long MIN_GAP_NANOS = 350_000_000L;
 	private static final int HALF_RES = ShapeMasks.RES / 2;
+	private static final double[][] TAPS = {{0.28, 0.28, 0.28}, {0.28, -0.28, -0.28}, {-0.28, 0.28, -0.28}, {-0.28, -0.28, 0.28}};
 	private static final int[] UNPACK = {
 		GL11.GL_UNPACK_ALIGNMENT, GL11.GL_UNPACK_ROW_LENGTH, GL11.GL_UNPACK_SKIP_ROWS,
 		GL11.GL_UNPACK_SKIP_PIXELS, GL12.GL_UNPACK_IMAGE_HEIGHT, GL12.GL_UNPACK_SKIP_IMAGES
@@ -517,7 +518,7 @@ public final class LightVolume {
 						double seenGreen = 1.0;
 						double seenBlue = 1.0;
 						if (!bake.noShadow() && distance > 0.9) {
-							trace(x + 0.5, y + 0.5, z + 0.5, bake.x(), bake.y(), bake.z(), distance, lightX, lightY, lightZ, job);
+							soften(bake, x, y, z, lightX, lightY, lightZ, job);
 							seenRed = passRed;
 							seenGreen = passGreen;
 							seenBlue = passBlue;
@@ -541,6 +542,59 @@ public final class LightVolume {
 					}
 				}
 			}
+		}
+
+		private void soften(Bake bake, int x, int y, int z, int lightX, int lightY, int lightZ, Job job) {
+			double sumRed = 0.0;
+			double sumGreen = 0.0;
+			double sumBlue = 0.0;
+			double firstRed = 0.0;
+			double firstGreen = 0.0;
+			double firstBlue = 0.0;
+			int taken = 0;
+			for (int s = 0; s < TAPS.length; s++) {
+				double[] tap = TAPS[s];
+				double ox = x + 0.5 + jitter(x, y, z, s * 3);
+				double oy = y + 0.5 + jitter(x, y, z, s * 3 + 1);
+				double oz = z + 0.5 + jitter(x, y, z, s * 3 + 2);
+				double tx = Math.min(lightX + 0.95, Math.max(lightX + 0.05, bake.x() + tap[0]));
+				double ty = Math.min(lightY + 0.95, Math.max(lightY + 0.05, bake.y() + tap[1]));
+				double tz = Math.min(lightZ + 0.95, Math.max(lightZ + 0.05, bake.z() + tap[2]));
+				double length = Math.sqrt((tx - ox) * (tx - ox) + (ty - oy) * (ty - oy) + (tz - oz) * (tz - oz));
+				if (length < 0.5) {
+					passRed = 1.0;
+					passGreen = 1.0;
+					passBlue = 1.0;
+				} else {
+					trace(ox, oy, oz, tx, ty, tz, length, lightX, lightY, lightZ, job);
+				}
+				sumRed += passRed;
+				sumGreen += passGreen;
+				sumBlue += passBlue;
+				taken++;
+				if (s == 0) {
+					firstRed = passRed;
+					firstGreen = passGreen;
+					firstBlue = passBlue;
+				} else if (s == 1) {
+					double top = Math.max(passRed, Math.max(passGreen, passBlue));
+					boolean agree = Math.abs(passRed - firstRed) < 0.02 && Math.abs(passGreen - firstGreen) < 0.02 && Math.abs(passBlue - firstBlue) < 0.02;
+					if (agree && (top > 0.98 || top < 0.02)) {
+						break;
+					}
+				}
+			}
+			passRed = sumRed / taken;
+			passGreen = sumGreen / taken;
+			passBlue = sumBlue / taken;
+		}
+
+		private static double jitter(int x, int y, int z, int salt) {
+			int h = x * 73856093 ^ y * 19349663 ^ z * 83492791 ^ salt * 0x9E3779B1;
+			h ^= h >>> 13;
+			h *= 0x5BD1E995;
+			h ^= h >>> 15;
+			return ((h & 0xFFFF) / 65535.0 - 0.5) * 0.7;
 		}
 
 		private void fillSolid() {
