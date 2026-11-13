@@ -55,6 +55,7 @@ public final class LuceatConfig {
 	public boolean particleLights = true;
 
 	public boolean placedLights = true;
+	public boolean bakedLights = true;
 	public float placedStrength = 1.0F;
 	public float vanillaReplace = 0.8F;
 	public int placedMinLevel = 3;

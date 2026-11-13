@@ -21,7 +21,7 @@ public final class LightBuffer {
 	public static final int BINDING = 7;
 	public static final String BLOCK_NAME = "LuceatLights";
 
-	private static final int HEADER = 176;
+	private static final int HEADER = 208;
 	private static final int SIZE = HEADER + MAX_LIGHTS * 32;
 
 	private final ByteBuffer scratch = BufferUtils.createByteBuffer(SIZE);
@@ -48,6 +48,8 @@ public final class LightBuffer {
 			this.scratch.putFloat(i == 7 ? slotCap(config) : sun[i]);
 		}
 		this.scratch.putInt(SunCache.originX()).putInt(SunCache.originY()).putInt(SunCache.originZ()).putInt(SunCache.ready() ? 1 : 0);
+		this.scratch.putInt(LightVolume.originX()).putInt(LightVolume.originY()).putInt(LightVolume.originZ()).putInt(LightVolume.ready() ? 1 : 0);
+		this.scratch.putFloat(config.flicker * 0.25F).putFloat(0.0F).putFloat(0.0F).putFloat(0.0F);
 		for (int i = 0; i < MAX_LIGHTS; i++) {
 			if (i < count) {
 				LightSource light = lights.get(i);

@@ -21,6 +21,7 @@ public final class LightSmoother {
 		float green;
 		float blue;
 		float radius;
+		float target;
 		boolean placed;
 		boolean fire;
 		boolean noShadow;
@@ -39,6 +40,14 @@ public final class LightSmoother {
 	public static void clear() {
 		STATES.clear();
 		lastNanos = 0L;
+	}
+
+	public static float settled(long key) {
+		State state = STATES.get(key);
+		if (state == null || state.fade < 1.0F || Math.abs(state.radius - state.target) > 0.05F) {
+			return -1.0F;
+		}
+		return state.target;
 	}
 
 	public static long key(int kind, int entityId, int sub) {
@@ -80,6 +89,7 @@ public final class LightSmoother {
 			state.fire = light.fire();
 			state.noShadow = light.noShadow();
 			state.vanilla = light.vanilla();
+			state.target = light.radius();
 			state.radius += (light.radius() - state.radius) * easeRadius;
 			state.fade = Math.min(1.0F, state.fade + fadeIn);
 			state.frame = frame;

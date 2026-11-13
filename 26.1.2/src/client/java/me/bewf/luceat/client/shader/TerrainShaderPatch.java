@@ -4,6 +4,7 @@ import me.bewf.luceat.Luceat;
 import me.bewf.luceat.client.light.LightBuffer;
 import me.bewf.luceat.client.light.LightGrid;
 import me.bewf.luceat.client.light.LightSpread;
+import me.bewf.luceat.client.light.LightVolume;
 import me.bewf.luceat.client.shadow.PatternAtlas;
 import me.bewf.luceat.client.shadow.ShadowCache;
 import me.bewf.luceat.client.shadow.SunCache;
@@ -34,6 +35,8 @@ public final class TerrainShaderPatch {
 			    vec4 u_LuceatSun;
 			    vec4 u_LuceatSun2;
 			    ivec4 u_LuceatSunOrigin;
+			    ivec4 u_LuceatBakeOrigin;
+			    vec4 u_LuceatBakeParams;
 			    vec4 u_LuceatPosRadius[@LIGHTS@];
 			    vec4 u_LuceatColor[@LIGHTS@];
 			};
@@ -48,6 +51,10 @@ public final class TerrainShaderPatch {
 #endif
 #ifdef LUCEAT_SPREAD
 			uniform sampler3D @SPREAD@;
+#endif
+#ifdef LUCEAT_BAKE
+			uniform sampler3D @BAKELIGHT@;
+			uniform sampler3D @BAKEDIR@;
 #endif
 
 			vec3 luceatSpec;
@@ -453,16 +460,62 @@ public final class TerrainShaderPatch {
 			    return min(x, vec3(knee)) + (cap - knee) * (vec3(1.0) - exp(-over / (cap - knee)));
 			}
 
+#ifdef LUCEAT_BAKE
+			void luceatBake(vec3 pos, vec3 normal, out vec3 term, out float cover) {
+			    term = vec3(0.0);
+			    cover = 0.0;
+			    if (u_LuceatBakeOrigin.w == 0) {
+			        return;
+			    }
+			    vec3 span = vec3(@BAKE_X@.0, @BAKE_Y@.0, @BAKE_Z@.0);
+			    vec3 rel = pos + vec3(u_LuceatCamBlock.xyz - u_LuceatBakeOrigin.xyz) + u_LuceatCamFrac.xyz + normal * 0.5;
+			    if (any(lessThan(rel, vec3(0.5))) || any(greaterThan(rel, span - 0.5))) {
+			        return;
+			    }
+			    vec3 at = rel / span;
+			    vec4 stored = texture(@BAKELIGHT@, at);
+			    vec4 pull = texture(@BAKEDIR@, at);
+			    float concentration = min(length(pull.xyz), 1.0);
+			    vec3 toward = pull.xyz / max(concentration, 1.0e-4);
+			    float ndotl = dot(normal, toward);
+			    float lambert = mix(1.0, 0.4 + 0.6 * clamp(ndotl, 0.0, 1.0), u_LuceatOptions.y);
+			    float facing = mix(1.0, smoothstep(-0.35, 0.15, ndotl), u_LuceatOptions.y);
+			    float shade = mix(1.0, lambert * facing, concentration);
+			    float flicker = 1.0;
+			    if (u_LuceatBakeParams.x > 0.0 && pull.w > 0.0) {
+			        vec3 world = pos + vec3(u_LuceatCamBlock.xyz) + u_LuceatCamFrac.xyz;
+			        float phase = dot(world, vec3(0.37, 0.53, 0.41));
+			        float t = u_LuceatCamFrac.w;
+			        float noise = 0.55 * sin(t * 9.0 + phase) + 0.3 * sin(t * 17.3 + phase * 1.7) + 0.15 * sin(t * 31.0 + phase * 2.3);
+			        flicker = 1.0 + u_LuceatBakeParams.x * pull.w * noise;
+			    }
+			    float strength = u_LuceatExtra.x * u_LuceatState.z;
+			    term = max(stored.rgb, vec3(0.0)) * (strength * shade * flicker);
+			    cover = stored.a * shade;
+			}
+#endif
+
+			vec3 luceatFinish(vec3 total, float placedCover, vec3 blockPart, float fade) {
+			    float coverage = clamp(placedCover * fade / max(dot(blockPart, vec3(0.299, 0.587, 0.114)), 0.02), 0.0, 1.0);
+			    return luceatSoft(total, u_LuceatState.w) * fade - blockPart * (u_LuceatOptions.w * coverage);
+			}
+
 			vec3 luceatLight(vec3 pos, vec3 normal, vec4 vertexColor, vec4 baseColor) {
 			    float exposure = max(baseColor.r, max(baseColor.g, baseColor.b)) * (1.0 - 0.6 * luceatShade);
 			    float fade = 1.0 - u_LuceatOptions.x * smoothstep(0.25, 0.95, exposure);
 			    luceatSpec = vec3(0.0);
-			    if (fade <= 0.01 || u_LuceatState.x < 0.5) {
+			    if (fade <= 0.01) {
 			        return vec3(0.0);
 			    }
+			    vec3 blockPart = max(vertexColor.rgb - baseColor.rgb, vec3(0.0));
+			    vec3 total = vec3(0.0);
+			    float placedCover = 0.0;
+#ifdef LUCEAT_BAKE
+			    luceatBake(pos, normal, total, placedCover);
+#endif
 			    ivec3 gc = ivec3(floor((pos + u_LuceatCamFrac.xyz + vec3(u_LuceatCamBlock.xyz - u_LuceatGridOrigin.xyz)) / 8.0));
-			    if (any(lessThan(gc, ivec3(0))) || any(greaterThanEqual(gc, ivec3(@GX@, @GY@, @GZ@)))) {
-			        return vec3(0.0);
+			    if (u_LuceatState.x < 0.5 || any(lessThan(gc, ivec3(0))) || any(greaterThanEqual(gc, ivec3(@GX@, @GY@, @GZ@)))) {
+			        return luceatFinish(total, placedCover, blockPart, fade);
 			    }
 			    int luceatTexels = u_LuceatGridOrigin.w;
 			    int luceatPer = @TEXELS@ + 4 - luceatTexels;
@@ -497,13 +550,11 @@ public final class TerrainShaderPatch {
 			        }
 			    }
 			    if (!reached) {
-			        return vec3(0.0);
+			        return luceatFinish(total, placedCover, blockPart, fade);
 			    }
 			    sumPower = max(sumPower, 1.0e-4);
 			    float invSum = 1.0 / sumPower;
-			    vec3 total = vec3(0.0);
 			    vec3 shiny = vec3(0.0);
-			    float placedCover = 0.0;
 			    float bounce = u_LuceatMore.x * smoothstep(0.35, 0.6, quality);
 			    float gloss = 0.0;
 #ifdef LUCEAT_RAYS
@@ -515,7 +566,6 @@ public final class TerrainShaderPatch {
 			        }
 			    }
 #endif
-			    vec3 blockPart = max(vertexColor.rgb - baseColor.rgb, vec3(0.0));
 			    float vanillaOpen = smoothstep(0.004, 0.035, dot(blockPart, vec3(0.299, 0.587, 0.114)));
 			    vec3 viewDir = normalize(-pos);
 			    int probes = 0;
@@ -616,8 +666,7 @@ public final class TerrainShaderPatch {
 			    }
 #endif
 			    luceatSpec = min(shiny, vec3(1.0)) * fade;
-			    float coverage = clamp(placedCover * fade / max(dot(blockPart, vec3(0.299, 0.587, 0.114)), 0.02), 0.0, 1.0);
-			    return luceatSoft(total, u_LuceatState.w) * fade - blockPart * (u_LuceatOptions.w * coverage);
+			    return luceatFinish(total, placedCover, blockPart, fade);
 			}
 			"""
 			.replace("@BLOCK@", LightBuffer.BLOCK_NAME)
@@ -643,6 +692,11 @@ public final class TerrainShaderPatch {
 			.replace("@CACHE_REACH@", Double.toString(ShadowCache.RADIUS * ShadowCache.RADIUS))
 			.replace("@CACHE_FADE@", Double.toString((ShadowCache.RADIUS - 3.5) * (ShadowCache.RADIUS - 3.5)))
 			.replace("@SPREAD@", LightSpread.SAMPLER)
+			.replace("@BAKELIGHT@", LightVolume.LIGHT_SAMPLER)
+			.replace("@BAKEDIR@", LightVolume.DIRECTION_SAMPLER)
+			.replace("@BAKE_X@", Integer.toString(LightVolume.SIDE_X))
+			.replace("@BAKE_Y@", Integer.toString(LightVolume.SIDE_Y))
+			.replace("@BAKE_Z@", Integer.toString(LightVolume.SIDE_Z))
 			.replace("@GX@", Integer.toString(LightGrid.GX))
 			.replace("@GY@", Integer.toString(LightGrid.GY))
 			.replace("@GZ@", Integer.toString(LightGrid.GZ))
@@ -658,12 +712,17 @@ public final class TerrainShaderPatch {
 	private static boolean vertexPatched;
 	private static ShaderVariant current;
 	private static ShaderVariant built;
+	private static boolean bakeCompiled;
 
 	private TerrainShaderPatch() {
 	}
 
 	public static ShaderVariant built() {
 		return built;
+	}
+
+	public static boolean bakeCompiled() {
+		return bakeCompiled;
 	}
 
 	public static String apply(Identifier id, String source) {
@@ -673,6 +732,7 @@ public final class TerrainShaderPatch {
 		if (VERTEX_PATH.equals(id.getPath())) {
 			current = ShaderVariant.wanted();
 			built = current;
+			bakeCompiled = LightVolume.capable();
 			if (current == ShaderVariant.OFF) {
 				vertexPatched = false;
 				return source;
@@ -694,7 +754,7 @@ public final class TerrainShaderPatch {
 	}
 
 	private static String patchFragment(String source) {
-		String defines = (current.rays() ? "\n#define LUCEAT_RAYS 1" : "") + (current.spread() ? "\n#define LUCEAT_SPREAD 1" : "");
+		String defines = (current.rays() ? "\n#define LUCEAT_RAYS 1" : "") + (current.spread() ? "\n#define LUCEAT_SPREAD 1" : "") + (bakeCompiled ? "\n#define LUCEAT_BAKE 1" : "");
 		String lighting = defines + FRAGMENT_LIGHTING;
 		String patched = replaceOnce(source, "flat in uint v_Material;", "flat in uint v_Material;\n" + lighting);
 		patched = replaceOnce(patched, "color *= v_Color;", "vec3 luceatAlbedo = color.rgb;\n    vec3 luceatFaceNormal = luceatNormal(v_LuceatPos);\n    color *= v_Color;");

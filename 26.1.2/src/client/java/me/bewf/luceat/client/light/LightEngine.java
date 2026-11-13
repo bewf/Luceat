@@ -78,18 +78,20 @@ public final class LightEngine {
 		}
 		if (!built) {
 			long gridStart = System.nanoTime();
-			LightGrid.update(lights, camera);
+			LightVolume.update(minecraft.level, lights, camera);
+			List<LightSource> live = LightVolume.remaining(lights);
+			LightGrid.update(live, camera);
 			Stats.record(Stats.GRID, System.nanoTime() - gridStart);
-			ShadowCache.update(lights, camera);
+			ShadowCache.update(live, camera);
 			SunCache.update(minecraft.level, camera);
 			long bufferStart = System.nanoTime();
-			BUFFER.update(lights, camera);
+			BUFFER.update(live, camera);
 			Stats.record(Stats.BUFFER, System.nanoTime() - bufferStart);
 			built = true;
 			ShaderVariant variant = TerrainShaderPatch.built();
 			if (variant != null && variant.spread()) {
 				long spreadStart = System.nanoTime();
-				LightSpread.update(BUFFER, lights, camera);
+				LightSpread.update(BUFFER, live, camera);
 				Stats.record(Stats.SPREAD, System.nanoTime() - spreadStart);
 			}
 		}
@@ -98,6 +100,7 @@ public final class LightEngine {
 		ShadowVolume.bind(program);
 		ShadowCache.bind(program);
 		SunCache.bind(program);
+		LightVolume.bind(program);
 		ShaderVariant bound = TerrainShaderPatch.built();
 		if (bound != null && bound.spread()) {
 			LightSpread.bind(program);

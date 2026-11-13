@@ -16,6 +16,7 @@ import org.lwjgl.opengl.GL13;
 import org.lwjgl.opengl.GL20;
 import org.lwjgl.opengl.GL30;
 
+import me.bewf.luceat.client.light.LightVolume;
 import me.bewf.luceat.client.light.PlacedLights;
 
 import net.minecraft.client.multiplayer.ClientLevel;
@@ -126,6 +127,7 @@ public final class ShadowVolume {
 		PlacedLights.clear();
 		ShadowCache.reset();
 		SunCache.reset();
+		LightVolume.reset();
 	}
 
 	public static short mirrorId(int x, int y, int z) {

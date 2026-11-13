@@ -11,6 +11,7 @@ import me.bewf.luceat.client.gui.glass.Glass;
 import me.bewf.luceat.client.gui.presets.HardwareHint;
 import me.bewf.luceat.client.light.Governor;
 import me.bewf.luceat.client.light.LightGrid;
+import me.bewf.luceat.client.light.LightVolume;
 import me.bewf.luceat.client.light.LightSpread;
 import me.bewf.luceat.client.light.Panic;
 import me.bewf.luceat.client.light.PlacedLights;
@@ -87,9 +88,10 @@ public final class DebugReport {
 		List<Row> lights = new ArrayList<>();
 		lights.add(new Row("Lights this frame", Integer.toString(Stats.lights()), Glass.TEXT));
 		lights.add(new Row("Light grid cells", Integer.toString(LightGrid.cellsUsed()), Glass.TEXT));
+		lights.add(new Row("Baked lights", Integer.toString(LightVolume.baked()), Glass.TEXT));
 		lights.add(new Row("Scanned sections", Integer.toString(PlacedLights.sectionCount()), Glass.TEXT));
 		lights.add(new Row("Shadow map cells", config.shadows ? Integer.toString(ShadowVolume.cellsFilled()) : "shadows off", Glass.TEXT));
-		long bytes = ShadowVolume.bytes() + PatternAtlas.bytes() + ShapeMasks.bytes() + LightGrid.bytes();
+		long bytes = ShadowVolume.bytes() + PatternAtlas.bytes() + ShapeMasks.bytes() + LightGrid.bytes() + LightVolume.bytes();
 		lights.add(new Row("Video memory", String.format(Locale.ROOT, "%.1f MB", bytes / 1048576.0), Glass.TEXT));
 		groups.add(new Group("Lights", lights));
 
@@ -120,6 +122,7 @@ public final class DebugReport {
 		}
 		LuceatConfig config = LuceatConfig.get();
 		out.append("\nSettings\npreset: ").append(config.preset).append('\n');
+		out.append("baked lights: ").append(config.bakedLights).append(", baked: ").append(LightVolume.baked()).append(", busy: ").append(LightVolume.busy()).append('\n');
 		out.append("shadows: ").append(config.shadows).append(", lights with shadows: ").append(config.shadowedLights).append(", shadow method: ").append(config.placedShadows).append(", stored volumes: ").append(ShadowCache.readySlots()).append('/').append(ShadowCache.SLOTS).append('\n');
 		out.append("max lights: ").append(config.maxLights).append(", max brightness: ").append(config.maxBrightness).append('\n');
 		return out.toString();
