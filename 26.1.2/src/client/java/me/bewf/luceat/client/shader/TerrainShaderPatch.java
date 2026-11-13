@@ -312,8 +312,14 @@ public final class TerrainShaderPatch {
 			    return 1.0;
 			}
 
+			vec3 luceatPenumbra(vec3 centre, float a, float b) {
+			    float dark = 1.0 - smoothstep(0.02, 0.1, max(centre.r, max(centre.g, centre.b)));
+			    float lost = (2.0 - a - b) * 0.3333333;
+			    return mix(centre * (1.0 - lost), vec3((a + b) * 0.3333333), dark);
+			}
+
 			vec3 luceatShadow(vec3 pos, vec3 normal, vec3 lightPos, bool soft) {
-			    vec3 centre = luceatVisibility(pos, normal, lightPos, 96);
+			    vec3 centre = luceatVisibility(pos, normal, lightPos, 80);
 			    float radius = soft ? u_LuceatExtra.z : 0.0;
 			    if (radius <= 0.0 || max(centre.r, max(centre.g, centre.b)) > 0.98) {
 			        return centre;
@@ -322,16 +328,16 @@ public final class TerrainShaderPatch {
 			    vec3 side = normalize(cross(dir, abs(dir.y) > 0.9 ? vec3(1.0, 0.0, 0.0) : vec3(0.0, 1.0, 0.0)));
 			    vec3 up = cross(dir, side);
 			    ivec3 home = ivec3(floor(lightPos + u_LuceatCamFrac.xyz));
-			    vec3 total = centre;
+			    float seen[2];
 			    for (int k = 0; k < 2; k++) {
 			        float angle = 3.1415927 * float(k) + 0.5;
 			        vec3 spot = lightPos + (side * cos(angle) + up * sin(angle)) * radius;
 			        if (ivec3(floor(spot + u_LuceatCamFrac.xyz)) != home) {
 			            spot = lightPos;
 			        }
-			        total += luceatVisibility(pos, normal, spot, 96);
+			        seen[k] = luceatCheap(pos, normal, spot);
 			    }
-			    return total * 0.3333333;
+			    return luceatPenumbra(centre, seen[0], seen[1]);
 			}
 
 			float luceatCaustic(vec2 p, float t) {
@@ -365,34 +371,43 @@ public final class TerrainShaderPatch {
 			            float closeBlend = volume ? 1.0 - smoothstep(@SUN_NEAR_A@, @SUN_NEAR_B@, dist) : 1.0;
 			            float runLength = volume ? @SUN_RUN@ : 48.0;
 			            vec3 seen = vec3(1.0);
-			            if (closeBlend > 0.001) {
-			                seen = luceatVisibility(pos, normal, pos + sun * runLength, volume ? @SUN_STEPS@ : 56);
-			            }
-			            float blocked = 1.0 - dot(seen, vec3(0.3333333));
-			            if (closeBlend > 0.001 && blocked > 0.02 && u_LuceatMore.w > 0.6) {
-			                float noise = fract(52.9829189 * fract(dot(gl_FragCoord.xy, vec2(0.06711056, 0.00583715))));
-			                float turn = noise * 6.2831853;
-			                vec3 sideA = normalize(cross(sun, vec3(0.0, 0.0, 1.0)));
-			                vec3 sideB = cross(sun, sideA);
-			                vec3 spread = (sideA * cos(turn) + sideB * sin(turn)) * (runLength * 0.0354);
-			                vec3 first = luceatVisibility(pos, normal, pos + sun * runLength + spread, volume ? @SUN_STEPS@ : 40);
-			                vec3 second = luceatVisibility(pos, normal, pos + sun * runLength - spread, volume ? @SUN_STEPS@ : 40);
-			                seen = (seen + first + second) * 0.3333333;
-			            }
+			            vec3 span = vec3(@SUN_X@.0, @SUN_Y@.0, @SUN_Z@.0);
+			            vec3 shift = vec3(u_LuceatCamBlock.xyz - u_LuceatSunOrigin.xyz) + u_LuceatCamFrac.xyz;
+			            vec3 distant = vec3(1.0);
+			            bool settled = false;
 			            if (volume) {
-			                vec3 span = vec3(@SUN_X@.0, @SUN_Y@.0, @SUN_Z@.0);
-			                vec3 shift = vec3(u_LuceatCamBlock.xyz - u_LuceatSunOrigin.xyz) + u_LuceatCamFrac.xyz;
+			                vec3 rel = pos + shift + normal * 0.6;
+			                vec3 edge = min(rel, span - rel);
+			                float inside = smoothstep(0.0, 6.0, min(edge.x, min(edge.y, edge.z)));
+			                distant = mix(vec3(1.0), texture(@SUNVOL@, rel / span).rgb, inside);
+			                float lowest = min(distant.r, min(distant.g, distant.b));
+			                float highest = max(distant.r, max(distant.g, distant.b));
+			                settled = inside > 0.999 && (lowest > 0.985 || highest < 0.012);
+			            }
+			            if (settled) {
+			                seen = distant;
+			            } else {
 			                if (closeBlend > 0.001) {
-			                    vec3 reachRel = pos + shift + sun * (runLength + 0.5);
-			                    vec3 reachEdge = min(reachRel, span - reachRel);
-			                    float reachIn = smoothstep(0.0, 6.0, min(reachEdge.x, min(reachEdge.y, reachEdge.z)));
-			                    seen *= mix(vec3(1.0), texture(@SUNVOL@, reachRel / span).rgb, reachIn);
+			                    seen = luceatVisibility(pos, normal, pos + sun * runLength, volume ? @SUN_STEPS@ : 56);
+			                    float blocked = 1.0 - dot(seen, vec3(0.3333333));
+			                    if (blocked > 0.02 && u_LuceatMore.w > 0.6) {
+			                        float noise = fract(52.9829189 * fract(dot(gl_FragCoord.xy, vec2(0.06711056, 0.00583715))));
+			                        float turn = noise * 6.2831853;
+			                        vec3 sideA = normalize(cross(sun, vec3(0.0, 0.0, 1.0)));
+			                        vec3 sideB = cross(sun, sideA);
+			                        vec3 spread = (sideA * cos(turn) + sideB * sin(turn)) * (runLength * 0.0354);
+			                        float first = luceatCheap(pos, normal, pos + sun * runLength + spread);
+			                        float second = luceatCheap(pos, normal, pos + sun * runLength - spread);
+			                        seen = luceatPenumbra(seen, first, second);
+			                    }
+			                    if (volume) {
+			                        vec3 reachRel = pos + shift + sun * (runLength + 0.5);
+			                        vec3 reachEdge = min(reachRel, span - reachRel);
+			                        float reachIn = smoothstep(0.0, 6.0, min(reachEdge.x, min(reachEdge.y, reachEdge.z)));
+			                        seen *= mix(vec3(1.0), texture(@SUNVOL@, reachRel / span).rgb, reachIn);
+			                    }
 			                }
-			                if (closeBlend < 0.999) {
-			                    vec3 rel = pos + shift + normal * 0.6;
-			                    vec3 edge = min(rel, span - rel);
-			                    float inside = smoothstep(0.0, 6.0, min(edge.x, min(edge.y, edge.z)));
-			                    vec3 distant = mix(vec3(1.0), texture(@SUNVOL@, rel / span).rgb, inside);
+			                if (volume && closeBlend < 0.999) {
 			                    seen = mix(distant, seen, closeBlend);
 			                }
 			            }
