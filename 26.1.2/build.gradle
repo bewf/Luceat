@@ -3,6 +3,12 @@ plugins {
 	id 'maven-publish'
 }
 
+version = providers.fileContents(layout.projectDirectory.file("../version.properties")).asText.map { text ->
+	def props = new Properties()
+	props.load(new StringReader(text))
+	props.getProperty("mod_version").trim()
+}.get()
+
 repositories {
 	exclusiveContent {
 		forRepository {
@@ -70,12 +76,12 @@ dependencies {
 	clientCompileOnly "maven.modrinth:modmenu:${project.modmenu_version}"
 }
 
-processResources {
-	def version = project.version
-	inputs.property "version", version
+tasks.withType(ProcessResources).configureEach {
+	def modVersion = project.version.toString()
+	inputs.property "version", modVersion
 
 	filesMatching("fabric.mod.json") {
-		expand "version": version
+		expand "version": modVersion
 	}
 }
 
