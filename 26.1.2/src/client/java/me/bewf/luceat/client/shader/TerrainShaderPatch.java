@@ -318,26 +318,20 @@ public final class TerrainShaderPatch {
 			    return mix(centre * (1.0 - lost), vec3((a + b) * 0.3333333), dark);
 			}
 
-			vec3 luceatShadow(vec3 pos, vec3 normal, vec3 lightPos, bool soft) {
-			    vec3 centre = luceatVisibility(pos, normal, lightPos, 80);
-			    float radius = soft ? u_LuceatExtra.z : 0.0;
-			    if (radius <= 0.0 || max(centre.r, max(centre.g, centre.b)) > 0.98) {
-			        return centre;
-			    }
-			    vec3 dir = normalize(lightPos - pos);
-			    vec3 side = normalize(cross(dir, abs(dir.y) > 0.9 ? vec3(1.0, 0.0, 0.0) : vec3(0.0, 1.0, 0.0)));
-			    vec3 up = cross(dir, side);
-			    ivec3 home = ivec3(floor(lightPos + u_LuceatCamFrac.xyz));
-			    float seen[2];
-			    for (int k = 0; k < 2; k++) {
-			        float angle = 3.1415927 * float(k) + 0.5;
-			        vec3 spot = lightPos + (side * cos(angle) + up * sin(angle)) * radius;
-			        if (ivec3(floor(spot + u_LuceatCamFrac.xyz)) != home) {
-			            spot = lightPos;
+			float luceatProbe(vec3 pos, vec3 normal, vec3 lightPos, float dist) {
+			    int count = int(clamp(dist - 0.5, 2.0, 12.0));
+			    vec3 origin = pos + normal * 0.1 + u_LuceatCamFrac.xyz;
+			    vec3 stride = (lightPos + u_LuceatCamFrac.xyz - origin) / float(count + 1);
+			    ivec3 lightCell = ivec3(floor(lightPos + u_LuceatCamFrac.xyz));
+			    vec3 at = origin;
+			    for (int k = 0; k < count; k++) {
+			        at += stride;
+			        ivec3 cell = ivec3(floor(at));
+			        if (cell != lightCell && luceatId(cell) == 1u) {
+			            return 0.0;
 			        }
-			        seen[k] = luceatCheap(pos, normal, spot);
 			    }
-			    return luceatPenumbra(centre, seen[0], seen[1]);
+			    return 1.0;
 			}
 
 			float luceatCaustic(vec2 p, float t) {
@@ -447,26 +441,6 @@ public final class TerrainShaderPatch {
 			}
 #endif
 
-			#ifdef LUCEAT_RAYS
-			void luceatPush(inout vec4 a, inout vec4 b, float v) {
-			    if (v <= b.w) {
-			        return;
-			    }
-			    float t;
-			    if (v > a.x) { t = a.x; a.x = v; v = t; }
-			    if (v > a.y) { t = a.y; a.y = v; v = t; }
-			    if (v > a.z) { t = a.z; a.z = v; v = t; }
-			    if (v > a.w) { t = a.w; a.w = v; v = t; }
-			    if (v > b.x) { t = b.x; b.x = v; v = t; }
-			    if (v > b.y) { t = b.y; b.y = v; v = t; }
-			    if (v > b.z) { t = b.z; b.z = v; v = t; }
-			    if (v > b.w) { b.w = v; }
-			}
-
-			float luceatKth(vec4 a, vec4 b, int k) {
-			    return k <= 4 ? a[k - 1] : b[k - 5];
-			}
-			#endif
 
 			float luceatRamp(float x, float low, float inverseWidth) {
 			    float t = clamp((x - low) * inverseWidth, 0.0, 1.0);
@@ -496,15 +470,9 @@ public final class TerrainShaderPatch {
 			    float shadowReach = u_LuceatExtra.y * mix(0.6, 1.0, quality);
 			    float shadowFade = u_LuceatState.y > 0.5 ? 1.0 - smoothstep(0.6 * shadowReach, shadowReach, length(pos)) : 0.0;
 			    float dayCut = (1.0 - fade) * 8.0;
-			    float budget = u_LuceatMore.z * quality;
-			    float full = budget > 0.5 ? 0.5 / budget : 2.0;
-			    float cheap = full * 0.25;
 			    float sumPower = 0.0;
-			    vec4 topA = vec4(0.0);
-			    vec4 topB = vec4(0.0);
 			    bool reached = false;
 			    int slotCap = int(u_LuceatSun2.w + 0.5);
-			    bool fancy = (u_LuceatCamBlock.w & 1) != 0;
 			    int taken = 0;
 			    for (int g = 0; g < luceatTexels && taken < slotCap; g++) {
 			        uvec4 slots = texelFetch(@GRID@, ivec3(gc.x * @TEXELS@ + g, gc.y, gc.z), 0);
@@ -526,12 +494,6 @@ public final class TerrainShaderPatch {
 			            vec4 colour = u_LuceatColor[int(id) - 1];
 			            float weight = level / (4.0 - 3.0 * level) * max(colour.r, max(colour.g, colour.b));
 			            sumPower += weight;
-			#ifdef LUCEAT_RAYS
-			            int tag = int(colour.w + 0.5);
-			            if ((tag & 2) == 0 && ((tag >> 6) == 0 || fancy)) {
-			                luceatPush(topA, topB, weight);
-			            }
-			#endif
 			        }
 			    }
 			    if (!reached) {
@@ -539,21 +501,6 @@ public final class TerrainShaderPatch {
 			    }
 			    sumPower = max(sumPower, 1.0e-4);
 			    float invSum = 1.0 / sumPower;
-			#ifdef LUCEAT_RAYS
-			    int fullRank = int(ceil(budget - 0.01));
-			    float fullCut = 0.0;
-			    float cheapCut = 0.0;
-			    if (fullRank >= 1 && fullRank <= 8) {
-			        fullCut = luceatKth(topA, topB, fullRank) / sumPower;
-			        cheapCut = luceatKth(topA, topB, min(8, fullRank + max(2, fullRank / 2))) / sumPower;
-			    }
-			    float fullEdge = max(full, fullCut);
-			    float cheapEdge = max(cheap, cheapCut);
-			    float fullLow = fullCut > full ? 0.9 * fullCut : 0.6 * full;
-			    float cheapLow = cheapCut > cheap ? 0.9 * cheapCut : 0.6 * cheap;
-			    float fullInv = 1.0 / max(fullEdge - fullLow, 1.0e-6);
-			    float cheapInv = 1.0 / max(cheapEdge - cheapLow, 1.0e-6);
-			#endif
 			    vec3 total = vec3(0.0);
 			    vec3 shiny = vec3(0.0);
 			    float placedCover = 0.0;
@@ -571,6 +518,8 @@ public final class TerrainShaderPatch {
 			    vec3 blockPart = max(vertexColor.rgb - baseColor.rgb, vec3(0.0));
 			    float vanillaOpen = smoothstep(0.004, 0.035, dot(blockPart, vec3(0.299, 0.587, 0.114)));
 			    vec3 viewDir = normalize(-pos);
+			    int probes = 0;
+			    int probeCap = int(u_LuceatMore.z * quality + 0.5);
 			    taken = 0;
 			    for (int g = 0; g < luceatTexels && taken < slotCap; g++) {
 			        uvec4 slots = texelFetch(@GRID@, ivec3(gc.x * @TEXELS@ + g, gc.y, gc.z), 0);
@@ -617,10 +566,13 @@ public final class TerrainShaderPatch {
 #ifdef LUCEAT_RAYS
 			            bool shadowAny = shadowFade > 0.01 && !noShadow;
 			            bool storedOn = shadowAny && stored >= 0;
-			            bool marchOn = shadowAny && budget > 0.5 && (stored < 0 || fancy);
-			            float wFull = marchOn ? luceatRamp(share, fullLow, fullInv) : 0.0;
-			            float wCheap = marchOn && stored < 0 ? luceatRamp(share, cheapLow, cheapInv) : 0.0;
-			            vec3 kept = storedOn ? luceatCached(pos, normal, light.xyz, stored) : vec3(1.0);
+			            vec3 kept = vec3(1.0);
+			            if (storedOn) {
+			                kept = luceatCached(pos, normal, light.xyz, stored);
+			            } else if (shadowAny && probes < probeCap && share > 0.08) {
+			                probes++;
+			                kept = vec3(luceatProbe(pos, normal, light.xyz, dist));
+			            }
 #endif
 			            if (level > 0.0 && facing > 0.0) {
 			                float lambert = mix(1.0, 0.4 + 0.6 * clamp(ndotl, 0.0, 1.0), u_LuceatOptions.y);
@@ -631,15 +583,7 @@ public final class TerrainShaderPatch {
 			                vec3 visible = vec3(1.0);
 #ifdef LUCEAT_RAYS
 			                if (shadowAny && power * u_LuceatState.z * fade * max(tint.r, max(tint.g, tint.b)) > 0.02) {
-			                    vec3 base = kept;
-			                    if (wCheap > 0.01 && wFull < 0.99) {
-			                        base = vec3(mix(1.0, luceatCheap(pos, normal, light.xyz), wCheap));
-			                    }
-			                    vec3 solved = base;
-			                    if (wFull > 0.01) {
-			                        solved = luceatShadow(pos, normal, light.xyz, share > 0.4 && dist < 16.0 && quality > 0.7);
-			                    }
-			                    visible = mix(vec3(1.0), mix(base, solved, wFull), u_LuceatOptions.z * shadowFade);
+			                    visible = mix(vec3(1.0), kept, u_LuceatOptions.z * shadowFade);
 			                }
 #endif
 			                total += tint * (u_LuceatState.z * power) * visible;
@@ -654,10 +598,8 @@ public final class TerrainShaderPatch {
 			                float curvedBounce = bounceLevel / (4.0 - 3.0 * bounceLevel);
 			                float seen = 1.0;
 #ifdef LUCEAT_RAYS
-			                if (storedOn) {
+			                if (shadowAny) {
 			                    seen = mix(1.0, dot(kept, vec3(0.3333333)), u_LuceatOptions.z * shadowFade);
-			                } else if (wCheap > 0.01 && share > 0.2) {
-			                    seen = mix(1.0, luceatCheap(pos + normal * 0.6, normal, light.xyz), wCheap * u_LuceatOptions.z * shadowFade);
 			                }
 #endif
 			                total += tint * (u_LuceatState.z * bounce * 0.2 * curvedBounce * (1.0 - clamp(ndotl, 0.0, 1.0)) * strength * seen);
