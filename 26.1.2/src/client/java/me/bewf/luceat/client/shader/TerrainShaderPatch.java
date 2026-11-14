@@ -568,7 +568,7 @@ public final class TerrainShaderPatch {
 			                continue;
 			            }
 			            vec4 colour = u_LuceatColor[int(id) - 1];
-			            float weight = level / (4.0 - 3.0 * level) * max(colour.r, max(colour.g, colour.b));
+			            float weight = pow(level / (4.0 - 3.0 * level), u_LuceatBakeParams.z) * max(colour.r, max(colour.g, colour.b));
 			            sumPower += weight;
 			        }
 			    }
@@ -615,7 +615,7 @@ public final class TerrainShaderPatch {
 			            }
 			            vec4 colour = u_LuceatColor[i];
 			            vec3 tint = colour.rgb;
-			            float curved = level / (4.0 - 3.0 * level);
+			            float curved = pow(level / (4.0 - 3.0 * level), u_LuceatBakeParams.z);
 			            float share = curved * max(tint.r, max(tint.g, tint.b)) * invSum;
 			            float keep = level > 0.0 ? luceatRamp(share, 0.006, 71.4286) : 1.0;
 			            if (keep <= 0.0) {

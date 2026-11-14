@@ -58,6 +58,7 @@ public final class LuceatConfig {
 	public boolean bakedLights = true;
 	public float placedStrength = 1.0F;
 	public float emissiveGlow = 1.0F;
+	public float lightFalloff = 1.3F;
 	public float vanillaReplace = 0.8F;
 	public int placedMinLevel = 3;
 
@@ -188,6 +189,7 @@ public final class LuceatConfig {
 		lightRange = Math.max(8, Math.min(lightRange, 128));
 		placedStrength = Math.max(0.0F, Math.min(placedStrength, 2.0F));
 		emissiveGlow = Math.max(0.0F, Math.min(emissiveGlow, 2.0F));
+		lightFalloff = Math.max(0.8F, Math.min(lightFalloff, 2.0F));
 		vanillaReplace = Math.max(0.0F, Math.min(vanillaReplace, 1.0F));
 		placedMinLevel = Math.max(1, Math.min(placedMinLevel, 15));
 		shadowDistance = Math.max(8, Math.min(shadowDistance, 128));

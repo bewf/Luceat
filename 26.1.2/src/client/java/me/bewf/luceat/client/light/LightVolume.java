@@ -56,7 +56,7 @@ public final class LightVolume {
 		GL11.GL_UNPACK_SKIP_PIXELS, GL12.GL_UNPACK_IMAGE_HEIGHT, GL12.GL_UNPACK_SKIP_IMAGES
 	};
 
-	private record Bake(long id, double x, double y, double z, float red, float green, float blue, float radius, boolean fire, boolean noShadow) {
+	private record Bake(long id, double x, double y, double z, float red, float green, float blue, float radius, float contrast, boolean fire, boolean noShadow) {
 	}
 
 	private record Job(int generation, int blockSignature, int originX, int originY, int originZ, List<Bake> lights, Map<Long, Integer> hashes, int minX, int minY, int minZ, int maxX, int maxY, int maxZ) {
@@ -252,7 +252,7 @@ public final class LightVolume {
 			if (base < 1.0F) {
 				continue;
 			}
-			out.add(new Bake(light.id(), light.x(), light.y(), light.z(), light.red(), light.green(), light.blue(), base, light.fire(), light.noShadow() || skipShadows));
+			out.add(new Bake(light.id(), light.x(), light.y(), light.z(), light.red(), light.green(), light.blue(), base, config.lightFalloff, light.fire(), light.noShadow() || skipShadows));
 		}
 		return out;
 	}
@@ -266,6 +266,7 @@ public final class LightVolume {
 		h ^= Math.round(bake.green() * 64.0F) * 0x27D4EB2F165667C5L;
 		h ^= Math.round(bake.blue() * 64.0F) * 0x9E3779B185EBCA87L;
 		h ^= Math.round(bake.radius() * 4.0F) * 0xFF51AFD7ED558CCDL;
+		h ^= Math.round(bake.contrast() * 32.0F) * 0x2545F4914F6CDD1DL;
 		h ^= bake.noShadow() ? 0x1234567L : 0L;
 		h ^= bake.fire() ? 0x7654321L : 0L;
 		return (int) (h ^ (h >>> 32));
@@ -535,6 +536,9 @@ public final class LightVolume {
 						double distance = Math.sqrt(distanceSquared);
 						float level = (float) Math.min(1.0, (radius - distance) / 15.0);
 						float curved = level / (4.0F - 3.0F * level);
+						if (bake.contrast() != 1.0F) {
+							curved = (float) Math.pow(curved, bake.contrast());
+						}
 						if (curved <= 0.0F) {
 							continue;
 						}
