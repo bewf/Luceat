@@ -55,6 +55,7 @@ public final class TerrainShaderPatch {
 #ifdef LUCEAT_BAKE
 			uniform sampler3D @BAKELIGHT@;
 			uniform sampler3D @BAKEDIR@;
+			uniform sampler3D @BAKEEMIT@;
 #endif
 
 			vec3 luceatSpec;
@@ -495,6 +496,28 @@ public final class TerrainShaderPatch {
 			}
 #endif
 
+			vec3 luceatEmit(vec3 lit, vec3 albedo, vec3 pos, vec3 normal) {
+#ifdef LUCEAT_BAKE
+			    float glow = u_LuceatBakeParams.y;
+			    if (glow <= 0.0 || u_LuceatBakeOrigin.w == 0) {
+			        return lit;
+			    }
+			    vec3 rel = pos + vec3(u_LuceatCamBlock.xyz - u_LuceatBakeOrigin.xyz) + u_LuceatCamFrac.xyz - normal * 0.05;
+			    if (any(lessThan(rel, vec3(0.0))) || any(greaterThanEqual(rel, vec3(@BAKE_X@.0, @BAKE_Y@.0, @BAKE_Z@.0)))) {
+			        return lit;
+			    }
+			    float emitter = texelFetch(@BAKEEMIT@, ivec3(floor(rel)), 0).r;
+			    if (emitter <= 0.0) {
+			        return lit;
+			    }
+			    float lum = dot(albedo, vec3(0.299, 0.587, 0.114));
+			    float k = smoothstep(0.42, 0.8, lum) * emitter * glow;
+			    return mix(lit * (1.0 + 0.7 * k), vec3(1.0, 0.96, 0.88), clamp(0.4 * k, 0.0, 0.8));
+#else
+			    return lit;
+#endif
+			}
+
 			vec3 luceatFinish(vec3 total, float placedCover, vec3 blockPart, float fade) {
 			    float coverage = clamp(placedCover * fade / max(dot(blockPart, vec3(0.299, 0.587, 0.114)), 0.02), 0.0, 1.0);
 			    return luceatSoft(total, u_LuceatState.w) * fade - blockPart * (u_LuceatOptions.w * coverage);
@@ -694,6 +717,7 @@ public final class TerrainShaderPatch {
 			.replace("@SPREAD@", LightSpread.SAMPLER)
 			.replace("@BAKELIGHT@", LightVolume.LIGHT_SAMPLER)
 			.replace("@BAKEDIR@", LightVolume.DIRECTION_SAMPLER)
+			.replace("@BAKEEMIT@", LightVolume.EMIT_SAMPLER)
 			.replace("@BAKE_X@", Integer.toString(LightVolume.SIDE_X))
 			.replace("@BAKE_Y@", Integer.toString(LightVolume.SIDE_Y))
 			.replace("@BAKE_Z@", Integer.toString(LightVolume.SIDE_Z))
@@ -758,7 +782,7 @@ public final class TerrainShaderPatch {
 		String lighting = defines + FRAGMENT_LIGHTING;
 		String patched = replaceOnce(source, "flat in uint v_Material;", "flat in uint v_Material;\n" + lighting);
 		patched = replaceOnce(patched, "color *= v_Color;", "vec3 luceatAlbedo = color.rgb;\n    vec3 luceatFaceNormal = luceatNormal(v_LuceatPos);\n    color *= v_Color;");
-		return replaceOnce(patched, "fragColor = _linearFog(", "vec3 luceatSunTerm = luceatSun(v_LuceatPos, luceatFaceNormal, v_LuceatBase);\n    color.rgb += luceatAlbedo * luceatLight(v_LuceatPos, luceatFaceNormal, v_Color, v_LuceatBase);\n    color.rgb += luceatAlbedo * luceatSunTerm;\n    color.rgb = max(color.rgb, vec3(0.0));\n    color.rgb += luceatSpec;\n\n    fragColor = _linearFog(");
+		return replaceOnce(patched, "fragColor = _linearFog(", "vec3 luceatSunTerm = luceatSun(v_LuceatPos, luceatFaceNormal, v_LuceatBase);\n    color.rgb += luceatAlbedo * luceatLight(v_LuceatPos, luceatFaceNormal, v_Color, v_LuceatBase);\n    color.rgb += luceatAlbedo * luceatSunTerm;\n    color.rgb = max(color.rgb, vec3(0.0));\n    color.rgb += luceatSpec;\n    color.rgb = luceatEmit(color.rgb, luceatAlbedo, v_LuceatPos, luceatFaceNormal);\n\n    fragColor = _linearFog(");
 	}
 
 	private static String replaceOnce(String source, String anchor, String replacement) {

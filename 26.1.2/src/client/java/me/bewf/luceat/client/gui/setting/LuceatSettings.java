@@ -122,6 +122,9 @@ public final class LuceatSettings {
 		all.add(new ToggleSetting(PLACED, "Baked placed lights",
 			"Works out placed lights ahead of time on a background thread, so each pixel reads one value instead of checking every light. Much faster with many lights. Shadows from baked lights are one block sharp.",
 			Cost.NONE, false, () -> c.bakedLights, value -> c.bakedLights = value));
+		all.add(new SliderSetting(PLACED, "Emissive glow",
+			"Brightens and whitens the glowing parts of light blocks such as lanterns, torches and glowstone. Needs baked placed lights.",
+			Cost.NONE, false, 0.0F, 2.0F, 0.05F, "x", () -> c.emissiveGlow, value -> c.emissiveGlow = value));
 		all.add(new SliderSetting(PLACED, "Placed light strength",
 			"Sets how bright placed lights are.",
 			Cost.NONE, false, 0.0F, 2.0F, 0.05F, "x", () -> c.placedStrength, value -> c.placedStrength = value));

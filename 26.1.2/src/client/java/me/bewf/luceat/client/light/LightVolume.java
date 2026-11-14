@@ -35,10 +35,13 @@ public final class LightVolume {
 	public static final String LIGHT_SAMPLER = "u_LuceatBakedLight";
 	public static final String DIRECTION_SAMPLER = "u_LuceatBakedDir";
 	public static final int LIGHT_UNIT = 16;
+	public static final String EMIT_SAMPLER = "u_LuceatBakedEmit";
 	public static final int DIRECTION_UNIT = 17;
+	public static final int EMIT_UNIT = 18;
 
 	private static final int VOXELS = SIDE_X * SIDE_Y * SIDE_Z;
 	private static final int SLICE_SHORTS = SIDE_X * SIDE_Y * 4;
+	private static final int SLICE_BYTES = SIDE_X * SIDE_Y;
 	private static final int SLICES_PER_FRAME = 16;
 	private static final int BIAS_Y = 40;
 	private static final int DRIFT_XZ = 16;
@@ -59,14 +62,16 @@ public final class LightVolume {
 	private record Job(int generation, int blockSignature, int originX, int originY, int originZ, List<Bake> lights, Map<Long, Integer> hashes, int minX, int minY, int minZ, int maxX, int maxY, int maxZ) {
 	}
 
-	private record Result(Job job, short[] light, short[] direction) {
+	private record Result(Job job, short[] light, short[] direction, byte[] emit) {
 	}
 
 	private static final LinkedBlockingQueue<Job> JOBS = new LinkedBlockingQueue<>();
 	private static final ConcurrentLinkedQueue<Result> RESULTS = new ConcurrentLinkedQueue<>();
 	private static final ShortBuffer UPLOAD = BufferUtils.createByteBuffer(SLICE_SHORTS * 2 * SLICES_PER_FRAME * 2).order(ByteOrder.nativeOrder()).asShortBuffer();
 	private static final int[] lightTextures = new int[2];
+	private static final ByteBuffer UPLOAD_EMIT = BufferUtils.createByteBuffer(SLICE_BYTES * SLICES_PER_FRAME * 2);
 	private static final int[] directionTextures = new int[2];
+	private static final int[] emitTextures = new int[2];
 
 	private static Thread worker;
 	private static volatile boolean failed;
@@ -94,7 +99,7 @@ public final class LightVolume {
 	public static boolean capable() {
 		if (capable == null) {
 			try {
-				capable = GL11.glGetInteger(GL20.GL_MAX_TEXTURE_IMAGE_UNITS) > DIRECTION_UNIT;
+				capable = GL11.glGetInteger(GL20.GL_MAX_TEXTURE_IMAGE_UNITS) > EMIT_UNIT;
 			} catch (Throwable error) {
 				return false;
 			}
@@ -127,7 +132,7 @@ public final class LightVolume {
 	}
 
 	public static long bytes() {
-		return lightTextures[0] == 0 ? 0L : (long) VOXELS * 32L;
+		return lightTextures[0] == 0 ? 0L : (long) VOXELS * 34L;
 	}
 
 	public static void reset() {
@@ -212,7 +217,8 @@ public final class LightVolume {
 		}
 		int lightLocation = GL20.glGetUniformLocation(program, LIGHT_SAMPLER);
 		int directionLocation = GL20.glGetUniformLocation(program, DIRECTION_SAMPLER);
-		if (lightLocation < 0 && directionLocation < 0) {
+		int emitLocation = GL20.glGetUniformLocation(program, EMIT_SAMPLER);
+		if (lightLocation < 0 && directionLocation < 0 && emitLocation < 0) {
 			return;
 		}
 		int previousUnit = GL11.glGetInteger(GL13.GL_ACTIVE_TEXTURE);
@@ -225,6 +231,11 @@ public final class LightVolume {
 			GL20.glUniform1i(directionLocation, DIRECTION_UNIT);
 			GL13.glActiveTexture(GL13.GL_TEXTURE0 + DIRECTION_UNIT);
 			GL11.glBindTexture(GL12.GL_TEXTURE_3D, directionTextures[0] == 0 ? 0 : directionTextures[front >= 0 ? front : 0]);
+		}
+		if (emitLocation >= 0) {
+			GL20.glUniform1i(emitLocation, EMIT_UNIT);
+			GL13.glActiveTexture(GL13.GL_TEXTURE0 + EMIT_UNIT);
+			GL11.glBindTexture(GL12.GL_TEXTURE_3D, emitTextures[0] == 0 ? 0 : emitTextures[front >= 0 ? front : 0]);
 		}
 		GL13.glActiveTexture(previousUnit);
 	}
@@ -343,6 +354,7 @@ public final class LightVolume {
 		}
 		upload(LIGHT_UNIT, lightTextures[target], pending.light(), slices);
 		upload(DIRECTION_UNIT, directionTextures[target], pending.direction(), slices);
+		uploadEmit(emitTextures[target], pending.emit(), slices);
 		GL13.glActiveTexture(previousUnit);
 		for (int i = 0; i < UNPACK.length; i++) {
 			GL11.glPixelStorei(UNPACK[i], previous[i]);
@@ -369,19 +381,29 @@ public final class LightVolume {
 		GL12.glTexSubImage3D(GL12.GL_TEXTURE_3D, 0, 0, 0, uploaded, SIDE_X, SIDE_Y, slices, GL11.GL_RGBA, GL30.GL_HALF_FLOAT, UPLOAD);
 	}
 
+	private static void uploadEmit(int texture, byte[] data, int slices) {
+		GL13.glActiveTexture(GL13.GL_TEXTURE0 + EMIT_UNIT);
+		GL11.glBindTexture(GL12.GL_TEXTURE_3D, texture);
+		UPLOAD_EMIT.clear();
+		UPLOAD_EMIT.put(data, uploaded * SLICE_BYTES, slices * SLICE_BYTES);
+		UPLOAD_EMIT.flip();
+		GL12.glTexSubImage3D(GL12.GL_TEXTURE_3D, 0, 0, 0, uploaded, SIDE_X, SIDE_Y, slices, GL11.GL_RED, GL11.GL_UNSIGNED_BYTE, UPLOAD_EMIT);
+	}
+
 	private static void ensureTextures() {
 		if (lightTextures[0] != 0) {
 			return;
 		}
 		int previousUnit = GL11.glGetInteger(GL13.GL_ACTIVE_TEXTURE);
 		for (int i = 0; i < 2; i++) {
-			lightTextures[i] = createTexture(LIGHT_UNIT);
-			directionTextures[i] = createTexture(DIRECTION_UNIT);
+			lightTextures[i] = createTexture(LIGHT_UNIT, GL30.GL_RGBA16F, GL11.GL_RGBA, GL30.GL_HALF_FLOAT);
+			directionTextures[i] = createTexture(DIRECTION_UNIT, GL30.GL_RGBA16F, GL11.GL_RGBA, GL30.GL_HALF_FLOAT);
+			emitTextures[i] = createTexture(EMIT_UNIT, GL30.GL_R8, GL11.GL_RED, GL11.GL_UNSIGNED_BYTE);
 		}
 		GL13.glActiveTexture(previousUnit);
 	}
 
-	private static int createTexture(int unit) {
+	private static int createTexture(int unit, int internalFormat, int format, int type) {
 		GL13.glActiveTexture(GL13.GL_TEXTURE0 + unit);
 		int texture = GL11.glGenTextures();
 		GL11.glBindTexture(GL12.GL_TEXTURE_3D, texture);
@@ -390,7 +412,7 @@ public final class LightVolume {
 		GL11.glTexParameteri(GL12.GL_TEXTURE_3D, GL11.GL_TEXTURE_WRAP_S, GL12.GL_CLAMP_TO_EDGE);
 		GL11.glTexParameteri(GL12.GL_TEXTURE_3D, GL11.GL_TEXTURE_WRAP_T, GL12.GL_CLAMP_TO_EDGE);
 		GL11.glTexParameteri(GL12.GL_TEXTURE_3D, GL12.GL_TEXTURE_WRAP_R, GL12.GL_CLAMP_TO_EDGE);
-		GL12.glTexImage3D(GL12.GL_TEXTURE_3D, 0, GL30.GL_RGBA16F, SIDE_X, SIDE_Y, SIDE_Z, 0, GL11.GL_RGBA, GL30.GL_HALF_FLOAT, (ByteBuffer) null);
+		GL12.glTexImage3D(GL12.GL_TEXTURE_3D, 0, internalFormat, SIDE_X, SIDE_Y, SIDE_Z, 0, format, type, (ByteBuffer) null);
 		return texture;
 	}
 
@@ -434,6 +456,7 @@ public final class LightVolume {
 		private final float[] pullY = new float[VOXELS];
 		private final float[] pullZ = new float[VOXELS];
 		private final boolean[] solid = new boolean[VOXELS];
+		private final byte[] emit = new byte[VOXELS];
 		private double passRed;
 		private double passGreen;
 		private double passBlue;
@@ -448,6 +471,7 @@ public final class LightVolume {
 			java.util.Arrays.fill(pullX, 0.0F);
 			java.util.Arrays.fill(pullY, 0.0F);
 			java.util.Arrays.fill(pullZ, 0.0F);
+			java.util.Arrays.fill(emit, (byte) 0);
 			int index = 0;
 			for (int k = 0; k < SIDE_Z; k++) {
 				for (int j = 0; j < SIDE_Y; j++) {
@@ -458,6 +482,7 @@ public final class LightVolume {
 			}
 			for (Bake bake : job.lights()) {
 				add(bake, job);
+				markEmitter(bake, job);
 			}
 			fillSolid();
 			short[] light = new short[VOXELS * 4];
@@ -477,7 +502,7 @@ public final class LightVolume {
 					direction[at + 3] = Float.floatToFloat16(Math.min(1.0F, fire[v] * inverse));
 				}
 			}
-			return new Result(job, light, direction);
+			return new Result(job, light, direction, emit.clone());
 		}
 
 		private void add(Bake bake, Job job) {
@@ -542,6 +567,16 @@ public final class LightVolume {
 					}
 				}
 			}
+		}
+
+		private void markEmitter(Bake bake, Job job) {
+			int ex = (int) Math.floor(bake.x()) - job.originX();
+			int ey = (int) Math.floor(bake.y()) - job.originY();
+			int ez = (int) Math.floor(bake.z()) - job.originZ();
+			if (ex < 0 || ey < 0 || ez < 0 || ex >= SIDE_X || ey >= SIDE_Y || ez >= SIDE_Z) {
+				return;
+			}
+			emit[(ez * SIDE_Y + ey) * SIDE_X + ex] = (byte) Math.round(255.0F * Math.min(1.0F, Math.max(0.35F, bake.radius() / 14.0F)));
 		}
 
 		private void soften(Bake bake, int x, int y, int z, int lightX, int lightY, int lightZ, Job job) {

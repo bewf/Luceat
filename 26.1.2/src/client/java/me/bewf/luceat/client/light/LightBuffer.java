@@ -49,7 +49,7 @@ public final class LightBuffer {
 		}
 		this.scratch.putInt(SunCache.originX()).putInt(SunCache.originY()).putInt(SunCache.originZ()).putInt(SunCache.ready() ? 1 : 0);
 		this.scratch.putInt(LightVolume.originX()).putInt(LightVolume.originY()).putInt(LightVolume.originZ()).putInt(LightVolume.ready() ? 1 : 0);
-		this.scratch.putFloat(config.flicker * 0.25F).putFloat(0.0F).putFloat(0.0F).putFloat(0.0F);
+		this.scratch.putFloat(config.flicker * 0.25F).putFloat(config.emissiveGlow).putFloat(0.0F).putFloat(0.0F);
 		for (int i = 0; i < MAX_LIGHTS; i++) {
 			if (i < count) {
 				LightSource light = lights.get(i);
