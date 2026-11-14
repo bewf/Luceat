@@ -474,8 +474,13 @@ public final class TerrainShaderPatch {
 			        return;
 			    }
 			    vec3 at = rel / span;
-			    vec4 stored = texture(@BAKELIGHT@, at);
-			    vec4 pull = texture(@BAKEDIR@, at);
+			    float open = texture(@BAKEEMIT@, at).g;
+			    if (open < 0.02) {
+			        return;
+			    }
+			    float renorm = 1.0 / open;
+			    vec4 stored = texture(@BAKELIGHT@, at) * renorm;
+			    vec4 pull = texture(@BAKEDIR@, at) * renorm;
 			    float concentration = min(length(pull.xyz), 1.0);
 			    vec3 toward = pull.xyz / max(concentration, 1.0e-4);
 			    float ndotl = dot(normal, toward);

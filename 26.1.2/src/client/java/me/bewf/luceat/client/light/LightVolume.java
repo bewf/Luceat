@@ -69,7 +69,7 @@ public final class LightVolume {
 	private static final ConcurrentLinkedQueue<Result> RESULTS = new ConcurrentLinkedQueue<>();
 	private static final ShortBuffer UPLOAD = BufferUtils.createByteBuffer(SLICE_SHORTS * 2 * SLICES_PER_FRAME * 2).order(ByteOrder.nativeOrder()).asShortBuffer();
 	private static final int[] lightTextures = new int[2];
-	private static final ByteBuffer UPLOAD_EMIT = BufferUtils.createByteBuffer(SLICE_BYTES * SLICES_PER_FRAME * 2);
+	private static final ByteBuffer UPLOAD_EMIT = BufferUtils.createByteBuffer(SLICE_BYTES * SLICES_PER_FRAME * 4);
 	private static final int[] directionTextures = new int[2];
 	private static final int[] emitTextures = new int[2];
 
@@ -386,9 +386,9 @@ public final class LightVolume {
 		GL13.glActiveTexture(GL13.GL_TEXTURE0 + EMIT_UNIT);
 		GL11.glBindTexture(GL12.GL_TEXTURE_3D, texture);
 		UPLOAD_EMIT.clear();
-		UPLOAD_EMIT.put(data, uploaded * SLICE_BYTES, slices * SLICE_BYTES);
+		UPLOAD_EMIT.put(data, uploaded * SLICE_BYTES * 2, slices * SLICE_BYTES * 2);
 		UPLOAD_EMIT.flip();
-		GL12.glTexSubImage3D(GL12.GL_TEXTURE_3D, 0, 0, 0, uploaded, SIDE_X, SIDE_Y, slices, GL11.GL_RED, GL11.GL_UNSIGNED_BYTE, UPLOAD_EMIT);
+		GL12.glTexSubImage3D(GL12.GL_TEXTURE_3D, 0, 0, 0, uploaded, SIDE_X, SIDE_Y, slices, GL30.GL_RG, GL11.GL_UNSIGNED_BYTE, UPLOAD_EMIT);
 	}
 
 	private static void ensureTextures() {
@@ -399,7 +399,7 @@ public final class LightVolume {
 		for (int i = 0; i < 2; i++) {
 			lightTextures[i] = createTexture(LIGHT_UNIT, GL30.GL_RGBA16F, GL11.GL_RGBA, GL30.GL_HALF_FLOAT);
 			directionTextures[i] = createTexture(DIRECTION_UNIT, GL30.GL_RGBA16F, GL11.GL_RGBA, GL30.GL_HALF_FLOAT);
-			emitTextures[i] = createTexture(EMIT_UNIT, GL30.GL_R8, GL11.GL_RED, GL11.GL_UNSIGNED_BYTE);
+			emitTextures[i] = createTexture(EMIT_UNIT, GL30.GL_RG8, GL30.GL_RG, GL11.GL_UNSIGNED_BYTE);
 		}
 		GL13.glActiveTexture(previousUnit);
 	}
@@ -457,7 +457,7 @@ public final class LightVolume {
 		private final float[] pullY = new float[VOXELS];
 		private final float[] pullZ = new float[VOXELS];
 		private final boolean[] solid = new boolean[VOXELS];
-		private final byte[] emit = new byte[VOXELS];
+		private final byte[] emit = new byte[VOXELS * 2];
 		private double passRed;
 		private double passGreen;
 		private double passBlue;
@@ -477,7 +477,9 @@ public final class LightVolume {
 			for (int k = 0; k < SIDE_Z; k++) {
 				for (int j = 0; j < SIDE_Y; j++) {
 					for (int i = 0; i < SIDE_X; i++, index++) {
-						solid[index] = (ShadowVolume.mirrorId(job.originX() + i, job.originY() + j, job.originZ() + k) & 0xFFFF) == PatternAtlas.OPAQUE;
+						boolean opaque = (ShadowVolume.mirrorId(job.originX() + i, job.originY() + j, job.originZ() + k) & 0xFFFF) == PatternAtlas.OPAQUE;
+						solid[index] = opaque;
+						emit[index * 2 + 1] = opaque ? (byte) 0 : (byte) 255;
 					}
 				}
 			}
@@ -485,7 +487,6 @@ public final class LightVolume {
 				add(bake, job);
 				markEmitter(bake, job);
 			}
-			fillSolid();
 			short[] light = new short[VOXELS * 4];
 			short[] direction = new short[VOXELS * 4];
 			int at = 0;
@@ -580,7 +581,7 @@ public final class LightVolume {
 			if (ex < 0 || ey < 0 || ez < 0 || ex >= SIDE_X || ey >= SIDE_Y || ez >= SIDE_Z) {
 				return;
 			}
-			emit[(ez * SIDE_Y + ey) * SIDE_X + ex] = (byte) Math.round(255.0F * Math.min(1.0F, Math.max(0.35F, bake.radius() / 14.0F)));
+			emit[((ez * SIDE_Y + ey) * SIDE_X + ex) * 2] = (byte) Math.round(255.0F * Math.min(1.0F, Math.max(0.35F, bake.radius() / 14.0F)));
 		}
 
 		private void soften(Bake bake, int x, int y, int z, int lightX, int lightY, int lightZ, Job job) {
@@ -634,65 +635,6 @@ public final class LightVolume {
 			h *= 0x5BD1E995;
 			h ^= h >>> 15;
 			return ((h & 0xFFFF) / 65535.0 - 0.5) * 0.7;
-		}
-
-		private void fillSolid() {
-			int index = 0;
-			for (int k = 0; k < SIDE_Z; k++) {
-				for (int j = 0; j < SIDE_Y; j++) {
-					for (int i = 0; i < SIDE_X; i++, index++) {
-						if (!solid[index]) {
-							continue;
-						}
-						int n = 0;
-						float r = 0.0F;
-						float g = 0.0F;
-						float b = 0.0F;
-						float c = 0.0F;
-						float w = 0.0F;
-						float f = 0.0F;
-						float px = 0.0F;
-						float py = 0.0F;
-						float pz = 0.0F;
-						for (int side = 0; side < 6; side++) {
-							int axis = side >> 1;
-							int step = (side & 1) == 0 ? -1 : 1;
-							int ni = i + (axis == 0 ? step : 0);
-							int nj = j + (axis == 1 ? step : 0);
-							int nk = k + (axis == 2 ? step : 0);
-							if (ni < 0 || nj < 0 || nk < 0 || ni >= SIDE_X || nj >= SIDE_Y || nk >= SIDE_Z) {
-								continue;
-							}
-							int near = (nk * SIDE_Y + nj) * SIDE_X + ni;
-							if (solid[near]) {
-								continue;
-							}
-							r += red[near];
-							g += green[near];
-							b += blue[near];
-							c += cover[near];
-							w += weight[near];
-							f += fire[near];
-							px += pullX[near];
-							py += pullY[near];
-							pz += pullZ[near];
-							n++;
-						}
-						if (n > 0) {
-							float inverse = 1.0F / n;
-							red[index] = r * inverse;
-							green[index] = g * inverse;
-							blue[index] = b * inverse;
-							cover[index] = c * inverse;
-							weight[index] = w * inverse;
-							fire[index] = f * inverse;
-							pullX[index] = px * inverse;
-							pullY[index] = py * inverse;
-							pullZ[index] = pz * inverse;
-						}
-					}
-				}
-			}
 		}
 
 		private void trace(double ox, double oy, double oz, double lx, double ly, double lz, double length, int lightX, int lightY, int lightZ, Job job) {
