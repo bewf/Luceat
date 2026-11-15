@@ -1582,13 +1582,6 @@ public final class LuceatScreen extends Screen {
 			bx += bw + 8;
 		}
 		int end = by + 24;
-		String sample = "The quick brown fox jumps over the lazy dog 0123456789";
-		int sy = end + 36;
-		s.text(BODY, "Text test: vanilla font, Luceat font, Luceat font at 2x oversample", x, sy, Glass.MUTED);
-		s.text(Surface.Role.PLAIN, sample, x, sy + 16, Glass.TEXT);
-		s.text(BODY, sample, x, sy + 32, Glass.TEXT);
-		s.text(Surface.Role.OVERSAMPLED, sample, x, sy + 48, Glass.TEXT);
-		end = sy + 62;
 		if (copiedNote != null && System.currentTimeMillis() < copiedUntil) {
 			s.text(BODY, copiedNote, x, by + 32, Glass.GOOD);
 			end += 20;

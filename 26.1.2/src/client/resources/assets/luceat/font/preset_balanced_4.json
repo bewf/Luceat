@@ -4,7 +4,7 @@
       "type": "ttf",
       "file": "luceat:huninn.ttf",
       "size": 11.0,
-      "oversample": 4.0,
+      "oversample": 8.0,
       "shift": [
         0.0,
         0.0

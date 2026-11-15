@@ -392,7 +392,7 @@ public final class BlocksTab {
 					ink(graphics, badge, rx + 5, y + 11, added ? 0xFFD9C8FF : 0xFFE4E0F6, false);
 					if (free && LuceatLook.inside(mx, my, rx, y + 7, rx + bw, y + 21) && my >= top) {
 						String text = added ? "A rule you made." : "Comes with the game or Luceat.";
-						tip = font.split(Component.literal(text).withStyle(Style.EMPTY.withColor(0xDDDDE6)), 200);
+						tip = font.split(LuceatFonts.body(text), 200);
 					}
 				}
 				if (rule != null && rule.edited() && !added) {
@@ -859,7 +859,7 @@ public final class BlocksTab {
 		int lift = over ? 2 : 0;
 		Icons.sprite(graphics, x - 1, y - lift, 16, Icons.TRASH, colour);
 		if (over) {
-			graphics.setTooltipForNextFrame(font, font.split(Component.literal("Delete this rule"), 120), Math.round(mx * factor), Math.round(my * factor));
+			graphics.setTooltipForNextFrame(font, font.split(LuceatFonts.body("Delete this rule"), 120), Math.round(mx * factor), Math.round(my * factor));
 		}
 	}
 

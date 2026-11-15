@@ -4,7 +4,7 @@
       "type": "ttf",
       "file": "luceat:redaction_regular.ttf",
       "size": 8.5,
-      "oversample": 3.0,
+      "oversample": 6.0,
       "shift": [
         0.0,
         0.0
