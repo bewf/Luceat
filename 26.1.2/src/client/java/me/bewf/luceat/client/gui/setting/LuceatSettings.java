@@ -3,6 +3,7 @@ package me.bewf.luceat.client.gui.setting;
 import java.util.ArrayList;
 import java.util.List;
 
+import me.bewf.luceat.client.config.BloomLevel;
 import me.bewf.luceat.client.config.LuceatConfig;
 import me.bewf.luceat.client.config.ShaderPackMode;
 import me.bewf.luceat.client.config.ShadowQuality;
@@ -70,6 +71,11 @@ public final class LuceatSettings {
 		all.add(new ToggleSetting(LIGHTING, "Glow on enchanted items",
 			"Gives enchanted items a faint purple glow in your hand.",
 			Cost.LOW, false, () -> c.enchantGlow, value -> c.enchantGlow = value));
+
+		all.add(new ChoiceSetting<>(LIGHTING, "Bloom",
+			"Adds a soft glow around bright things such as the sun, lanterns and glowstone. Click to change.",
+			Cost.LOW, false, BloomLevel.values(), new String[]{"Off", "Low", "Medium", "High"}, () -> c.bloom, value -> c.bloom = value)
+			.withNotes("No glow.", "A faint glow around the brightest things.", "A clear glow around bright things.", "A strong, wide glow. Looks best at night."));
 
 		all.add(new ToggleSetting(SHADOWS, "Sun shadows",
 			"Lets trees, roofs and cliffs cast sun shadows on the ground near you.",

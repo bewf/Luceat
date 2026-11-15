@@ -1,0 +1,8 @@
+-proc:none
+-d
+/tmp/claude-0/-home-claude/1d225c5f-e38e-5ea8-8e8d-e0b2a3fe0e0f/scratchpad/bc_out
+-sourcepath
+.
+me/bewf/luceat/client/shader/BloomPass.java
+me/bewf/luceat/client/mixin/GameRendererBloomMixin.java
+me/bewf/luceat/client/config/BloomLevel.java

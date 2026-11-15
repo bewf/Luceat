@@ -1,0 +1,227 @@
+{
+  "targets": {
+    "glowA": {
+      "width": 480,
+      "height": 270
+    },
+    "glowB": {
+      "width": 480,
+      "height": 270
+    },
+    "wideA": {
+      "width": 120,
+      "height": 68
+    },
+    "wideB": {
+      "width": 120,
+      "height": 68
+    },
+    "frame": {}
+  },
+  "passes": [
+    {
+      "vertex_shader": "minecraft:core/screenquad",
+      "fragment_shader": "luceat:post/bloom_bright",
+      "inputs": [
+        {
+          "sampler_name": "In",
+          "target": "minecraft:main",
+          "bilinear": true
+        }
+      ],
+      "output": "glowA",
+      "uniforms": {
+        "BloomConfig": [
+          {
+            "name": "Threshold",
+            "type": "vec4",
+            "value": [
+              0.88,
+              0.12,
+              0.0,
+              0.0
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "vertex_shader": "minecraft:core/screenquad",
+      "fragment_shader": "luceat:post/bloom_blur",
+      "inputs": [
+        {
+          "sampler_name": "In",
+          "target": "glowA",
+          "bilinear": true
+        }
+      ],
+      "output": "glowB",
+      "uniforms": {
+        "BlurConfig": [
+          {
+            "name": "Direction",
+            "type": "vec4",
+            "value": [
+              1.0,
+              0.0,
+              0.0,
+              0.0
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "vertex_shader": "minecraft:core/screenquad",
+      "fragment_shader": "luceat:post/bloom_blur",
+      "inputs": [
+        {
+          "sampler_name": "In",
+          "target": "glowB",
+          "bilinear": true
+        }
+      ],
+      "output": "glowA",
+      "uniforms": {
+        "BlurConfig": [
+          {
+            "name": "Direction",
+            "type": "vec4",
+            "value": [
+              0.0,
+              1.0,
+              0.0,
+              0.0
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "vertex_shader": "minecraft:core/screenquad",
+      "fragment_shader": "luceat:post/bloom_down",
+      "inputs": [
+        {
+          "sampler_name": "In",
+          "target": "glowA",
+          "bilinear": true
+        }
+      ],
+      "output": "wideA"
+    },
+    {
+      "vertex_shader": "minecraft:core/screenquad",
+      "fragment_shader": "luceat:post/bloom_blur",
+      "inputs": [
+        {
+          "sampler_name": "In",
+          "target": "wideA",
+          "bilinear": true
+        }
+      ],
+      "output": "wideB",
+      "uniforms": {
+        "BlurConfig": [
+          {
+            "name": "Direction",
+            "type": "vec4",
+            "value": [
+              1.0,
+              0.0,
+              0.0,
+              0.0
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "vertex_shader": "minecraft:core/screenquad",
+      "fragment_shader": "luceat:post/bloom_blur",
+      "inputs": [
+        {
+          "sampler_name": "In",
+          "target": "wideB",
+          "bilinear": true
+        }
+      ],
+      "output": "wideA",
+      "uniforms": {
+        "BlurConfig": [
+          {
+            "name": "Direction",
+            "type": "vec4",
+            "value": [
+              0.0,
+              1.0,
+              0.0,
+              0.0
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "vertex_shader": "minecraft:core/screenquad",
+      "fragment_shader": "luceat:post/bloom_composite",
+      "inputs": [
+        {
+          "sampler_name": "Main",
+          "target": "minecraft:main",
+          "bilinear": false
+        },
+        {
+          "sampler_name": "Near",
+          "target": "glowA",
+          "bilinear": true
+        },
+        {
+          "sampler_name": "Wide",
+          "target": "wideA",
+          "bilinear": true
+        }
+      ],
+      "output": "frame",
+      "uniforms": {
+        "BloomConfig": [
+          {
+            "name": "Mix",
+            "type": "vec4",
+            "value": [
+              0.5,
+              0.45,
+              0.0,
+              0.0
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "vertex_shader": "minecraft:core/screenquad",
+      "fragment_shader": "minecraft:post/blit",
+      "inputs": [
+        {
+          "sampler_name": "In",
+          "target": "frame",
+          "bilinear": false
+        }
+      ],
+      "output": "minecraft:main",
+      "uniforms": {
+        "BlitConfig": [
+          {
+            "name": "ColorModulate",
+            "type": "vec4",
+            "value": [
+              1.0,
+              1.0,
+              1.0,
+              1.0
+            ]
+          }
+        ]
+      }
+    }
+  ]
+}

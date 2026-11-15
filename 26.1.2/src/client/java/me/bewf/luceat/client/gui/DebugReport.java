@@ -16,6 +16,7 @@ import me.bewf.luceat.client.light.LightSpread;
 import me.bewf.luceat.client.light.Panic;
 import me.bewf.luceat.client.light.PlacedLights;
 import me.bewf.luceat.client.light.Stats;
+import me.bewf.luceat.client.shader.BloomPass;
 import me.bewf.luceat.client.shader.ShaderVariant;
 import me.bewf.luceat.client.shader.TerrainShaderPatch;
 import me.bewf.luceat.client.shadow.PatternAtlas;
@@ -124,6 +125,7 @@ public final class DebugReport {
 		out.append("\nSettings\npreset: ").append(config.preset).append('\n');
 		out.append("baked lights: ").append(config.bakedLights).append(", baked: ").append(LightVolume.baked()).append(", busy: ").append(LightVolume.busy()).append('\n');
 		out.append("shadows: ").append(config.shadows).append(", lights with shadows: ").append(config.shadowedLights).append(", shadow method: ").append(config.placedShadows).append(", stored volumes: ").append(ShadowCache.readySlots()).append('/').append(ShadowCache.SLOTS).append('\n');
+		out.append("bloom: ").append(config.bloom).append(", running: ").append(BloomPass.active()).append('\n');
 		out.append("max lights: ").append(config.maxLights).append(", max brightness: ").append(config.maxBrightness).append('\n');
 		return out.toString();
 	}
