@@ -499,7 +499,7 @@ public final class TerrainShaderPatch {
 			    }
 			    float strength = u_LuceatExtra.x * u_LuceatState.z;
 			    term = max(stored.rgb, vec3(0.0)) * (strength * shade * flicker);
-			    cover = stored.a * shade;
+			    cover = stored.a;
 			}
 #endif
 
@@ -523,7 +523,7 @@ public final class TerrainShaderPatch {
 			}
 
 			vec3 luceatFinish(vec3 total, float placedCover, vec3 blockPart, float fade) {
-			    float coverage = clamp(placedCover * fade / max(dot(blockPart, vec3(0.299, 0.587, 0.114)), 0.02), 0.0, 1.0);
+			    float coverage = smoothstep(0.0, 0.03, placedCover * fade);
 			    return luceatSoft(total, u_LuceatState.w) * fade - blockPart * (u_LuceatOptions.w * coverage);
 			}
 
@@ -653,12 +653,12 @@ public final class TerrainShaderPatch {
 			                kept = vec3(luceatProbe(pos, normal, light.xyz, dist));
 			            }
 #endif
+			            if (placed && level > 0.0) {
+			                placedCover += basis;
+			            }
 			            if (level > 0.0 && facing > 0.0) {
 			                float lambert = mix(1.0, 0.4 + 0.6 * clamp(ndotl, 0.0, 1.0), u_LuceatOptions.y);
 			                float power = curved * lambert * facing * strength;
-			                if (placed) {
-			                    placedCover += basis * facing;
-			                }
 			                vec3 visible = vec3(1.0);
 #ifdef LUCEAT_RAYS
 			                if (shadowAny && power * u_LuceatState.z * fade * max(tint.r, max(tint.g, tint.b)) > 0.02) {

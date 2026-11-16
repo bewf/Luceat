@@ -151,7 +151,7 @@ public final class EntityLights {
 				strongest = Math.max(strongest, other.radius());
 				members += counts.get(j);
 			}
-			float radius = strongest + (float) Math.min(3.0, Math.log(members) / Math.log(2.0));
+			float radius = strongest;
 			out.add(new LightSource(x / weight, y / weight, z / weight, red / weight, green / weight, blue / weight, radius, false, first.fire(), first.id()));
 		}
 	}

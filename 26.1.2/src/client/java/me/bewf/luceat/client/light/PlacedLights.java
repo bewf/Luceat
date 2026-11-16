@@ -446,7 +446,7 @@ public final class PlacedLights {
 			double dy = py - camera.y;
 			double dz = pz - camera.z;
 			double distance = Math.sqrt(dx * dx + dy * dy + dz * dz);
-			float level = Math.min(Math.max(15.0F, maxLevel[slot]), maxLevel[slot] + Math.min(4.5F, 1.2F * (float) (Math.log(members[slot]) / Math.log(2.0))));
+			float level = maxLevel[slot];
 			cx[total] = (float) px;
 			cy[total] = (float) py;
 			cz[total] = (float) pz;

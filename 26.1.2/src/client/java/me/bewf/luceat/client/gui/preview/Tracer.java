@@ -662,13 +662,13 @@ public final class Tracer {
 			float facing = mix(1.0F, smoothstep(-0.35F, 0.15F, ndotl), params.directional());
 			float strength = light.placed() ? params.placedStrength() : 1.0F;
 			float strongest = Math.max(light.red(), Math.max(light.green(), light.blue()));
+			if (light.placed() && level > 0.0F) {
+				placedCover += level / (4.0F - 3.0F * level);
+			}
 			if (level > 0.0F && facing > 0.0F) {
 				float lambert = mix(1.0F, 0.4F + 0.6F * Math.min(1.0F, Math.max(0.0F, ndotl)), params.directional());
 				float curved = level / (4.0F - 3.0F * level);
 				float power = curved * lambert * facing * strength;
-				if (light.placed()) {
-					placedCover += curved * facing;
-				}
 				float[] visible = {1.0F, 1.0F, 1.0F};
 				if (params.shadows() && near && power * params.brightness() * fade * strongest > 0.01F) {
 					float[] through = shadow(px, py, pz, n, light);
@@ -718,7 +718,7 @@ public final class Tracer {
 		float blockGreen = Math.max(vertex[1] - base[1], 0.0F);
 		float blockBlue = Math.max(vertex[2] - base[2], 0.0F);
 		float luma = 0.299F * blockRed + 0.587F * blockGreen + 0.114F * blockBlue;
-		float coverage = Math.min(1.0F, Math.max(0.0F, placedCover * fade / Math.max(luma, 0.02F)));
+		float coverage = smoothstep(0.0F, 0.03F, placedCover * fade);
 		float cap = params.maxBrightness();
 		float[] block = {blockRed, blockGreen, blockBlue};
 		for (int c = 0; c < 3; c++) {

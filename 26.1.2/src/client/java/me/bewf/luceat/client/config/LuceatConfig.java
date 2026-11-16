@@ -59,7 +59,7 @@ public final class LuceatConfig {
 	public float placedStrength = 1.0F;
 	public float emissiveGlow = 1.0F;
 	public float lightFalloff = 2.0F;
-	public float vanillaReplace = 0.8F;
+	public float vanillaReplace = 1.0F;
 	public int placedMinLevel = 3;
 
 	public boolean shadows = true;

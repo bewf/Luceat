@@ -150,7 +150,7 @@ public final class LuceatSettings {
 				ShadowVolume.reset();
 			}));
 		all.add(new SliderSetting(PLACED, "Replace normal light",
-			"Sets how much of Minecraft's block light Luceat replaces. At zero placed lights look vanilla.",
+			"Sets how much of Minecraft's block light Luceat replaces wherever one of its lights reaches. At 1 only Luceat's light shows there. At zero placed lights look vanilla.",
 			Cost.NONE, false, 0.0F, 1.0F, 0.05F, "", () -> c.vanillaReplace, value -> c.vanillaReplace = value));
 		all.add(new SliderSetting(PLACED, "Smallest light",
 			"Skips light blocks dimmer than this, like candles and small buds.",
