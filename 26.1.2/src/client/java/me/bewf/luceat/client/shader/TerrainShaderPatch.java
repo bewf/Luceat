@@ -1,6 +1,7 @@
 package me.bewf.luceat.client.shader;
 
 import me.bewf.luceat.Luceat;
+import me.bewf.luceat.client.light.EmitterMap;
 import me.bewf.luceat.client.light.LightBuffer;
 import me.bewf.luceat.client.light.LightGrid;
 import me.bewf.luceat.client.light.LightSpread;
@@ -56,6 +57,7 @@ public final class TerrainShaderPatch {
 			uniform sampler3D @BAKELIGHT@;
 			uniform sampler3D @BAKEDIR@;
 			uniform sampler3D @BAKEEMIT@;
+			uniform sampler3D @EMITMAP@;
 #endif
 
 			vec3 luceatSpec;
@@ -504,14 +506,11 @@ public final class TerrainShaderPatch {
 			vec3 luceatEmit(vec3 lit, vec3 albedo, vec3 pos, vec3 normal) {
 #ifdef LUCEAT_BAKE
 			    float glow = u_LuceatBakeParams.y;
-			    if (glow <= 0.0 || u_LuceatBakeOrigin.w == 0) {
+			    if (glow <= 0.0) {
 			        return lit;
 			    }
-			    vec3 rel = pos + vec3(u_LuceatCamBlock.xyz - u_LuceatBakeOrigin.xyz) + u_LuceatCamFrac.xyz - normal * 0.05;
-			    if (any(lessThan(rel, vec3(0.0))) || any(greaterThanEqual(rel, vec3(@BAKE_X@.0, @BAKE_Y@.0, @BAKE_Z@.0)))) {
-			        return lit;
-			    }
-			    float emitter = texelFetch(@BAKEEMIT@, ivec3(floor(rel)), 0).r;
+			    ivec3 cell = ivec3(floor(pos + u_LuceatCamFrac.xyz - normal * 0.05)) + u_LuceatCamBlock.xyz;
+			    float emitter = texelFetch(@EMITMAP@, cell & 127, 0).r;
 			    if (emitter <= 0.0) {
 			        return lit;
 			    }
@@ -725,6 +724,7 @@ public final class TerrainShaderPatch {
 			.replace("@BAKELIGHT@", LightVolume.LIGHT_SAMPLER)
 			.replace("@BAKEDIR@", LightVolume.DIRECTION_SAMPLER)
 			.replace("@BAKEEMIT@", LightVolume.EMIT_SAMPLER)
+			.replace("@EMITMAP@", EmitterMap.SAMPLER)
 			.replace("@BAKE_X@", Integer.toString(LightVolume.SIDE_X))
 			.replace("@BAKE_Y@", Integer.toString(LightVolume.SIDE_Y))
 			.replace("@BAKE_Z@", Integer.toString(LightVolume.SIDE_Z))

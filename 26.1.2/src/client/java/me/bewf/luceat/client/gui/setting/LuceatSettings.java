@@ -132,7 +132,7 @@ public final class LuceatSettings {
 			"Sets how quickly light fades with distance. Higher values keep the glow tight around each light and leave darker gaps between lights. Lower values spread it out evenly.",
 			Cost.NONE, false, 0.8F, 3.0F, 0.05F, "x", () -> c.lightFalloff, value -> c.lightFalloff = value));
 		all.add(new SliderSetting(PLACED, "Emissive glow",
-			"Brightens and whitens the glowing parts of light blocks such as lanterns, torches and glowstone. Needs baked placed lights.",
+			"Brightens and whitens the glowing parts of light blocks such as lanterns, torches and glowstone.",
 			Cost.NONE, false, 0.0F, 2.0F, 0.05F, "x", () -> c.emissiveGlow, value -> c.emissiveGlow = value));
 		all.add(new SliderSetting(PLACED, "Placed light strength",
 			"Sets how bright placed lights are.",

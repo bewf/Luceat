@@ -99,7 +99,7 @@ public final class LightVolume {
 	public static boolean capable() {
 		if (capable == null) {
 			try {
-				capable = GL11.glGetInteger(GL20.GL_MAX_TEXTURE_IMAGE_UNITS) > EMIT_UNIT;
+				capable = GL11.glGetInteger(GL20.GL_MAX_TEXTURE_IMAGE_UNITS) > EmitterMap.UNIT;
 			} catch (Throwable error) {
 				return false;
 			}

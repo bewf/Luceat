@@ -101,6 +101,7 @@ public final class LightEngine {
 		ShadowCache.bind(program);
 		SunCache.bind(program);
 		LightVolume.bind(program);
+		EmitterMap.bind(program);
 		ShaderVariant bound = TerrainShaderPatch.built();
 		if (bound != null && bound.spread()) {
 			LightSpread.bind(program);
@@ -140,6 +141,7 @@ public final class LightEngine {
 			PlacedLights.collect(camera, Math.min(config.maxLights, LightBuffer.MAX_LIGHTS) - found.size(), found);
 			Stats.record(Stats.PLACED, System.nanoTime() - placedStart);
 		}
+		EmitterMap.update(minecraft.level, found, camera);
 		return LightSmoother.apply(found);
 	}
 }
