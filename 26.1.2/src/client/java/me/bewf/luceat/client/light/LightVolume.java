@@ -536,14 +536,15 @@ public final class LightVolume {
 						}
 						double distance = Math.sqrt(distanceSquared);
 						float level = (float) Math.min(1.0, (radius - distance) / 15.0);
-						float curved = level / (4.0F - 3.0F * level);
+						float basis = level / (4.0F - 3.0F * level);
+						float curved = basis;
 						if (bake.contrast() != 1.0F) {
 							curved = (float) Math.pow(curved, bake.contrast());
 						}
 						if (curved <= 0.0F) {
 							continue;
 						}
-						cover[index] += curved;
+						cover[index] += basis;
 						double seenRed = 1.0;
 						double seenGreen = 1.0;
 						double seenBlue = 1.0;

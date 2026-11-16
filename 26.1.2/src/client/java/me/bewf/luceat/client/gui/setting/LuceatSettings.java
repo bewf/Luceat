@@ -129,8 +129,8 @@ public final class LuceatSettings {
 			"Works out placed lights ahead of time on a background thread, so each pixel reads one value instead of checking every light. Much faster with many lights. Shadows from baked lights are one block sharp.",
 			Cost.NONE, false, () -> c.bakedLights, value -> c.bakedLights = value));
 		all.add(new SliderSetting(PLACED, "Light falloff",
-			"Higher values make light fade faster with distance, so overlapping lights leave darker gaps between them. 1.0 is the old falloff.",
-			Cost.NONE, false, 0.8F, 2.0F, 0.05F, "x", () -> c.lightFalloff, value -> c.lightFalloff = value));
+			"Sets how quickly light fades with distance. Higher values keep the glow tight around each light and leave darker gaps between lights. Lower values spread it out evenly.",
+			Cost.NONE, false, 0.8F, 3.0F, 0.05F, "x", () -> c.lightFalloff, value -> c.lightFalloff = value));
 		all.add(new SliderSetting(PLACED, "Emissive glow",
 			"Brightens and whitens the glowing parts of light blocks such as lanterns, torches and glowstone. Needs baked placed lights.",
 			Cost.NONE, false, 0.0F, 2.0F, 0.05F, "x", () -> c.emissiveGlow, value -> c.emissiveGlow = value));

@@ -620,13 +620,15 @@ public final class TerrainShaderPatch {
 			            }
 			            vec4 colour = u_LuceatColor[i];
 			            vec3 tint = colour.rgb;
-			            float curved = pow(level / (4.0 - 3.0 * level), u_LuceatBakeParams.z);
+			            float basis = level / (4.0 - 3.0 * level);
+			            float curved = pow(basis, u_LuceatBakeParams.z);
 			            float share = curved * max(tint.r, max(tint.g, tint.b)) * invSum;
 			            float keep = level > 0.0 ? luceatRamp(share, 0.006, 71.4286) : 1.0;
 			            if (keep <= 0.0) {
 			                continue;
 			            }
 			            curved *= keep;
+			            basis *= keep;
 			            vec3 dirToLight = toLight * invDist;
 			            float ndotl = dot(normal, dirToLight);
 			            float facing = mix(1.0, smoothstep(-0.35, 0.15, ndotl), u_LuceatOptions.y);
@@ -656,7 +658,7 @@ public final class TerrainShaderPatch {
 			                float lambert = mix(1.0, 0.4 + 0.6 * clamp(ndotl, 0.0, 1.0), u_LuceatOptions.y);
 			                float power = curved * lambert * facing * strength;
 			                if (placed) {
-			                    placedCover += curved * facing;
+			                    placedCover += basis * facing;
 			                }
 			                vec3 visible = vec3(1.0);
 #ifdef LUCEAT_RAYS
