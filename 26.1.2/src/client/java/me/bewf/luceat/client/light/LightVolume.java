@@ -86,7 +86,6 @@ public final class LightVolume {
 	private static int originZ;
 	private static int builtBlockSignature;
 	private static Map<Long, Integer> builtHashes = Map.of();
-	private static Map<Long, Integer> candidateHashes = Map.of();
 	private static Result pending;
 	private static int uploaded;
 	private static int frame;
@@ -105,6 +104,10 @@ public final class LightVolume {
 			}
 		}
 		return capable;
+	}
+
+	public static boolean covers() {
+		return active && !failed;
 	}
 
 	public static boolean ready() {
@@ -144,7 +147,6 @@ public final class LightVolume {
 		front = -1;
 		uploaded = 0;
 		builtHashes = Map.of();
-		candidateHashes = Map.of();
 		bakedCount = 0;
 	}
 
@@ -170,7 +172,6 @@ public final class LightVolume {
 		for (Bake bake : candidates) {
 			hashes.put(bake.id(), hashOf(bake));
 		}
-		candidateHashes = hashes;
 		Result done = RESULTS.poll();
 		if (done != null) {
 			inFlight = false;
@@ -200,11 +201,8 @@ public final class LightVolume {
 		}
 		List<LightSource> out = new ArrayList<>(lights.size());
 		for (LightSource light : lights) {
-			if (light.placed()) {
-				Integer wanted = candidateHashes.get(light.id());
-				if (wanted != null && wanted.equals(builtHashes.get(light.id()))) {
-					continue;
-				}
+			if (light.placed() && builtHashes.containsKey(light.id())) {
+				continue;
 			}
 			out.add(light);
 		}

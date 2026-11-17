@@ -40,6 +40,7 @@ public final class PlacedLights {
 	private static final int MASSIVE = 40;
 	private static final float KEEP_BONUS = 1.3F;
 	private static final double SECTION_RADIUS = 14.0;
+	private static final double VOLUME_REACH = 48.0;
 	private static final float[] DEFAULT_COLOUR = {1.0F, 0.7F, 0.35F};
 	private static final Direction[] SIDES = Direction.values();
 
@@ -380,6 +381,7 @@ public final class PlacedLights {
 
 	private static List<LightSource> build(Vec3 camera, int limit, LuceatConfig config) {
 		double range = Math.min(config.lightRange, LightGrid.REACH_XZ);
+		boolean baked = LightVolume.covers();
 		int total = 0;
 		int groups = 0;
 		for (var entry : SECTIONS.entrySet()) {
@@ -395,7 +397,7 @@ public final class PlacedLights {
 			if (centre - SECTION_RADIUS > range || Math.abs(my) - SECTION_RADIUS > LightGrid.REACH_Y + 15.0) {
 				continue;
 			}
-			if (!LightCull.sees(camera.x + mx, camera.y + my, camera.z + mz, SECTION_RADIUS + 15.0)) {
+			if (!(baked && centre <= VOLUME_REACH + SECTION_RADIUS) && !LightCull.sees(camera.x + mx, camera.y + my, camera.z + mz, SECTION_RADIUS + 15.0)) {
 				continue;
 			}
 			int crowd = config.clusterLights ? config.clusterSize : Integer.MAX_VALUE;
@@ -411,7 +413,7 @@ public final class PlacedLights {
 					continue;
 				}
 				int tier = settle(section, i, distance, config.mergeFarLights, dense, massive, config.joinBeyond);
-				if (tier == 0 && !LightCull.sees(section.x[i], section.y[i], section.z[i], level)) {
+				if (tier == 0 && !(baked && distance <= VOLUME_REACH) && !LightCull.sees(section.x[i], section.y[i], section.z[i], level)) {
 					continue;
 				}
 				if (tier == 0) {
