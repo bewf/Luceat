@@ -10,9 +10,12 @@
     "EntityRendererMixin",
     "GameRendererBloomMixin",
     "ItemInHandRendererMixin",
+    "ItemModelResolverMixin",
+    "ItemStackRenderStateMixin",
     "OptionsBlurMixin",
     "ParticleMixin",
     "PlayerTabOverlayMixin",
+    "ShaderManagerMixin",
     "SkyHanniTabMixin",
     "sodium.SodiumChunkRendererMixin",
     "sodium.SodiumShaderLoaderMixin"
