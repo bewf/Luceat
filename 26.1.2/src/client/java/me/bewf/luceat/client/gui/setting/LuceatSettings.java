@@ -35,7 +35,7 @@ public final class LuceatSettings {
 		List<Setting> all = new ArrayList<>();
 
 		all.add(new ToggleSetting(GENERAL, "Luceat",
-			"Turns Luceat on or off. Off gives you the normal Minecraft look.",
+			"Turns Luceat on or off. Off gives normal Minecraft lighting.",
 			Cost.MEDIUM, false, () -> c.enabled, value -> c.enabled = value));
 
 		all.add(new SliderSetting(LIGHTING, "Light strength",
@@ -48,19 +48,19 @@ public final class LuceatSettings {
 			"Fades Luceat's light out in daylight.",
 			Cost.NONE, false, 0.0F, 1.0F, 0.05F, "", () -> c.daylightFade, value -> c.daylightFade = value));
 		all.add(new SliderSetting(LIGHTING, "Surface direction",
-			"Lights surfaces that face a light more than surfaces that face away. At zero everything gets the same light.",
+			"Sets how much more light a surface gets when it faces the light. At 0 every surface gets the same light.",
 			Cost.LOW, false, 0.0F, 1.0F, 0.05F, "", () -> c.directionalShading, value -> c.directionalShading = value));
 		all.add(new SliderSetting(LIGHTING, "Light bounce",
-			"Lets shadows keep some light, as if it bounced off nearby walls. At zero shadows go fully dark.",
+			"Sets how much light shadows keep, as if it bounced off nearby blocks. At 0 shadows are fully dark.",
 			Cost.LOW, false, 0.0F, 1.0F, 0.05F, "", () -> c.lightBounce, value -> c.lightBounce = value));
 		all.add(new ToggleSetting(LIGHTING, "Light around corners",
-			"Spreads light around corners and through gaps, so the room next door glows a little. Needs OpenGL 4.3.",
+			"Spreads light around corners and through gaps. Needs OpenGL 4.3.",
 			Cost.MEDIUM, false, () -> c.lightSpread, value -> c.lightSpread = value).blockedBy(LightSpread::blocker, LightSpread::shortBlocker, LightSpread::blockerDetail));
 		all.add(new SliderSetting(LIGHTING, "Corner light strength",
 			"Sets how strong light around corners is.",
 			Cost.NONE, false, 0.0F, 1.0F, 0.05F, "", () -> c.spillStrength, value -> c.spillStrength = value));
 		all.add(new SliderSetting(LIGHTING, "Shiny surfaces",
-			"Makes polished blocks, metal and water catch the light. At zero nothing shines.",
+			"Sets how much polished blocks, metal and water catch the light. At 0 nothing shines.",
 			Cost.LOW, true, 0.0F, 1.0F, 0.05F, "", () -> c.shine, value -> c.shine = value));
 		all.add(new ToggleSetting(LIGHTING, "Colours from textures",
 			"Takes the glow colour from the item's texture, so a resource pack changes the colours too.",
@@ -73,9 +73,9 @@ public final class LuceatSettings {
 			Cost.LOW, false, () -> c.enchantGlow, value -> c.enchantGlow = value));
 
 		all.add(new ChoiceSetting<>(LIGHTING, "Bloom",
-			"Adds a soft glow around bright things such as the sun, lanterns and glowstone. Click to change.",
+			"Adds a soft glow around bright things such as the sun, lanterns and glowstone.",
 			Cost.LOW, false, BloomLevel.values(), new String[]{"Off", "Low", "Medium", "High"}, () -> c.bloom, value -> c.bloom = value)
-			.withNotes("No glow.", "A faint glow around the brightest things.", "A clear glow around bright things.", "A strong, wide glow. Looks best at night."));
+			.withNotes("No glow.", "A faint glow around the brightest things.", "A clear glow around bright things.", "A wide, strong glow."));
 
 		all.add(new ToggleSetting(SHADOWS, "Sun shadows",
 			"Lets trees, roofs and cliffs cast sun shadows on the ground near you.",
@@ -90,9 +90,9 @@ public final class LuceatSettings {
 			"Makes lights cast shadows, so light stops at blocks.",
 			Cost.HIGH, false, () -> c.shadows, value -> c.shadows = value));
 		all.add(new ChoiceSetting<>(SHADOWS, "Shadow method",
-			"Sets how placed lights cast shadows. Click to change.",
+			"Sets how placed lights cast shadows.",
 			Cost.MEDIUM, false, ShadowQuality.values(), new String[]{"Off", "Fast", "Fancy"}, () -> c.placedShadows, value -> c.placedShadows = value)
-			.withNotes("Placed lights shine without shadows.", "Placed lights cast soft shadows from a stored copy of the blocks around them. Edges are about a block wide.", "The strongest lights near you cast sharp shadows worked out per pixel. The rest use the stored copy. Costs the most."));
+			.withNotes("Placed lights shine without shadows.", "Placed lights cast soft shadows from a stored copy of the blocks around them. Edges are about a block wide.", "The strongest lights near you cast sharp per-pixel shadows. The rest use the stored copy. Costs the most."));
 		all.add(new SliderSetting(SHADOWS, "Shadow darkness",
 			"Sets how dark shadows get. At zero light ignores walls.",
 			Cost.NONE, false, 0.0F, 1.0F, 0.05F, "", () -> c.shadowStrength, value -> c.shadowStrength = value));
@@ -109,7 +109,7 @@ public final class LuceatSettings {
 			"Lets plants cast a soft shadow.",
 			Cost.LOW, true, () -> c.plantShadows, value -> c.plantShadows = value));
 		all.add(new ChoiceSetting<>(SHADOWS, "Leaves and holes",
-			"Sets how leaves, grates and other blocks with holes block light. Click to change.",
+			"Sets how leaves, grates and other blocks with holes block light.",
 			Cost.MEDIUM, true, ShadowQuality.values(), new String[]{"Off", "Fast", "Fancy"}, () -> c.foliageShadows, value -> c.foliageShadows = value)
 			.withNotes("Leaves and grates block light like solid blocks.", "Leaves and grates dim light by how see-through they are.", "Leaves and grates let light through their real holes."));
 		all.add(new ToggleSetting(SHADOWS, "Coloured glass",
@@ -126,13 +126,13 @@ public final class LuceatSettings {
 				ShadowVolume.reset();
 			}));
 		all.add(new ToggleSetting(PLACED, "Baked placed lights",
-			"Works out placed lights ahead of time on a background thread, so each pixel reads one value instead of checking every light. Much faster with many lights. Shadows from baked lights are one block sharp.",
+			"Works out placed lights ahead of time on a background thread. Much faster with many lights. Shadows from baked lights have edges about a block wide.",
 			Cost.NONE, false, () -> c.bakedLights, value -> c.bakedLights = value));
 		all.add(new SliderSetting(PLACED, "Light falloff",
-			"Sets how quickly light fades with distance. Higher values keep the glow tight around each light and leave darker gaps between lights. Lower values spread it out evenly.",
+			"Sets how quickly light fades with distance. Higher keeps light close to each source and leaves darker gaps between lights. Lower spreads it out evenly.",
 			Cost.NONE, false, 0.8F, 3.0F, 0.05F, "x", () -> c.lightFalloff, value -> c.lightFalloff = value));
 		all.add(new SliderSetting(PLACED, "Emissive glow",
-			"Brightens and whitens the glowing parts of light blocks and light items such as lanterns, torches and glowstone, in the world, in your hand, in item frames and on the ground.",
+			"Sets how much the glowing parts of lanterns, torches, glowstone and similar blocks and items brighten and turn white.",
 			Cost.NONE, false, 0.0F, 2.0F, 0.05F, "x", () -> c.emissiveGlow, value -> c.emissiveGlow = value));
 		all.add(new SliderSetting(PLACED, "Placed light strength",
 			"Sets how bright placed lights are.",
@@ -150,7 +150,7 @@ public final class LuceatSettings {
 				ShadowVolume.reset();
 			}));
 		all.add(new SliderSetting(PLACED, "Replace normal light",
-			"Sets how much of Minecraft's block light Luceat replaces wherever one of its lights reaches. At 1 only Luceat's light shows there. At zero placed lights look vanilla.",
+			"Sets how much of Minecraft's block light Luceat replaces near its own lights. At 1 only Luceat's light shows there. At 0 Minecraft's block light stays.",
 			Cost.NONE, false, 0.0F, 1.0F, 0.05F, "", () -> c.vanillaReplace, value -> c.vanillaReplace = value));
 		all.add(new SliderSetting(PLACED, "Smallest light",
 			"Skips light blocks dimmer than this, like candles and small buds.",
@@ -194,7 +194,7 @@ public final class LuceatSettings {
 			Cost.NONE, false, () -> c.waterPutsOutLights, value -> c.waterPutsOutLights = value));
 
 		all.add(new SliderSetting(PERFORMANCE, "Most lights at once",
-			"Sets how many lights can be active at once. Each pixel only checks nearby lights, so a high number costs little.",
+			"Sets how many lights can be active at once. Each pixel only checks nearby lights.",
 			Cost.LOW, false, 4.0F, 256.0F, 4.0F, "", () -> c.maxLights, value -> c.maxLights = Math.round(value)));
 		all.add(new ToggleSetting(PERFORMANCE, "Join faraway lights",
 			"Joins lights that are far from you and close together into one bigger light.",
@@ -213,9 +213,9 @@ public final class LuceatSettings {
 			Cost.MEDIUM, false, 8.0F, 128.0F, 8.0F, " blocks", () -> c.shadowDistance, value -> c.shadowDistance = Math.round(value)));
 
 		all.add(new ChoiceSetting<>(GENERAL, "When a shader pack is on",
-			"Off: Luceat stays out of the way. Overwrite: turns the pack off so Luceat shows. Compatible: keeps the pack and lights held items, mobs, dropped items and particles with the game's own light.",
+			"Sets what Luceat does while a shader pack is on.",
 			Cost.NONE, false, ShaderPackMode.values(), new String[]{"Disable", "Overwrite", "Compatible"}, () -> c.shaderPacks, value -> c.shaderPacks = value)
-			.withNotes("Disable Luceat while a shader pack is on.", "Turn the shader pack off so Luceat's lighting shows.", "Keep the shader pack and light held items, mobs, dropped items and particles with the game's own light."));
+			.withNotes("Disable Luceat while a shader pack is on.", "Turn the shader pack off so Luceat's lighting shows.", "Keep the shader pack. Luceat lights held items, mobs, dropped items and particles with Minecraft's own light."));
 		all.add(new ToggleSetting(GENERAL, "Update notices",
 			"Checks Modrinth at startup and tells you in chat about new versions.",
 			Cost.NONE, false, () -> c.updateChecker, value -> c.updateChecker = value));
@@ -263,7 +263,7 @@ public final class LuceatSettings {
 			"Sets the lowest quality adaptive quality can reach. At 1 it never drops.",
 			Cost.NONE, false, 0.3F, 1.0F, 0.05F, "", () -> c.lowestQuality, value -> c.lowestQuality = value));
 		all.add(new ToggleSetting(ADVANCED, "Pause when it freezes",
-			"Pauses lights if the game stays under 4 fps for several seconds. /luceat resume turns them back on. Off by default.",
+			"Pauses lights if the game stays under 4 fps for several seconds. Run /luceat resume to turn them back on.",
 			Cost.NONE, false, () -> c.pauseOnFreeze, value -> c.pauseOnFreeze = value));
 		word(all);
 		return all;
@@ -271,23 +271,24 @@ public final class LuceatSettings {
 
 	private static void word(List<Setting> all) {
 		String[][] table = {
-			{"Luceat", "Luceat", "Dynamic lights, shadows and placed lights. Turn it off to get normal Minecraft lighting."},
+			{"Luceat", "Luceat", "Dynamic lights, shadows and placed lights. Off gives normal Minecraft lighting."},
 			{"Light strength", "Light Strength", "How bright every light is."},
 			{"Brightness limit", "Brightness Cap", "The brightest a spot can get when lights stack up."},
 			{"Fade in daylight", "Daylight Fade", "How much Luceat's light fades out in daylight."},
-			{"Surface direction", "Surface Shading", "How much more light a surface gets when it faces the light."},
-			{"Light bounce", "Light Bounce", "How much light stays in the shadows to simulate light bounce."},
+			{"Surface direction", "Surface Shading", "How much more light a surface gets when it faces the light. At 0 every surface gets the same light."},
+			{"Light bounce", "Light Bounce", "How much light shadows keep, as if it bounced off nearby blocks. At 0 shadows are fully dark."},
 			{"Light around corners", "Corner Light", "Light spreads around corners and through gaps."},
 			{"Corner light strength", "Corner Strength", "How strong the light around corners is."},
-			{"Shiny surfaces", "Shiny Surfaces", "How much polished blocks, metal and water catch the light."},
+			{"Shiny surfaces", "Shiny Surfaces", "How much polished blocks, metal and water catch the light. At 0 nothing shines."},
 			{"Colours from textures", "Texture Colours", "Lights take their colour from the item's texture, so resource packs change it."},
 			{"Glow on enchanted items", "Enchant Glow", "Enchanted items in your hand give off a faint purple glow."},
+			{"Bloom", "Bloom", "A soft glow around bright things such as the sun, lanterns and glowstone."},
 			{"Sun shadows", "Sun Shadows", "Trees, roofs and cliffs cast sun shadows near you."},
 			{"Sun shadow strength", "Sun Shadow Darkness", "How dark sun shadows are."},
 			{"Water light patterns", "Water Patterns", "Moving streaks of sunlight show on pool and sea floors."},
 			{"Shadows", "Light Shadows", "Lights cast shadows. Blocks stop their light."},
 			{"Shadow method", "Shadow Method", "How placed lights cast shadows."},
-			{"Shadow darkness", "Shadow Darkness", "How dark shadows from lights get."},
+			{"Shadow darkness", "Shadow Darkness", "How dark shadows from lights get. At 0 light ignores walls."},
 			{"Keep lights out of walls", "Keep Out of Walls", "A light stuck inside a wall moves out, so the wall doesn't go dark."},
 			{"Soft edges", "Soft Shadows", "How blurry shadow edges are. Higher looks softer and costs more."},
 			{"Fences, panes, slabs and more", "Thin Block Shadows", "Fences, bars, doors, stairs and slabs cast their real shape."},
@@ -296,10 +297,13 @@ public final class LuceatSettings {
 			{"Coloured glass", "Stained Glass", "Light takes the colour of the stained glass it passes through."},
 			{"Hole strength", "Leaf Density", "How solid leaves and grates count. Lower lets more light through."},
 			{"Placed lights", "Placed Lights", "Glowing blocks light up their surroundings in their own colour, with shadows."},
+			{"Baked placed lights", "Baked Lights", "Placed lights are worked out ahead of time on a background thread. Much faster with many lights. Shadows from baked lights have edges about a block wide."},
+			{"Light falloff", "Light Falloff", "How quickly light fades with distance. Higher keeps light close to each source and leaves darker gaps between lights. Lower spreads it out evenly."},
+			{"Emissive glow", "Emissive Glow", "How much the glowing parts of lanterns, torches, glowstone and similar blocks and items brighten and turn white."},
 			{"Placed light strength", "Placed Strength", "How bright placed lights are."},
 			{"Placed light reach", "Placed Reach", "How far placed light travels before it fades."},
 			{"Blocks from other mods", "Modded Blocks", "Glowing blocks from other mods get a Luceat light, coloured from their texture."},
-			{"Replace normal light", "Replace Vanilla Light", "How much of Minecraft's flat block light Luceat replaces."},
+			{"Replace normal light", "Replace Vanilla Light", "How much of Minecraft's block light Luceat replaces near its own lights. At 1 only Luceat's light shows there. At 0 Minecraft's block light stays."},
 			{"Smallest light", "Minimum Level", "Skips light blocks dimmer than this level, like candles and small buds."},
 			{"Your held lights", "Held Items", "Items in your hands light up the world around you."},
 			{"Other players", "Other Players", "Items other players hold light up their surroundings."},
@@ -312,28 +316,28 @@ public final class LuceatSettings {
 			{"Held light height", "Held Light Height", "How high your held light sits on your body."},
 			{"Fire flicker", "Flicker", "How much warm lights like torches and campfires flicker."},
 			{"Water puts out lights", "Water Puts Out Lights", "Torches, campfires and similar items go out under water."},
-			{"Most lights at once", "Light Limit", "The most lights active at once. Each pixel checks only nearby ones, so a high number costs little."},
+			{"Most lights at once", "Light Limit", "The most lights active at once. Each pixel only checks nearby lights."},
 			{"Join faraway lights", "Merge Far Lights", "Far away lights that sit close together join into one bigger light."},
-			{"Adaptive quality", "Adaptive Quality", "Eases shadows and bounce down when your frame rate drops, then brings them back."},
+			{"Adaptive quality", "Adaptive Quality", "Shadows and bounce ease down when your frame rate drops, then come back."},
 			{"Light range", "Light Range", "How far Luceat looks for lights. Lights past it fade out."},
-			{"Lights with shadows", "Shadowed Lights", "How many of the strongest nearby lights cast shadows. The rest shine without them."},
+			{"Lights with shadows", "Shadowed Lights", "How many of the strongest lights get sharp shadows worked out per pixel. Placed lights follow Shadow Method."},
 			{"Shadow distance", "Shadow Distance", "Shadows fade out past this distance. Lower is faster."},
 			{"When a shader pack is on", "Shader Pack Settings", "What Luceat does while a shader pack is on."},
-			{"Update notices", "Update Notices", "Checks Modrinth at startup and tells you in chat if a new update is available."},
+			{"Update notices", "Update Notices", "Checks Modrinth when the game starts and posts in chat if there is a new version."},
 			{"Skip buried lights", "Skip Buried Lights", "Ignores light blocks with no open side, like the inside of a lava lake."},
-			{"Hide lights behind blocks", "Hide Behind Walls", "A placed light shows only where the game's own light reaches, so lava can't glow through the ground."},
+			{"Hide lights behind blocks", "Hide Behind Walls", "Placed lights show only where Minecraft's own light reaches. Stops lava glowing through the ground."},
 			{"Join crowded lights", "Merge Crowds", "Lava lakes and walls of torches become a few strong lights instead of hundreds."},
 			{"Crowd size", "Crowd Size", "How many lights a 16 block chunk holds before they join."},
 			{"Join lights past", "Merge Distance", "How far away lights start joining. Needs Merge Far Lights."},
 			{"Search time", "Search Time", "Time per frame spent finding new light blocks. Lower is smoother, but new lights show up later."},
-			{"Light easing", "Fade Speed", "How slowly lights fade in, fade out and change size. At zero they change instantly."},
+			{"Light easing", "Fade Speed", "How long lights take to fade in, fade out and change size. At 0 they change instantly."},
 			{"Corner light steps", "Spread Speed", "How far corner light travels each frame. Higher fills rooms faster and costs more."},
 			{"Rest corner light", "Pause Corner Light", "Corner light stops updating while nothing moves."},
 			{"Shadow map updates", "Shadow Refresh", "How many 16 block pieces of the shadow map rebuild each frame. Higher catches up faster after you build."},
 			{"Lower quality below", "Drop Below", "Quality drops when your frame rate stays under this."},
 			{"Raise quality above", "Recover Above", "Quality comes back when your frame rate stays over this."},
 			{"Lowest quality", "Quality Floor", "The lowest quality adaptive quality can reach. At 1 it never drops."},
-			{"Pause when it freezes", "Freeze Guard", "Pauses every Luceat light if the game stays under 4 fps for several seconds, which takes Luceat off the frame. Type /luceat resume to turn the lights back on."},
+			{"Pause when it freezes", "Freeze Guard", "Pauses Luceat if the game stays under 4 fps for several seconds. Run /luceat resume to turn it back on."},
 		};
 		for (String[] row : table) {
 			for (Setting setting : all) {
