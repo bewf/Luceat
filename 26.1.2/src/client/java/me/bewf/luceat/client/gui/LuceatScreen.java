@@ -488,7 +488,7 @@ public final class LuceatScreen extends Screen {
 	}
 
 	private Bar.Rects bar() {
-		return Bar.layout(MEASURE, new Bar.View(slabX0, slabY0, slabX1, compact, tiny, version(), presetLabel(), true, 1.0F, false, 0.0F, 0.0F, 0.0F, 0.0F, 0.0F));
+		return Bar.layout(MEASURE, new Bar.View(slabX0, slabY0, slabX1, compact, tiny, version(), presetLabel(), true, 1.0F, false, false, 0.0F, 0.0F, 0.0F, 0.0F, 0.0F, 0.0F));
 	}
 
 	private int searchX0() {
@@ -579,12 +579,14 @@ public final class LuceatScreen extends Screen {
 	private void drawHeader(Surface s) {
 		boolean on = LuceatConfig.get().enabled;
 		boolean canUndo = !undo.isEmpty();
-		Bar.View view = new Bar.View(slabX0, slabY0, slabX1, compact, tiny, version(), presetLabel(), on, anim("tg:master", on ? 1.0F : 0.0F, 0.05F), canUndo, anim("focus:search", search.focused() ? 1.0F : 0.0F, 0.05F), hoverOf("hd:power"),
-			canUndo ? hoverOf("hd:undo") : 0.0F, hoverOf("hd:preset"), hoverOf("hd:close"));
+		boolean canRedo = !redo.isEmpty();
+		Bar.View view = new Bar.View(slabX0, slabY0, slabX1, compact, tiny, version(), presetLabel(), on, anim("tg:master", on ? 1.0F : 0.0F, 0.05F), canUndo, canRedo, anim("focus:search", search.focused() ? 1.0F : 0.0F, 0.05F), hoverOf("hd:power"),
+			canUndo ? hoverOf("hd:undo") : 0.0F, canRedo ? hoverOf("hd:redo") : 0.0F, hoverOf("hd:preset"), hoverOf("hd:close"));
 		Bar.Rects r = Bar.draw(s, view);
 		hit(r.power()[0], r.power()[1], r.power()[2], r.power()[3], "hd:power", null);
 		hit(r.close()[0], r.close()[1], r.close()[2], r.close()[3], "hd:close", null);
 		hit(r.undo()[0], r.undo()[1], r.undo()[2], r.undo()[3], "hd:undo", null);
+		hit(r.redo()[0], r.redo()[1], r.redo()[2], r.redo()[3], "hd:redo", null);
 		hit(r.preset()[0], r.preset()[1], r.preset()[2], r.preset()[3], "hd:preset", null);
 		hit(r.search()[0], r.search()[1], r.search()[2], r.search()[3], "hd:search", null);
 	}
@@ -1706,6 +1708,10 @@ public final class LuceatScreen extends Screen {
 		}
 		if (inside(mx, my, header.undo())) {
 			undoLast();
+			return true;
+		}
+		if (inside(mx, my, header.redo())) {
+			redoLast();
 			return true;
 		}
 		if (inside(mx, my, header.preset())) {

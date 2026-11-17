@@ -106,6 +106,7 @@ public final class Icons {
 	public static final Icon BUG = new Icon(LucideData.BUG);
 	public static final Icon COPY = new Icon(LucideData.COPY);
 	public static final Icon UNDO = new Icon(LucideData.UNDO);
+	public static final Icon REDO = new Icon(LucideData.REDO);
 	public static final Icon PLUS = new Icon(LucideData.PLUS);
 	public static final Icon POWER = new Icon(LucideData.POWER);
 	public static final Icon CPU = new Icon(LucideData.CPU);

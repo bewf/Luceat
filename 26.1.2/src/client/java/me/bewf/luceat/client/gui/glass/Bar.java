@@ -4,12 +4,13 @@ import static me.bewf.luceat.client.gui.glass.Paint.argb;
 
 public final class Bar {
 	public static final int HEIGHT = 50;
+	private static final int ICON = 14;
 	private static final String TAGLINE = "Dynamic Lighting for Minecraft";
 
-	public record View(int x0, int y0, int x1, boolean compact, boolean tiny, String version, String preset, boolean on, float onAnim, boolean canUndo, float focus, float hoverPower, float hoverUndo, float hoverPreset, float hoverClose) {
+	public record View(int x0, int y0, int x1, boolean compact, boolean tiny, String version, String preset, boolean on, float onAnim, boolean canUndo, boolean canRedo, float focus, float hoverPower, float hoverUndo, float hoverRedo, float hoverPreset, float hoverClose) {
 	}
 
-	public record Rects(int cy, int[] power, int[] undo, int[] preset, int[] close, int[] search) {
+	public record Rects(int cy, int[] power, int[] undo, int[] redo, int[] preset, int[] close, int[] search) {
 	}
 
 	private Bar() {
@@ -27,10 +28,15 @@ public final class Bar {
 		int cy = centre(v.y0());
 		int[] close = {v.x1() - 44, cy - 16, v.x1() - 12, cy + 16};
 		int dividerX = close[0] - 6;
-		int undoW = v.tiny() ? 14 : 12 + 5 + s.width(Surface.Role.BODY, "Undo");
-		int undoX1 = dividerX - 18;
+		boolean labels = !v.tiny() && !v.compact();
+		int undoW = labels ? Math.max(ICON, spacedWidth(s, "UNDO")) : ICON;
+		int redoW = labels ? Math.max(ICON, spacedWidth(s, "REDO")) : ICON;
+		int redoX1 = dividerX - 16;
+		int redoX0 = redoX1 - redoW;
+		int[] redo = {redoX0 - 8, cy - 18, redoX1 + 8, cy + 18};
+		int undoX1 = redoX0 - 26;
 		int undoX0 = undoX1 - undoW;
-		int[] undo = {undoX0 - 8, cy - 14, undoX1 + 8, cy + 14};
+		int[] undo = {undoX0 - 8, cy - 18, undoX1 + 8, cy + 18};
 		int presetMax = v.compact() ? 64 : 92;
 		String label = v.tiny() ? "" : Glass.fit(s, Surface.Role.BODY, v.preset(), presetMax);
 		int presetW = v.tiny() ? 14 : s.width(Surface.Role.BODY, label) + 6 + 10;
@@ -43,7 +49,7 @@ public final class Bar {
 		int toggleX = leftEnd(s, v) + 2;
 		int powerW = v.tiny() ? 30 : 38 + s.width(Surface.Role.BODY, "Off");
 		int[] power = {toggleX - 4, cy - 14, toggleX + powerW + 6, cy + 14};
-		return new Rects(cy, power, undo, preset, close, search);
+		return new Rects(cy, power, undo, redo, preset, close, search);
 	}
 
 	private static int leftEnd(Surface s, View v) {
@@ -61,6 +67,31 @@ public final class Bar {
 			x += 8;
 		}
 		return x;
+	}
+
+	private static int spacedWidth(Surface s, String text) {
+		int w = 0;
+		for (int i = 0; i < text.length(); i++) {
+			w += s.width(Surface.Role.SMALL, text.substring(i, i + 1)) + (i < text.length() - 1 ? 1 : 0);
+		}
+		return w;
+	}
+
+	private static void historyButton(Surface s, int[] rect, int cy, boolean labels, String label, Icons.Icon icon, boolean enabled, float hover) {
+		int colour = enabled ? Paint.mix(Glass.SOFT, Glass.TEXT, hover) : Paint.alpha(Glass.MUTED, 0.45F);
+		int cx = (rect[0] + rect[2]) / 2;
+		if (!labels) {
+			Icons.draw(s, cx - ICON / 2, cy - ICON / 2, ICON, icon, colour);
+			return;
+		}
+		Icons.draw(s, cx - ICON / 2, cy - 15, ICON, icon, colour);
+		int x = cx - spacedWidth(s, label) / 2;
+		int y = cy + 4;
+		for (int i = 0; i < label.length(); i++) {
+			String c = label.substring(i, i + 1);
+			s.text(Surface.Role.SMALL, c, x, y, colour);
+			x += s.width(Surface.Role.SMALL, c) + 1;
+		}
 	}
 
 	public static int drawWordmark(Surface s, int x, int y, int colour) {
@@ -106,15 +137,12 @@ public final class Bar {
 			Icons.draw(s, p[2] - 8 - 10, cy - 5, 10, Icons.CHEVRON, Paint.mix(Glass.MUTED, Glass.SOFT, v.hoverPreset()));
 		}
 
-		int[] u = r.undo();
-		Glass.pane(s, u[0], u[1], u[2], u[3], (u[3] - u[1]) / 2, v.canUndo() ? v.hoverUndo() : 0.0F, 0.0F);
-		int uc = v.canUndo() ? Paint.mix(Glass.SOFT, Glass.TEXT, v.hoverUndo()) : Glass.MUTED;
-		if (v.tiny()) {
-			Icons.draw(s, u[0] + 8, cy - 7, 14, Icons.UNDO, uc);
-		} else {
-			Icons.draw(s, u[0] + 8, cy - 6, 12, Icons.UNDO, uc);
-			s.text(Surface.Role.BODY, "Undo", u[0] + 8 + 12 + 5, textTop(cy), uc);
-		}
+		boolean labels = !v.tiny() && !v.compact();
+		historyButton(s, r.undo(), cy, labels, "UNDO", Icons.UNDO, v.canUndo(), v.hoverUndo());
+		historyButton(s, r.redo(), cy, labels, "REDO", Icons.REDO, v.canRedo(), v.hoverRedo());
+		int mx = (r.undo()[2] + r.redo()[0]) / 2;
+		Paint.vertical(s, mx, cy - 11, mx + 1, cy, 0, argb(0, 205, 187, 255), argb(46, 205, 187, 255));
+		Paint.vertical(s, mx, cy, mx + 1, cy + 11, 0, argb(46, 205, 187, 255), argb(0, 205, 187, 255));
 
 		int dx = r.close()[0] - 6;
 		Paint.vertical(s, dx, cy - 11, dx + 1, cy, 0, argb(0, 205, 187, 255), argb(46, 205, 187, 255));
