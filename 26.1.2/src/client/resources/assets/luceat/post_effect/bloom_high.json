@@ -1,18 +1,18 @@
 {
   "targets": {
-    "glowA": {
+    "glow_a": {
       "width": 480,
       "height": 270
     },
-    "glowB": {
+    "glow_b": {
       "width": 480,
       "height": 270
     },
-    "wideA": {
+    "wide_a": {
       "width": 120,
       "height": 68
     },
-    "wideB": {
+    "wide_b": {
       "width": 120,
       "height": 68
     },
@@ -29,7 +29,7 @@
           "bilinear": true
         }
       ],
-      "output": "glowA",
+      "output": "glow_a",
       "uniforms": {
         "BloomConfig": [
           {
@@ -51,11 +51,11 @@
       "inputs": [
         {
           "sampler_name": "In",
-          "target": "glowA",
+          "target": "glow_a",
           "bilinear": true
         }
       ],
-      "output": "glowB",
+      "output": "glow_b",
       "uniforms": {
         "BlurConfig": [
           {
@@ -77,11 +77,11 @@
       "inputs": [
         {
           "sampler_name": "In",
-          "target": "glowB",
+          "target": "glow_b",
           "bilinear": true
         }
       ],
-      "output": "glowA",
+      "output": "glow_a",
       "uniforms": {
         "BlurConfig": [
           {
@@ -103,11 +103,11 @@
       "inputs": [
         {
           "sampler_name": "In",
-          "target": "glowA",
+          "target": "glow_a",
           "bilinear": true
         }
       ],
-      "output": "wideA"
+      "output": "wide_a"
     },
     {
       "vertex_shader": "minecraft:core/screenquad",
@@ -115,11 +115,11 @@
       "inputs": [
         {
           "sampler_name": "In",
-          "target": "wideA",
+          "target": "wide_a",
           "bilinear": true
         }
       ],
-      "output": "wideB",
+      "output": "wide_b",
       "uniforms": {
         "BlurConfig": [
           {
@@ -141,11 +141,11 @@
       "inputs": [
         {
           "sampler_name": "In",
-          "target": "wideB",
+          "target": "wide_b",
           "bilinear": true
         }
       ],
-      "output": "wideA",
+      "output": "wide_a",
       "uniforms": {
         "BlurConfig": [
           {
@@ -172,12 +172,12 @@
         },
         {
           "sampler_name": "Near",
-          "target": "glowA",
+          "target": "glow_a",
           "bilinear": true
         },
         {
           "sampler_name": "Wide",
-          "target": "wideA",
+          "target": "wide_a",
           "bilinear": true
         }
       ],
