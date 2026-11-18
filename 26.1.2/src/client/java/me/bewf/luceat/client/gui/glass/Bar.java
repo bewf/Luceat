@@ -127,7 +127,6 @@ public final class Bar {
 		Icons.draw(s, f[0] + 10, cy - 6, 12, Icons.SEARCH, Paint.mix(Glass.MUTED, Glass.PALE, v.focus()));
 
 		int[] p = r.preset();
-		Glass.pane(s, p[0], p[1], p[2], p[3], (p[3] - p[1]) / 2, v.hoverPreset(), 0.0F);
 		int pc = Paint.mix(Glass.SOFT, Glass.TEXT, v.hoverPreset());
 		if (v.tiny()) {
 			Icons.draw(s, p[0] + 8, cy - 7, 14, Icons.STAR, pc);
@@ -149,8 +148,7 @@ public final class Bar {
 		Paint.vertical(s, dx, cy, dx + 1, cy + 11, 0, argb(46, 205, 187, 255), argb(0, 205, 187, 255));
 
 		int[] c = r.close();
-		Glass.pane(s, (c[0] + c[2]) / 2 - 14, cy - 14, (c[0] + c[2]) / 2 + 14, cy + 14, 14, v.hoverClose(), 0.0F);
-		Icons.draw(s, (c[0] + c[2]) / 2 - 8, cy - 8, 16, Icons.CLOSE, Paint.mix(Glass.SOFT, Glass.TEXT, v.hoverClose()));
+		Icons.draw(s, (c[0] + c[2]) / 2 - 9, cy - 9, 18, Icons.CLOSE, Paint.mix(Glass.SOFT, Glass.TEXT, v.hoverClose()));
 		return r;
 	}
 }
