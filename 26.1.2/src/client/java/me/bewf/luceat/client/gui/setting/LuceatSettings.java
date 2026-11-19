@@ -14,6 +14,7 @@ import me.bewf.luceat.client.shadow.ShadowVolume;
 public final class LuceatSettings {
 	public static final String LIGHTING = "Lighting";
 	public static final String SHADOWS = "Shadows";
+	public static final String SKY = "Sky";
 	public static final String PLACED = "Placed lights";
 	public static final String SOURCES = "Light sources";
 	public static final String PERFORMANCE = "Performance";
@@ -24,7 +25,7 @@ public final class LuceatSettings {
 	}
 
 	public static List<String> sections() {
-		return List.of(GENERAL, LIGHTING, SHADOWS, PLACED, SOURCES, PERFORMANCE, ADVANCED);
+		return List.of(GENERAL, LIGHTING, SHADOWS, SKY, PLACED, SOURCES, PERFORMANCE, ADVANCED);
 	}
 
 	public static List<Setting> create() {
@@ -118,6 +119,10 @@ public final class LuceatSettings {
 		all.add(new SliderSetting(SHADOWS, "Hole strength",
 			"Sets how solid leaves and grates count. Lower lets more light through.",
 			Cost.NONE, true, 0.3F, 1.0F, 0.05F, "", () -> c.cutoutOpacity, value -> c.cutoutOpacity = value));
+
+		all.add(new ToggleSetting(SKY, "Clouds",
+			"Draws Fancy clouds with thick centres, thin see-through edges and darker undersides. Off uses Minecraft's clouds. Fast clouds are not changed.",
+			Cost.NONE, false, () -> c.luceatClouds, value -> c.luceatClouds = value));
 
 		all.add(new ToggleSetting(PLACED, "Placed lights",
 			"Lights up the area around blocks that glow, in their own colour, with shadows.",
@@ -282,6 +287,7 @@ public final class LuceatSettings {
 			{"Shiny surfaces", "Shiny Surfaces", "How much polished blocks, metal and water catch the light. At 0 nothing shines."},
 			{"Colours from textures", "Texture Colours", "Lights take their colour from the item's texture, so resource packs change it."},
 			{"Glow on enchanted items", "Enchant Glow", "Enchanted items in your hand give off a faint purple glow."},
+			{"Clouds", "Clouds", "Draws Fancy clouds with thick centres, thin see-through edges and darker undersides. Off uses Minecraft's clouds. Fast clouds are not changed."},
 			{"Bloom", "Bloom", "A soft glow around bright things such as the sun, lanterns and glowstone."},
 			{"Sun shadows", "Sun Shadows", "Trees, roofs and cliffs cast sun shadows near you."},
 			{"Sun shadow strength", "Sun Shadow Darkness", "How dark sun shadows are."},

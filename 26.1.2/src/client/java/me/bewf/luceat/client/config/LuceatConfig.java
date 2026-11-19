@@ -74,6 +74,7 @@ public final class LuceatConfig {
 	public ShadowQuality placedShadows = ShadowQuality.FAST;
 	public boolean glassTint = true;
 	public BloomLevel bloom = BloomLevel.OFF;
+	public boolean luceatClouds = true;
 	public float cutoutOpacity = 0.9F;
 
 	public boolean entityShadows = true;

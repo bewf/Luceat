@@ -610,6 +610,7 @@ public final class LuceatScreen extends Screen {
 			case PRESETS -> Icons.STAR;
 			case LuceatSettings.LIGHTING -> Icons.SUN;
 			case LuceatSettings.SHADOWS -> Icons.SHADOW;
+			case LuceatSettings.SKY -> Icons.MOON;
 			case LuceatSettings.PLACED -> Icons.BULB;
 			case LuceatSettings.SOURCES -> Icons.FLAME;
 			case LuceatSettings.PERFORMANCE -> Icons.GAUGE;

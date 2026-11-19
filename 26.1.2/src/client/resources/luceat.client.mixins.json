@@ -6,6 +6,7 @@
   "client": [
     "ChatComponentMixin",
     "ClientLevelMixin",
+    "CloudRendererMixin",
     "DisplayNameMixin",
     "EntityRendererMixin",
     "FontTextureMixin",

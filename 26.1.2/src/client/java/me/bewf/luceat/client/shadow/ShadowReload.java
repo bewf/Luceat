@@ -4,6 +4,7 @@ import me.bewf.luceat.Luceat;
 import me.bewf.luceat.client.gui.preview.BlockVoxels;
 import me.bewf.luceat.client.gui.preview.Scenes;
 import me.bewf.luceat.client.light.block.BlockRules;
+import me.bewf.luceat.client.sky.LuceatClouds;
 
 import net.minecraft.resources.Identifier;
 import net.minecraft.server.packs.resources.ResourceManager;
@@ -24,5 +25,6 @@ public final class ShadowReload extends SimplePreparableReloadListener<Object> {
 		Scenes.clear();
 		BlockRules.rebuild();
 		ShadowVolume.reset();
+		LuceatClouds.reload();
 	}
 }
