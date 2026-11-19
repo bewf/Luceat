@@ -16,6 +16,22 @@
       "width": 120,
       "height": 68
     },
+    "sun_a": {
+      "width": 120,
+      "height": 68
+    },
+    "sun_b": {
+      "width": 120,
+      "height": 68
+    },
+    "far_a": {
+      "width": 30,
+      "height": 17
+    },
+    "far_b": {
+      "width": 30,
+      "height": 17
+    },
     "frame": {}
   },
   "passes": [
@@ -27,6 +43,12 @@
           "sampler_name": "In",
           "target": "minecraft:main",
           "bilinear": true
+        },
+        {
+          "sampler_name": "Depth",
+          "target": "minecraft:main",
+          "bilinear": false,
+          "use_depth_buffer": true
         }
       ],
       "output": "glow_a",
@@ -163,6 +185,192 @@
     },
     {
       "vertex_shader": "minecraft:core/screenquad",
+      "fragment_shader": "luceat:post/bloom_sun",
+      "inputs": [
+        {
+          "sampler_name": "In",
+          "target": "minecraft:main",
+          "bilinear": true
+        },
+        {
+          "sampler_name": "Depth",
+          "target": "minecraft:main",
+          "bilinear": false,
+          "use_depth_buffer": true
+        }
+      ],
+      "output": "sun_a"
+    },
+    {
+      "vertex_shader": "minecraft:core/screenquad",
+      "fragment_shader": "luceat:post/bloom_down4",
+      "inputs": [
+        {
+          "sampler_name": "In",
+          "target": "sun_a",
+          "bilinear": true
+        }
+      ],
+      "output": "far_a"
+    },
+    {
+      "vertex_shader": "minecraft:core/screenquad",
+      "fragment_shader": "luceat:post/bloom_blur",
+      "inputs": [
+        {
+          "sampler_name": "In",
+          "target": "far_a",
+          "bilinear": true
+        }
+      ],
+      "output": "far_b",
+      "uniforms": {
+        "BlurConfig": [
+          {
+            "name": "Direction",
+            "type": "vec4",
+            "value": [
+              1.0,
+              0.0,
+              0.0,
+              0.0
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "vertex_shader": "minecraft:core/screenquad",
+      "fragment_shader": "luceat:post/bloom_blur",
+      "inputs": [
+        {
+          "sampler_name": "In",
+          "target": "far_b",
+          "bilinear": true
+        }
+      ],
+      "output": "far_a",
+      "uniforms": {
+        "BlurConfig": [
+          {
+            "name": "Direction",
+            "type": "vec4",
+            "value": [
+              0.0,
+              1.0,
+              0.0,
+              0.0
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "vertex_shader": "minecraft:core/screenquad",
+      "fragment_shader": "luceat:post/bloom_blur",
+      "inputs": [
+        {
+          "sampler_name": "In",
+          "target": "far_a",
+          "bilinear": true
+        }
+      ],
+      "output": "far_b",
+      "uniforms": {
+        "BlurConfig": [
+          {
+            "name": "Direction",
+            "type": "vec4",
+            "value": [
+              1.0,
+              0.0,
+              0.0,
+              0.0
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "vertex_shader": "minecraft:core/screenquad",
+      "fragment_shader": "luceat:post/bloom_blur",
+      "inputs": [
+        {
+          "sampler_name": "In",
+          "target": "far_b",
+          "bilinear": true
+        }
+      ],
+      "output": "far_a",
+      "uniforms": {
+        "BlurConfig": [
+          {
+            "name": "Direction",
+            "type": "vec4",
+            "value": [
+              0.0,
+              1.0,
+              0.0,
+              0.0
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "vertex_shader": "minecraft:core/screenquad",
+      "fragment_shader": "luceat:post/bloom_blur",
+      "inputs": [
+        {
+          "sampler_name": "In",
+          "target": "sun_a",
+          "bilinear": true
+        }
+      ],
+      "output": "sun_b",
+      "uniforms": {
+        "BlurConfig": [
+          {
+            "name": "Direction",
+            "type": "vec4",
+            "value": [
+              1.0,
+              0.0,
+              0.0,
+              0.0
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "vertex_shader": "minecraft:core/screenquad",
+      "fragment_shader": "luceat:post/bloom_blur",
+      "inputs": [
+        {
+          "sampler_name": "In",
+          "target": "sun_b",
+          "bilinear": true
+        }
+      ],
+      "output": "sun_a",
+      "uniforms": {
+        "BlurConfig": [
+          {
+            "name": "Direction",
+            "type": "vec4",
+            "value": [
+              0.0,
+              1.0,
+              0.0,
+              0.0
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "vertex_shader": "minecraft:core/screenquad",
       "fragment_shader": "luceat:post/bloom_composite",
       "inputs": [
         {
@@ -179,6 +387,16 @@
           "sampler_name": "Wide",
           "target": "wide_a",
           "bilinear": true
+        },
+        {
+          "sampler_name": "Far",
+          "target": "far_a",
+          "bilinear": true
+        },
+        {
+          "sampler_name": "Sun",
+          "target": "sun_a",
+          "bilinear": true
         }
       ],
       "output": "frame",
@@ -188,10 +406,10 @@
             "name": "Mix",
             "type": "vec4",
             "value": [
-              1.0,
-              1.3,
-              0.0,
-              0.0
+              1.1,
+              1.35,
+              5.5,
+              1.2
             ]
           }
         ]
