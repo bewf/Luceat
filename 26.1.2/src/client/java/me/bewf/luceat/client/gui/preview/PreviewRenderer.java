@@ -106,6 +106,13 @@ public final class PreviewRenderer {
 			double[] eye = {scene.eye[0] + 0.8 * Math.sin(phase), scene.eye[1], scene.eye[2]};
 			tracer(scene, config, occ, List.of(flickered), eye, scene.target, scene.fov, NIGHT, seconds).render(out, width, height);
 		}
+
+		public void panorama(int width, int height, int[] out) {
+			List<Light> lights = PreviewLights.build(scene, config, 0.0, Double.NaN, Double.NaN, Double.NaN);
+			double tanVertical = Math.tan(Math.toRadians(scene.fov) * 0.5);
+			double span = width * 2.0 * tanVertical / height;
+			tracer(scene, config, occ, lights, scene.eye, scene.target, scene.fov, NIGHT, 0.0).renderPanorama(out, width, height, 0.0, span, tanVertical);
+		}
 	}
 
 	public static Prepared prepare(SceneId id, LuceatConfig config) {

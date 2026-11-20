@@ -27,21 +27,19 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.texture.DynamicTexture;
 import net.minecraft.resources.Identifier;
 
-// short looping videos of each preset, made once in the background and kept on disk
+// a wide still of each preset, made once in the background and kept on disk. The picker pans across it with the mouse
 public final class PresetFilmstrips {
-	public static final int WIDTH = 288;
+	public static final int WIDTH = 352;
 	public static final int HEIGHT = 192;
-	public static final int FRAMES = 24;
-	private static final int VERSION = 4;
-	private static final int MAGIC = 0x4C554331;
-	private static final double FRAMES_PER_SECOND = FRAMES / PreviewRenderer.LOOP_SECONDS;
+	private static final int VERSION = 5;
+	private static final int MAGIC = 0x4C554332;
 
 	public static final class Strip {
 		private final Presets.Preset preset;
-		private volatile int[][] frames;
+		private volatile int[] pixels;
 		private DynamicTexture texture;
 		private Identifier id;
-		private int shown = -1;
+		private boolean uploaded;
 		private boolean queued;
 
 		private Strip(Presets.Preset preset) {
@@ -49,12 +47,12 @@ public final class PresetFilmstrips {
 		}
 
 		public boolean ready() {
-			return frames != null;
+			return pixels != null;
 		}
 
-		// the texture showing the right frame for now, or null while the video is still being made
-		public Identifier texture(long nowNanos) {
-			int[][] have = frames;
+		// the texture holding the wide still, or null while it is still being made
+		public Identifier texture() {
+			int[] have = pixels;
 			if (have == null) {
 				return null;
 			}
@@ -63,17 +61,15 @@ public final class PresetFilmstrips {
 				texture = new DynamicTexture("luceat preset", WIDTH, HEIGHT, false);
 				Minecraft.getInstance().getTextureManager().register(id, texture);
 			}
-			int index = (int) ((nowNanos / 1.0E9 * FRAMES_PER_SECOND) % FRAMES);
-			if (index != shown) {
-				int[] pixels = have[index];
+			if (!uploaded) {
 				NativeImage image = texture.getPixels();
 				for (int y = 0; y < HEIGHT; y++) {
 					for (int x = 0; x < WIDTH; x++) {
-						image.setPixel(x, y, pixels[x + y * WIDTH]);
+						image.setPixel(x, y, have[x + y * WIDTH]);
 					}
 				}
 				texture.upload();
-				shown = index;
+				uploaded = true;
 			}
 			return id;
 		}
@@ -82,7 +78,7 @@ public final class PresetFilmstrips {
 			if (texture != null) {
 				Minecraft.getInstance().getTextureManager().release(id);
 				texture = null;
-				shown = -1;
+				uploaded = false;
 			}
 		}
 	}
@@ -144,9 +140,9 @@ public final class PresetFilmstrips {
 		LuceatConfig config = new LuceatConfig();
 		strip.preset.apply().accept(config);
 		Path file = cacheFile(strip.preset, config);
-		int[][] loaded = read(file);
+		int[] loaded = read(file);
 		if (loaded != null) {
-			strip.frames = loaded;
+			strip.pixels = loaded;
 			return;
 		}
 		PreviewRenderer.Prepared prepared;
@@ -159,15 +155,10 @@ public final class PresetFilmstrips {
 		working = true;
 		Thread thread = new Thread(() -> {
 			try {
-				int[][] made = new int[FRAMES][WIDTH * HEIGHT];
-				for (int i = 0; i < FRAMES; i++) {
-					prepared.render((float) (i / FRAMES_PER_SECOND), WIDTH, HEIGHT, made[i]);
-					Thread.sleep(30L);
-				}
+				int[] made = new int[WIDTH * HEIGHT];
+				prepared.panorama(WIDTH, HEIGHT, made);
 				write(file, made);
-				strip.frames = made;
-			} catch (InterruptedException error) {
-				Thread.currentThread().interrupt();
+				strip.pixels = made;
 			} catch (RuntimeException error) {
 				Luceat.LOGGER.warn("Could not render the {} preview", strip.preset.name(), error);
 			} finally {
@@ -184,49 +175,44 @@ public final class PresetFilmstrips {
 		return FabricLoader.getInstance().getConfigDir().resolve("luceat").resolve("preview-cache").resolve(preset.name().toLowerCase() + "-" + Integer.toHexString(hash) + ".bin");
 	}
 
-	private static int[][] read(Path file) {
+	private static int[] read(Path file) {
 		if (!Files.exists(file)) {
 			return null;
 		}
 		try (DataInputStream in = new DataInputStream(new BufferedInputStream(new GZIPInputStream(Files.newInputStream(file))))) {
-			if (in.readInt() != MAGIC || in.readInt() != WIDTH || in.readInt() != HEIGHT || in.readInt() != FRAMES) {
+			if (in.readInt() != MAGIC || in.readInt() != WIDTH || in.readInt() != HEIGHT) {
 				return null;
 			}
-			int[][] frames = new int[FRAMES][WIDTH * HEIGHT];
+			int[] pixels = new int[WIDTH * HEIGHT];
 			byte[] row = new byte[WIDTH * 3];
-			for (int[] frame : frames) {
-				for (int y = 0; y < HEIGHT; y++) {
-					in.readFully(row);
-					for (int x = 0; x < WIDTH; x++) {
-						frame[x + y * WIDTH] = 0xFF000000 | (row[x * 3] & 255) << 16 | (row[x * 3 + 1] & 255) << 8 | (row[x * 3 + 2] & 255);
-					}
+			for (int y = 0; y < HEIGHT; y++) {
+				in.readFully(row);
+				for (int x = 0; x < WIDTH; x++) {
+					pixels[x + y * WIDTH] = 0xFF000000 | (row[x * 3] & 255) << 16 | (row[x * 3 + 1] & 255) << 8 | (row[x * 3 + 2] & 255);
 				}
 			}
-			return frames;
+			return pixels;
 		} catch (IOException | RuntimeException error) {
 			return null;
 		}
 	}
 
-	private static void write(Path file, int[][] frames) {
+	private static void write(Path file, int[] pixels) {
 		try {
 			Files.createDirectories(file.getParent());
 			try (DataOutputStream out = new DataOutputStream(new BufferedOutputStream(new GZIPOutputStream(Files.newOutputStream(file))))) {
 				out.writeInt(MAGIC);
 				out.writeInt(WIDTH);
 				out.writeInt(HEIGHT);
-				out.writeInt(FRAMES);
 				byte[] row = new byte[WIDTH * 3];
-				for (int[] frame : frames) {
-					for (int y = 0; y < HEIGHT; y++) {
-						for (int x = 0; x < WIDTH; x++) {
-							int argb = frame[x + y * WIDTH];
-							row[x * 3] = (byte) (argb >> 16);
-							row[x * 3 + 1] = (byte) (argb >> 8);
-							row[x * 3 + 2] = (byte) argb;
-						}
-						out.write(row);
+				for (int y = 0; y < HEIGHT; y++) {
+					for (int x = 0; x < WIDTH; x++) {
+						int argb = pixels[x + y * WIDTH];
+						row[x * 3] = (byte) (argb >> 16);
+						row[x * 3 + 1] = (byte) (argb >> 8);
+						row[x * 3 + 2] = (byte) argb;
 					}
+					out.write(row);
 				}
 			}
 		} catch (IOException error) {

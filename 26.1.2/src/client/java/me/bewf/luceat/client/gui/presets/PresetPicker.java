@@ -50,6 +50,8 @@ public final class PresetPicker extends Screen {
 	private final float[] lift = new float[4];
 	private final float[] weightVel = new float[4];
 	private final float[] liftVel = new float[4];
+	private final float[] sway = new float[4];
+	private long lastSwayNanos = System.nanoTime();
 	private int focus = -1;
 	private int pending = -1;
 	private long pendingSince;
@@ -419,6 +421,8 @@ public final class PresetPicker extends Screen {
 			settledWidths[k] = settledRects[k * 2 + 1] - settledRects[k * 2];
 		}
 		LuceatConfig live = LuceatConfig.get();
+		float swayDt = Math.min(0.1F, (now - lastSwayNanos) / 1.0E9F);
+		lastSwayNanos = now;
 		for (int i = 0; i < 4; i++) {
 			int x0 = layout[i * 2];
 			int x1 = layout[i * 2 + 1];
@@ -438,7 +442,12 @@ public final class PresetPicker extends Screen {
 			int y1 = bottom + rise;
 			int r = Math.min(RADIUS, w / 2);
 			PresetFilmstrips.Strip strip = PresetFilmstrips.of(preset);
-			Identifier tex = strip.texture(now);
+			float swayTarget = 0.0F;
+			if (mouseLive && focus == i && chosen == null) {
+				swayTarget = Math.max(-1.0F, Math.min(1.0F, (mouseX - (x0 + x1) / 2.0F) / (w / 2.0F)));
+			}
+			sway[i] += (swayTarget - sway[i]) * (1.0F - (float) Math.exp(-swayDt * 5.0F));
+			Identifier tex = strip.texture();
 			if (tex != null) {
 				float aspect = w / (float) height;
 				float u0 = 0.0F;
@@ -447,7 +456,7 @@ public final class PresetPicker extends Screen {
 				float v1 = 1.0F;
 				if (aspect < IMAGE_ASPECT) {
 					float visible = aspect / IMAGE_ASPECT;
-					float centre = Math.max(visible / 2.0F, Math.min(1.0F - visible / 2.0F, 0.56F));
+					float centre = 0.5F + sway[i] * (0.5F - visible / 2.0F);
 					u0 = centre - visible / 2.0F;
 					u1 = centre + visible / 2.0F;
 				} else {
