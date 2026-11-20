@@ -91,7 +91,7 @@ public final class Presets {
 				c.mergeFarLights = true;
 				c.entityLights = true;
 				c.particleLights = true;
-				c.lightRange = 64;
+				c.lightRange = 96;
 				c.heldLights = true;
 				c.otherPlayers = true;
 				c.mobs = true;
@@ -133,7 +133,7 @@ public final class Presets {
 				c.mergeFarLights = true;
 				c.entityLights = true;
 				c.particleLights = true;
-				c.lightRange = 96;
+				c.lightRange = 128;
 				c.heldLights = true;
 				c.otherPlayers = true;
 				c.mobs = true;
@@ -173,7 +173,7 @@ public final class Presets {
 				c.adaptiveQuality = false;
 				c.entityLights = true;
 				c.particleLights = true;
-				c.lightRange = 128;
+				c.lightRange = 192;
 				c.heldLights = true;
 				c.otherPlayers = true;
 				c.mobs = true;

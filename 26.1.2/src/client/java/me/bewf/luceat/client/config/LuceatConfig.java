@@ -50,7 +50,7 @@ public final class LuceatConfig {
 	public boolean adaptiveQuality = true;
 	public float placedReach = 1.0F;
 	public boolean autoLights = true;
-	public int lightRange = 64;
+	public int lightRange = 96;
 	public boolean entityLights = true;
 	public boolean particleLights = true;
 
@@ -188,7 +188,7 @@ public final class LuceatConfig {
 		shine = Math.max(0.0F, Math.min(shine, 1.0F));
 		spillStrength = Math.max(0.0F, Math.min(spillStrength, 1.0F));
 		sunShadowStrength = Math.max(0.0F, Math.min(sunShadowStrength, 1.0F));
-		lightRange = Math.max(8, Math.min(lightRange, 128));
+		lightRange = Math.max(8, Math.min(lightRange, 192));
 		placedStrength = Math.max(0.0F, Math.min(placedStrength, 2.0F));
 		emissiveGlow = Math.max(0.0F, Math.min(emissiveGlow, 2.0F));
 		lightFalloff = Math.max(0.8F, Math.min(lightFalloff, 3.0F));

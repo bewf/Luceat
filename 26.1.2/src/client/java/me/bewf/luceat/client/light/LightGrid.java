@@ -17,11 +17,11 @@ import net.minecraft.world.phys.Vec3;
 // 3d map of which lights can reach which 8 block cell
 public final class LightGrid {
 	public static final int CELL = 8;
-	public static final int GX = 24;
+	public static final int GX = 48;
 	public static final int GY = 16;
-	public static final int GZ = 24;
+	public static final int GZ = 48;
 	public static final int SLOTS = 12;
-	public static final int REACH_XZ = 88;
+	public static final int REACH_XZ = 184;
 	public static final int REACH_Y = 56;
 	public static final String SAMPLER = "u_LuceatGrid";
 

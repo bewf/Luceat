@@ -209,7 +209,7 @@ public final class LuceatSettings {
 			Cost.NONE, false, () -> c.adaptiveQuality, value -> c.adaptiveQuality = value));
 		all.add(new SliderSetting(PERFORMANCE, "Light range",
 			"Sets how far Luceat looks for lights. Lights past it fade out.",
-			Cost.LOW, false, 16.0F, 128.0F, 8.0F, " blocks", () -> c.lightRange, value -> c.lightRange = Math.round(value)));
+			Cost.LOW, false, 16.0F, 192.0F, 8.0F, " blocks", () -> c.lightRange, value -> c.lightRange = Math.round(value)));
 		all.add(new SliderSetting(PERFORMANCE, "Lights with shadows",
 			"Sets how many of the strongest lights get sharp shadows worked out per pixel. Placed lights follow the Shadow method setting.",
 			Cost.HIGH, false, 0.0F, 12.0F, 1.0F, "", () -> c.shadowedLights, value -> c.shadowedLights = Math.round(value)));
