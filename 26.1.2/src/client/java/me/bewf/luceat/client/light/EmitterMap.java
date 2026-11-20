@@ -137,7 +137,7 @@ public final class EmitterMap {
 		int previousUnit = GL11.glGetInteger(GL13.GL_ACTIVE_TEXTURE);
 		GL13.glActiveTexture(GL13.GL_TEXTURE0 + UNIT);
 		GL11.glBindTexture(GL12.GL_TEXTURE_3D, texture);
-		GL12.glTexImage3D(GL12.GL_TEXTURE_3D, 0, GL30.GL_R8, SIDE, SIDE, SIDE, 0, GL11.GL_RED, GL11.GL_UNSIGNED_BYTE, BufferUtils.createByteBuffer(SIDE * SIDE * SIDE));
+		GL12.glTexSubImage3D(GL12.GL_TEXTURE_3D, 0, 0, 0, 0, SIDE, SIDE, SIDE, GL11.GL_RED, GL11.GL_UNSIGNED_BYTE, BufferUtils.createByteBuffer(SIDE * SIDE * SIDE));
 		GL13.glActiveTexture(previousUnit);
 		SHOWN.clear();
 	}
