@@ -28,6 +28,7 @@ public final class LuceatConfig {
 	public float directionalShading = 0.7F;
 	public float lightBounce = 0.25F;
 	public float shine = 0.4F;
+	public float waterStyle = 0.8F;
 	public boolean lightSpread = false;
 	public boolean sunShadows = false;
 	public float sunShadowStrength = 0.65F;
@@ -186,6 +187,7 @@ public final class LuceatConfig {
 		shadowedLights = Math.max(0, Math.min(shadowedLights, 12));
 		lightBounce = Math.max(0.0F, Math.min(lightBounce, 1.0F));
 		shine = Math.max(0.0F, Math.min(shine, 1.0F));
+		waterStyle = Math.max(0.0F, Math.min(waterStyle, 1.0F));
 		spillStrength = Math.max(0.0F, Math.min(spillStrength, 1.0F));
 		sunShadowStrength = Math.max(0.0F, Math.min(sunShadowStrength, 1.0F));
 		lightRange = Math.max(8, Math.min(lightRange, 192));

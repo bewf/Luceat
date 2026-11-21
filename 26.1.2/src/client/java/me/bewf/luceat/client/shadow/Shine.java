@@ -11,6 +11,9 @@ import net.minecraft.world.level.block.state.BlockState;
 
 // how glossy a block looks under a light, 0 to 255
 public final class Shine {
+	public static final float SAND = 0.31F;
+	public static final float SNOW = 0.27F;
+
 	private static final Map<BlockState, Integer> KNOWN = new IdentityHashMap<>();
 
 	private Shine() {
@@ -43,11 +46,17 @@ public final class Shine {
 	}
 
 	public static float material(String path) {
+		if (path.equals("sand") || path.equals("red_sand") || path.endsWith("suspicious_sand")) {
+			return SAND;
+		}
+		if (path.equals("snow") || path.equals("snow_block") || path.equals("powder_snow")) {
+			return SNOW;
+		}
 		if (path.contains("ore") || path.contains("raw_") || path.contains("powder") || path.contains("stairs") && !path.contains("quartz")) {
 			return 0.0F;
 		}
 		if (path.contains("iron_block") || path.contains("gold_block") || path.contains("netherite_block") || path.contains("diamond_block") || path.contains("emerald_block")) {
-			return 1.0F;
+			return 0.97F;
 		}
 		if (path.contains("copper")) {
 			return 0.9F;

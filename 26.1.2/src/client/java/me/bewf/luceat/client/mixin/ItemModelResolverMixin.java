@@ -26,7 +26,7 @@ public abstract class ItemModelResolverMixin {
 
 	@Inject(method = "updateForNonLiving", at = @At("RETURN"), require = 0)
 	private void luceat$glowNonLiving(ItemStackRenderState state, ItemStack stack, ItemDisplayContext context, Entity entity, CallbackInfo info) {
-		((GlowCarrier) state).luceat$setGlow(ItemGlow.tag(stack, context));
+		((GlowCarrier) state).luceat$setGlow(ItemGlow.tag(stack, context, entity));
 	}
 
 	@Inject(method = "updateForTopItem", at = @At("RETURN"), require = 0)

@@ -63,6 +63,9 @@ public final class LuceatSettings {
 		all.add(new SliderSetting(LIGHTING, "Shiny surfaces",
 			"Sets how much polished blocks, metal and water catch the light. At 0 nothing shines.",
 			Cost.LOW, true, 0.0F, 1.0F, 0.05F, "", () -> c.shine, value -> c.shine = value));
+		all.add(new SliderSetting(LIGHTING, "Water style",
+			"Draws water as a moving surface with waves, sky reflections and sun glints in place of Minecraft's water texture. Sets how strong they are. At 0 water looks like Minecraft's.",
+			Cost.LOW, false, 0.0F, 1.0F, 0.05F, "", () -> c.waterStyle, value -> c.waterStyle = value));
 		all.add(new ToggleSetting(LIGHTING, "Colours from textures",
 			"Takes the glow colour from the item's texture, so a resource pack changes the colours too.",
 			Cost.NONE, false, () -> c.textureColours, value -> {
@@ -177,7 +180,7 @@ public final class LuceatSettings {
 			"Lets items on the ground give off light.",
 			Cost.LOW, false, () -> c.droppedItems, value -> c.droppedItems = value));
 		all.add(new ToggleSetting(SOURCES, "Items in item frames",
-			"Lets items in item frames give off light.",
+			"Lets items in item frames give off light. Glow item frames give off a soft light of their own and make what they hold glow.",
 			Cost.LOW, false, () -> c.itemFrames, value -> c.itemFrames = value));
 		all.add(new ToggleSetting(SOURCES, "Fire, glowing mobs and more",
 			"Lets blazes, burning mobs, allays, glow squid, magma cubes, fireballs, end crystals and similar mobs and objects give off light.",
@@ -285,6 +288,7 @@ public final class LuceatSettings {
 			{"Light around corners", "Corner Light", "Light spreads around corners and through gaps."},
 			{"Corner light strength", "Corner Strength", "How strong the light around corners is."},
 			{"Shiny surfaces", "Shiny Surfaces", "How much polished blocks, metal and water catch the light. At 0 nothing shines."},
+			{"Water style", "Water Style", "Water gets moving ripples, sky reflections and sun glints instead of Minecraft's water texture. At 0 water looks like Minecraft's."},
 			{"Colours from textures", "Texture Colours", "Lights take their colour from the item's texture, so resource packs change it."},
 			{"Glow on enchanted items", "Enchant Glow", "Enchanted items in your hand give off a faint purple glow."},
 			{"Clouds", "Clouds", "Draws Fancy clouds with thick centres, thin see-through edges and darker undersides. Off uses Minecraft's clouds. Fast clouds are not changed."},
@@ -315,7 +319,7 @@ public final class LuceatSettings {
 			{"Other players", "Other Players", "Items other players hold light up their surroundings."},
 			{"Mobs holding items", "Mob Items", "Mobs holding a light item give it off."},
 			{"Dropped items", "Dropped Items", "Items on the ground give off light."},
-			{"Items in item frames", "Item Frames", "Items in item frames light up the wall around them."},
+			{"Items in item frames", "Item Frames", "Items in item frames light up the wall around them. Glow item frames give off a soft light of their own."},
 			{"Fire, glowing mobs and more", "Fire and Mobs", "Blazes, burning mobs, allays, glow squid, magma cubes, fireballs and end crystals give off light."},
 			{"Light on mobs and items", "Lit Entities", "Players, mobs and dropped items get lit by nearby lights."},
 			{"Light on particles", "Lit Particles", "Smoke, sparks and other particles get lit by nearby lights."},

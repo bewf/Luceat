@@ -11,6 +11,7 @@ import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.core.Direction;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.decoration.GlowItemFrame;
 import net.minecraft.world.entity.decoration.ItemFrame;
 import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.phys.Vec3;
@@ -90,7 +91,7 @@ public final class EntityLights {
 	}
 
 	private static void addFrame(List<LightSource> out, ItemFrame frame) {
-		LightSpec spec = LightSpecs.of(frame.getItem(), false, LightSpecs.Where.FRAMED);
+		LightSpec spec = frame instanceof GlowItemFrame ? LightSpecs.glowFrame(frame.getItem()) : LightSpecs.of(frame.getItem(), false, LightSpecs.Where.FRAMED);
 		if (spec.level() <= 0) {
 			return;
 		}

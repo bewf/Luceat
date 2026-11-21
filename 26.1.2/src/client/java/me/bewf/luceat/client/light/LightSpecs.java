@@ -19,6 +19,7 @@ public final class LightSpecs {
 	private static final LightSpec NONE = new LightSpec(0, 0.0F, 0.0F, 0.0F);
 	private static final LightSpec ENCHANT_GLOW = new LightSpec(2, 0.62F, 0.38F, 1.0F);
 	private static final float[] DEFAULT_COLOUR = {1.0F, 0.7F, 0.35F};
+	private static final float[] GLOW_FRAME = {0.3F, 0.95F, 0.85F};
 	private static final Map<Item, float[]> COLOURS = new HashMap<>();
 
 	private LightSpecs() {
@@ -80,6 +81,21 @@ public final class LightSpecs {
 		float[] colour = custom != null && custom.colour >= 0 ? custom.rgb() : best != null && best.colour() != null ? best.colour() : colourOf(stack, config.textureColours);
 		boolean hidden = BlockRules.noShadow(stack.getItem() instanceof BlockItem blockItem ? blockItem.getBlock() : null, custom);
 		return new LightSpec(level, colour[0], colour[1], colour[2], hidden);
+	}
+
+	public static LightSpec glowFrame(ItemStack stack) {
+		if (stack.isEmpty()) {
+			return new LightSpec(4, GLOW_FRAME[0], GLOW_FRAME[1], GLOW_FRAME[2]);
+		}
+		LightSpec own = of(stack, false, Where.FRAMED);
+		if (own.level() >= 7) {
+			return own;
+		}
+		float[] item = colourOf(stack, true);
+		return new LightSpec(Math.max(own.level(), 7),
+			item[0] * 0.75F + GLOW_FRAME[0] * 0.25F,
+			item[1] * 0.75F + GLOW_FRAME[1] * 0.25F,
+			item[2] * 0.75F + GLOW_FRAME[2] * 0.25F);
 	}
 
 	private static float[] colourOf(ItemStack stack, boolean fromTexture) {

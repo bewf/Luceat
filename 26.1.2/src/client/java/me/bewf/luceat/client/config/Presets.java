@@ -48,6 +48,7 @@ public final class Presets {
 				c.sunShadowStrength = 0.65F;
 				c.caustics = false;
 				c.shine = 0.0F;
+				c.waterStyle = 0.0F;
 				c.maxLights = 48;
 				c.mergeFarLights = true;
 				c.lightRange = 48;
@@ -87,6 +88,7 @@ public final class Presets {
 				c.sunShadowStrength = 0.65F;
 				c.caustics = true;
 				c.shine = 0.35F;
+				c.waterStyle = 0.6F;
 				c.maxLights = 96;
 				c.mergeFarLights = true;
 				c.entityLights = true;
@@ -129,6 +131,7 @@ public final class Presets {
 				c.sunShadowStrength = 0.65F;
 				c.caustics = true;
 				c.shine = 0.7F;
+				c.waterStyle = 0.85F;
 				c.maxLights = 192;
 				c.mergeFarLights = true;
 				c.entityLights = true;
@@ -168,6 +171,7 @@ public final class Presets {
 				c.sunShadowStrength = 0.65F;
 				c.caustics = true;
 				c.shine = 1.0F;
+				c.waterStyle = 1.0F;
 				c.maxLights = 256;
 				c.mergeFarLights = false;
 				c.adaptiveQuality = false;

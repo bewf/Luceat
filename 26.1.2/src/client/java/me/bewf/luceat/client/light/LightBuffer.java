@@ -10,6 +10,7 @@ import org.lwjgl.opengl.GL31;
 
 import me.bewf.luceat.client.config.LuceatConfig;
 import me.bewf.luceat.client.config.ShadowQuality;
+import me.bewf.luceat.client.shader.TerrainShaderPatch;
 import me.bewf.luceat.client.shadow.ShadowCache;
 import me.bewf.luceat.client.shadow.ShadowVolume;
 import me.bewf.luceat.client.shadow.SunCache;
@@ -22,7 +23,7 @@ public final class LightBuffer {
 	public static final String BLOCK_NAME = "LuceatLights";
 
 	private static final int HEADER = 208;
-	private static final int SIZE = HEADER + MAX_LIGHTS * 32;
+	private static final int SIZE = HEADER + MAX_LIGHTS * 32 + 32;
 
 	private final ByteBuffer scratch = BufferUtils.createByteBuffer(SIZE);
 	private int handle;
@@ -49,7 +50,7 @@ public final class LightBuffer {
 		}
 		this.scratch.putInt(SunCache.originX()).putInt(SunCache.originY()).putInt(SunCache.originZ()).putInt(SunCache.ready() ? 1 : 0);
 		this.scratch.putInt(LightVolume.originX()).putInt(LightVolume.originY()).putInt(LightVolume.originZ()).putInt(LightVolume.ready() ? 1 : 0);
-		this.scratch.putFloat(config.flicker * 0.25F).putFloat(config.emissiveGlow).putFloat(config.lightFalloff).putFloat(0.0F);
+		this.scratch.putFloat(config.flicker * 0.25F).putFloat(config.emissiveGlow).putFloat(config.lightFalloff).putFloat(config.waterStyle);
 		for (int i = 0; i < MAX_LIGHTS; i++) {
 			if (i < count) {
 				LightSource light = lights.get(i);
@@ -68,6 +69,11 @@ public final class LightBuffer {
 			} else {
 				this.scratch.putFloat(0.0F).putFloat(0.0F).putFloat(0.0F).putFloat(0.0F);
 			}
+		}
+		boolean waves = TerrainShaderPatch.built() != null && TerrainShaderPatch.built().rays();
+		float[] rects = WaterSprites.rects();
+		for (int i = 0; i < 8; i++) {
+			this.scratch.putFloat(waves ? rects[i] : 0.0F);
 		}
 		this.scratch.flip();
 
