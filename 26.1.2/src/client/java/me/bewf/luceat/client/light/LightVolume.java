@@ -56,7 +56,7 @@ public final class LightVolume {
 		GL11.GL_UNPACK_SKIP_PIXELS, GL12.GL_UNPACK_IMAGE_HEIGHT, GL12.GL_UNPACK_SKIP_IMAGES
 	};
 
-	private record Bake(long id, double x, double y, double z, float red, float green, float blue, float radius, float contrast, boolean fire, boolean noShadow) {
+	private record Bake(long id, double x, double y, double z, float red, float green, float blue, float radius, float contrast, boolean fire, boolean noShadow, int shape) {
 	}
 
 	private record Job(int generation, int blockSignature, int originX, int originY, int originZ, List<Bake> lights, Map<Long, Integer> hashes, int minX, int minY, int minZ, int maxX, int maxY, int maxZ) {
@@ -250,7 +250,7 @@ public final class LightVolume {
 			if (base < 1.0F) {
 				continue;
 			}
-			out.add(new Bake(light.id(), light.x(), light.y(), light.z(), light.red(), light.green(), light.blue(), base, config.lightFalloff, light.fire(), light.noShadow() || skipShadows));
+			out.add(new Bake(light.id(), light.x(), light.y(), light.z(), light.red(), light.green(), light.blue(), base, config.lightFalloff, light.fire(), light.noShadow() || skipShadows, light.shape()));
 		}
 		return out;
 	}
@@ -267,6 +267,7 @@ public final class LightVolume {
 		h ^= Math.round(bake.contrast() * 32.0F) * 0x2545F4914F6CDD1DL;
 		h ^= bake.noShadow() ? 0x1234567L : 0L;
 		h ^= bake.fire() ? 0x7654321L : 0L;
+		h ^= bake.shape() * 0x1B873593L;
 		return (int) (h ^ (h >>> 32));
 	}
 
@@ -554,9 +555,10 @@ public final class LightVolume {
 							seenGreen = passGreen;
 							seenBlue = passBlue;
 						}
-						float addRed = (float) (bake.red() * curved * seenRed);
-						float addGreen = (float) (bake.green() * curved * seenGreen);
-						float addBlue = (float) (bake.blue() * curved * seenBlue);
+						float aim = bake.shape() == 0 || distance < 0.01 ? 1.0F : EmissionShape.gain(bake.shape(), -dy / distance);
+						float addRed = (float) (bake.red() * curved * seenRed) * aim;
+						float addGreen = (float) (bake.green() * curved * seenGreen) * aim;
+						float addBlue = (float) (bake.blue() * curved * seenBlue) * aim;
 						red[index] += addRed;
 						green[index] += addGreen;
 						blue[index] += addBlue;

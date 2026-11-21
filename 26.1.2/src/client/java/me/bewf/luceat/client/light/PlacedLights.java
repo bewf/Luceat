@@ -57,8 +57,9 @@ public final class PlacedLights {
 		boolean[] noShadow = new boolean[4];
 		byte[] vanilla = new byte[4];
 		byte[] tier = new byte[4];
+		byte[] shape = new byte[4];
 
-		void add(float px, float py, float pz, float[] colour, float power, boolean flame, boolean skipShadow, int natural) {
+		void add(float px, float py, float pz, float[] colour, float power, boolean flame, boolean skipShadow, int natural, int form) {
 			if (count == x.length) {
 				int size = count * 2;
 				x = Arrays.copyOf(x, size);
@@ -72,6 +73,7 @@ public final class PlacedLights {
 				noShadow = Arrays.copyOf(noShadow, size);
 				vanilla = Arrays.copyOf(vanilla, size);
 				tier = Arrays.copyOf(tier, size);
+				shape = Arrays.copyOf(shape, size);
 			}
 			x[count] = px;
 			y[count] = py;
@@ -83,6 +85,7 @@ public final class PlacedLights {
 			fire[count] = flame;
 			noShadow[count] = skipShadow;
 			vanilla[count] = (byte) Math.min(15, Math.max(0, natural));
+			shape[count] = (byte) form;
 			count++;
 		}
 	}
@@ -106,6 +109,7 @@ public final class PlacedLights {
 	private static final boolean[] cf = new boolean[MAX_CANDIDATES];
 	private static final boolean[] cn = new boolean[MAX_CANDIDATES];
 	private static final int[] cv = new int[MAX_CANDIDATES];
+	private static final byte[] csh = new byte[MAX_CANDIDATES];
 	private static final long[] cid = new long[MAX_CANDIDATES];
 	private static final long[] ck = new long[MAX_CANDIDATES];
 	private static long[] lastPicked = new long[0];
@@ -334,7 +338,7 @@ public final class PlacedLights {
 			}
 		}
 		boolean skip = BlockRules.noShadow(state.getBlock(), rule);
-		into.add((float) px, (float) py, (float) pz, colourOf(state), power, flames, skip, state.getLightEmission());
+		into.add((float) px, (float) py, (float) pz, colourOf(state), power, flames, skip, state.getLightEmission(), EmissionShape.of(state));
 	}
 
 	private static float[] colourOf(BlockState state) {
@@ -428,6 +432,7 @@ public final class PlacedLights {
 						cf[total] = section.fire[i];
 						cn[total] = section.noShadow[i];
 						cv[total] = section.vanilla[i];
+						csh[total] = section.shape[i];
 						cid[total] = 0L;
 						ck[total] = key((int) Math.floor(section.x[i]), (int) Math.floor(section.y[i]), (int) Math.floor(section.z[i]));
 						cs[total] = score(level, distance) * kept(ck[total]);
@@ -459,6 +464,7 @@ public final class PlacedLights {
 			cf[total] = flame[slot];
 			cn[total] = true;
 			cv[total] = open[slot] ? 0 : Math.max(0, natural[slot] - spans[slot]);
+			csh[total] = 0;
 			cid[total] = LightSmoother.key(6, (int) (tableKey[slot] ^ (tableKey[slot] >>> 32)), (int) (tableKey[slot] >>> 62));
 			ck[total] = tableKey[slot];
 			cs[total] = score(level, distance) * kept(ck[total]);
@@ -481,7 +487,7 @@ public final class PlacedLights {
 		int written = 0;
 		for (int i = 0; i < total; i++) {
 			if (picked[i]) {
-				result.add(new LightSource(cx[i], cy[i], cz[i], cr[i], cg[i], cb[i], cl[i], true, cf[i], cid[i], cn[i], cv[i]));
+				result.add(new LightSource(cx[i], cy[i], cz[i], cr[i], cg[i], cb[i], cl[i], true, cf[i], cid[i], cn[i], cv[i], csh[i]));
 				keys[written++] = ck[i];
 			}
 		}

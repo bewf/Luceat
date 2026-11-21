@@ -452,6 +452,17 @@ public final class TerrainShaderPatch {
 #endif
 
 
+			const vec3 LUCEAT_SHAPES[3] = vec3[3](vec3(1.0), vec3(1.0, 0.55, 0.75), vec3(0.85, 1.0, 0.35));
+
+			float luceatAim(int shape, float upward) {
+			    if (shape <= 0 || shape > 2) {
+			        return 1.0;
+			    }
+			    vec3 profile = LUCEAT_SHAPES[shape];
+			    float blend = smoothstep(0.25, 0.9, abs(upward));
+			    return mix(profile.x, upward > 0.0 ? profile.y : profile.z, blend);
+			}
+
 			float luceatRamp(float x, float low, float inverseWidth) {
 			    float t = clamp((x - low) * inverseWidth, 0.0, 1.0);
 			    return t * t * (3.0 - 2.0 * t);
@@ -520,8 +531,11 @@ public final class TerrainShaderPatch {
 			        return lit;
 			    }
 			    float lum = dot(albedo, vec3(0.299, 0.587, 0.114));
-			    float k = smoothstep(0.42, 0.8, lum) * emitter * glow;
-			    return mix(lit * (1.0 + 0.7 * k), vec3(1.0, 0.96, 0.88), clamp(0.4 * k, 0.0, 0.8));
+			    float bright = smoothstep(0.42, 0.8, lum);
+			    float body = emitter * glow;
+			    float k = bright * body;
+			    float lift = k + 0.3 * (1.0 - bright) * body;
+			    return mix(lit * (1.0 + 0.7 * lift), vec3(1.0, 0.96, 0.88), clamp(0.4 * k, 0.0, 0.8));
 #else
 			    return lit;
 #endif
@@ -639,7 +653,8 @@ public final class TerrainShaderPatch {
 			            int flags = int(colour.w + 0.5);
 			            bool placed = (flags & 1) != 0;
 			            bool noShadow = (flags & 2) != 0;
-			            int stored = (flags >> 6) - 1;
+			            int stored = ((flags >> 6) & 1023) - 1;
+			            int shape = flags >> 16;
 			            float strength = placed ? u_LuceatExtra.x : 1.0;
 			            int vanillaReach = (flags >> 2) & 15;
 			            if (placed && vanillaReach > 0) {
@@ -663,7 +678,7 @@ public final class TerrainShaderPatch {
 			            }
 			            if (level > 0.0 && facing > 0.0) {
 			                float lambert = mix(1.0, 0.4 + 0.6 * clamp(ndotl, 0.0, 1.0), u_LuceatOptions.y);
-			                float power = curved * lambert * facing * strength;
+			                float power = curved * lambert * facing * strength * luceatAim(shape, -dirToLight.y);
 			                vec3 visible = vec3(1.0);
 #ifdef LUCEAT_RAYS
 			                if (shadowAny && power * u_LuceatState.z * fade * max(tint.r, max(tint.g, tint.b)) > 0.02) {

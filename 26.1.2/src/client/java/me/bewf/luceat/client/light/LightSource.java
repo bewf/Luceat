@@ -1,20 +1,24 @@
 package me.bewf.luceat.client.light;
 
-public record LightSource(double x, double y, double z, float red, float green, float blue, float radius, boolean placed, boolean fire, long id, boolean noShadow, int vanilla) {
+public record LightSource(double x, double y, double z, float red, float green, float blue, float radius, boolean placed, boolean fire, long id, boolean noShadow, int vanilla, int shape) {
+	public LightSource(double x, double y, double z, float red, float green, float blue, float radius, boolean placed, boolean fire, long id, boolean noShadow, int vanilla) {
+		this(x, y, z, red, green, blue, radius, placed, fire, id, noShadow, vanilla, 0);
+	}
+
 	public LightSource(double x, double y, double z, float red, float green, float blue, float radius, boolean placed, boolean fire, long id, boolean noShadow) {
-		this(x, y, z, red, green, blue, radius, placed, fire, id, noShadow, 0);
+		this(x, y, z, red, green, blue, radius, placed, fire, id, noShadow, 0, 0);
 	}
 
 	public LightSource(double x, double y, double z, float red, float green, float blue, float radius, boolean placed, boolean fire, long id) {
-		this(x, y, z, red, green, blue, radius, placed, fire, id, false, 0);
+		this(x, y, z, red, green, blue, radius, placed, fire, id, false, 0, 0);
 	}
 
 	public LightSource(double x, double y, double z, float red, float green, float blue, float radius) {
-		this(x, y, z, red, green, blue, radius, false, false, 0L, false, 0);
+		this(x, y, z, red, green, blue, radius, false, false, 0L, false, 0, 0);
 	}
 
 	public LightSource(double x, double y, double z, float red, float green, float blue, float radius, boolean placed) {
-		this(x, y, z, red, green, blue, radius, placed, false, 0L, false, 0);
+		this(x, y, z, red, green, blue, radius, placed, false, 0L, false, 0, 0);
 	}
 
 	public static boolean warm(float red, float blue, float radius) {

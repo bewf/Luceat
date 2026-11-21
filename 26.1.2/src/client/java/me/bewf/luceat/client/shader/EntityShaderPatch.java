@@ -23,7 +23,13 @@ public final class EntityShaderPatch {
 	}
 
 	public static String apply(Identifier id, String source) {
-		if (source == null || !"minecraft".equals(id.getNamespace()) || !"core/entity".equals(id.getPath())) {
+		if (source == null || !"minecraft".equals(id.getNamespace())) {
+			return source;
+		}
+		if ("core/item".equals(id.getPath())) {
+			return applyItem(source);
+		}
+		if (!"core/entity".equals(id.getPath())) {
 			return source;
 		}
 		if (source.contains("in Position;") || source.contains("in vec3 Position;")) {
@@ -40,5 +46,31 @@ public final class EntityShaderPatch {
 			+ "    color *= vec4(lightMapColor.rgb, 1.0);\n"
 			+ "    color.rgb = luceatItemGlow(color.rgb, luceatLum, luceatTag);";
 		return source.replace(FRAGMENT_LIGHT, lit).replace(FRAGMENT_ENTRY, GLOW + FRAGMENT_ENTRY);
+	}
+
+	private static String applyItem(String source) {
+		if (source.contains("luceatTag")) {
+			return source;
+		}
+		if (source.contains("in vec3 Position;")) {
+			String light = "sample_lightmap(Sampler2, UV2)";
+			String out = "out vec2 texCoord0;";
+			String uv = "texCoord0 = UV0;";
+			if (source.indexOf(light) < 0 || source.indexOf(out) < 0 || source.indexOf(uv) < 0) {
+				return source;
+			}
+			return source.replace(light, "sample_lightmap(Sampler2, UV2 & ivec2(-16))")
+				.replace(out, out + "\nflat out float luceatTag;")
+				.replace(uv, uv + "\n    luceatTag = float(UV2.x & 15);");
+		}
+		String in = "in vec2 texCoord0;";
+		String mul = "    color *= vertexColor * ColorModulator;";
+		if (source.indexOf(in) < 0 || source.indexOf(mul) < 0 || source.indexOf(FRAGMENT_ENTRY) < 0) {
+			return source;
+		}
+		String lit = "    float luceatLum = dot(color.rgb, vec3(0.299, 0.587, 0.114));\n"
+			+ "    color *= vertexColor * ColorModulator;\n"
+			+ "    color.rgb = luceatItemGlow(color.rgb, luceatLum, luceatTag);";
+		return source.replace(in, in + "\nflat in float luceatTag;").replace(mul, lit).replace(FRAGMENT_ENTRY, GLOW + FRAGMENT_ENTRY);
 	}
 }

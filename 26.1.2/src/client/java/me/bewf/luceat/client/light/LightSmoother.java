@@ -26,6 +26,7 @@ public final class LightSmoother {
 		boolean fire;
 		boolean noShadow;
 		int vanilla;
+		int shape;
 		float fade;
 		long frame;
 	}
@@ -89,6 +90,7 @@ public final class LightSmoother {
 			state.fire = light.fire();
 			state.noShadow = light.noShadow();
 			state.vanilla = light.vanilla();
+			state.shape = light.shape();
 			state.target = light.radius();
 			state.radius += (light.radius() - state.radius) * easeRadius;
 			state.fade = Math.min(1.0F, state.fade + fadeIn);
@@ -121,7 +123,7 @@ public final class LightSmoother {
 					+ 0.15F * (float) Math.sin(seconds * 31.0F + seed * 2.3F);
 				radius += flicker * 1.3F * noise;
 			}
-			result.add(new LightSource(state.x, state.y, state.z, state.red, state.green, state.blue, Math.max(radius, 0.0F), state.placed, state.fire, key, state.noShadow, state.vanilla));
+			result.add(new LightSource(state.x, state.y, state.z, state.red, state.green, state.blue, Math.max(radius, 0.0F), state.placed, state.fire, key, state.noShadow, state.vanilla, state.shape));
 		}
 		return result;
 	}
