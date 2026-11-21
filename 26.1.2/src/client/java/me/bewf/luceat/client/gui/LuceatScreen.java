@@ -516,7 +516,7 @@ public final class LuceatScreen extends Screen {
 	}
 
 	private int popupY1() {
-		return popupY0() + popupRows() * DROPDOWN_ROW + 12;
+		return popupY0() + popupRows() * DROPDOWN_ROW + 12 + (matches().size() > DROPDOWN_ROWS ? 20 : 0);
 	}
 
 	private String version() {
@@ -730,7 +730,7 @@ public final class LuceatScreen extends Screen {
 		}
 		if (found.size() > DROPDOWN_ROWS) {
 			String more = (found.size() - DROPDOWN_ROWS - dropdownScroll) + " more, scroll";
-			s.text(BODY, more, x0 + 12, y1 - 12, Glass.FAINT);
+			s.text(BODY, more, x0 + 12, y1 - 22, Glass.FAINT);
 		}
 	}
 
@@ -1194,8 +1194,8 @@ public final class LuceatScreen extends Screen {
 		return listLeft + 2;
 	}
 
-	private int trackRight() {
-		return listRight - 44;
+	private int trackRight(SliderSetting slider) {
+		return listRight - Math.max(44, Texts.width(BODY, slider.valueText()) + 16);
 	}
 
 	private String costText(Setting setting) {
@@ -1299,10 +1299,10 @@ public final class LuceatScreen extends Screen {
 			drawTestPill(s, setting, cy, hitTop, areaBottom);
 		} else if (setting instanceof SliderSetting sl) {
 			float value = anim("sl:" + id, sl.fraction(), dragging == setting ? 0.012F : 0.045F);
-			Glass.slider(s, trackLeft(), cy, trackRight(), value, hoverAny, dragging == setting ? 1.0F : 0.0F);
+			Glass.slider(s, trackLeft(), cy, trackRight(sl), value, hoverAny, dragging == setting ? 1.0F : 0.0F);
 			int valueColour = Paint.mix(Glass.SOFT, Glass.TEXT, Math.max(hoverAny, dragging == setting ? 1.0F : 0.0F));
 			Glass.right(s, BODY, sl.valueText(), listRight, cy - 4, fade(valueColour, cy - 4));
-			clampedHit(trackLeft() - 10, cy - 10, trackRight() + 10, cy + 10, "sl:" + id, setting, hitTop, areaBottom);
+			clampedHit(trackLeft() - 10, cy - 10, trackRight(sl) + 10, cy + 10, "sl:" + id, setting, hitTop, areaBottom);
 		} else if (setting instanceof ChoiceSetting<?> choice) {
 			int w = choiceWidth(choice);
 			int x = listLeft;
@@ -1862,7 +1862,7 @@ public final class LuceatScreen extends Screen {
 
 	private void dragSlider(SliderSetting slider, double mx) {
 		int left = trackLeft();
-		int right = trackRight();
+		int right = trackRight(slider);
 		slider.setFraction((float) ((mx - left) / (right - left)));
 		applyChanged(slider);
 	}
