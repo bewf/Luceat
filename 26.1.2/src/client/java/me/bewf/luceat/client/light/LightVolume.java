@@ -537,7 +537,9 @@ public final class LightVolume {
 						float basis = level / (4.0F - 3.0F * level);
 						float curved = basis;
 						if (bake.contrast() != 1.0F) {
-							curved = (float) Math.pow(curved, bake.contrast());
+							float top = (float) Math.min(1.0, radius / 15.0);
+							float peak = Math.max(top / (4.0F - 3.0F * top), 1.0E-6F);
+							curved = peak * (float) Math.pow(curved / peak, bake.contrast());
 						}
 						if (curved <= 0.0F) {
 							continue;
