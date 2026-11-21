@@ -26,6 +26,10 @@ public final class EmitterMap {
 	private static final int MASK = SIDE - 1;
 	private static final int REACH = 62;
 	private static final int UPLOADS_PER_FRAME = 2048;
+	private static final int[] UNPACK = {
+		GL11.GL_UNPACK_ALIGNMENT, GL11.GL_UNPACK_ROW_LENGTH, GL11.GL_UNPACK_SKIP_ROWS,
+		GL11.GL_UNPACK_SKIP_PIXELS, GL12.GL_UNPACK_IMAGE_HEIGHT, GL12.GL_UNPACK_SKIP_IMAGES
+	};
 
 	private static final ByteBuffer ONE = BufferUtils.createByteBuffer(1);
 	private static final Map<Integer, Byte> SHOWN = new HashMap<>();
@@ -40,6 +44,21 @@ public final class EmitterMap {
 		if (clientLevel == null || !LightVolume.capable()) {
 			return;
 		}
+		int[] previousStore = new int[UNPACK.length];
+		for (int i = 0; i < UNPACK.length; i++) {
+			previousStore[i] = GL11.glGetInteger(UNPACK[i]);
+			GL11.glPixelStorei(UNPACK[i], i == 0 ? 1 : 0);
+		}
+		try {
+			upload(clientLevel, lights, camera);
+		} finally {
+			for (int i = 0; i < UNPACK.length; i++) {
+				GL11.glPixelStorei(UNPACK[i], previousStore[i]);
+			}
+		}
+	}
+
+	private static void upload(ClientLevel clientLevel, List<LightSource> lights, Vec3 camera) {
 		ensureTexture();
 		if (clientLevel != level) {
 			level = clientLevel;
@@ -128,7 +147,7 @@ public final class EmitterMap {
 		GL11.glTexParameteri(GL12.GL_TEXTURE_3D, GL11.GL_TEXTURE_WRAP_S, GL12.GL_CLAMP_TO_EDGE);
 		GL11.glTexParameteri(GL12.GL_TEXTURE_3D, GL11.GL_TEXTURE_WRAP_T, GL12.GL_CLAMP_TO_EDGE);
 		GL11.glTexParameteri(GL12.GL_TEXTURE_3D, GL12.GL_TEXTURE_WRAP_R, GL12.GL_CLAMP_TO_EDGE);
-		GL12.glTexImage3D(GL12.GL_TEXTURE_3D, 0, GL30.GL_R8, SIDE, SIDE, SIDE, 0, GL11.GL_RED, GL11.GL_UNSIGNED_BYTE, BufferUtils.createByteBuffer(SIDE * SIDE * SIDE));
+		GL12.glTexImage3D(GL12.GL_TEXTURE_3D, 0, GL30.GL_R8, SIDE, SIDE, SIDE, 0, GL11.GL_RED, GL11.GL_UNSIGNED_BYTE, (ByteBuffer) null);
 		GL13.glActiveTexture(previousUnit);
 		SHOWN.clear();
 	}
