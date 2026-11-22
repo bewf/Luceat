@@ -7,6 +7,7 @@ import me.bewf.luceat.client.compat.IrisCompat;
 import me.bewf.luceat.client.compat.RenderBackend;
 import me.bewf.luceat.client.config.LuceatConfig;
 import me.bewf.luceat.client.config.ShaderPackMode;
+import me.bewf.luceat.client.shadow.EntityShadows;
 import me.bewf.luceat.client.shadow.PatternAtlas;
 import me.bewf.luceat.client.shadow.ShadowCache;
 import me.bewf.luceat.client.shadow.ShadowVolume;
@@ -86,6 +87,7 @@ public final class LightEngine {
 			SunCache.update(minecraft.level, camera);
 			long bufferStart = System.nanoTime();
 			BUFFER.update(live, camera);
+			EntityShadows.update(minecraft, camera, partialTick);
 			Stats.record(Stats.BUFFER, System.nanoTime() - bufferStart);
 			built = true;
 			ShaderVariant variant = TerrainShaderPatch.built();
@@ -96,6 +98,7 @@ public final class LightEngine {
 			}
 		}
 		BUFFER.bind(program);
+		EntityShadows.bind(program);
 		LightGrid.bind(program);
 		ShadowVolume.bind(program);
 		ShadowCache.bind(program);

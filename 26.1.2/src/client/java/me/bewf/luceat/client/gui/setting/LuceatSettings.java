@@ -84,6 +84,9 @@ public final class LuceatSettings {
 		all.add(new ToggleSetting(SHADOWS, "Sun shadows",
 			"Lets trees, roofs and cliffs cast sun shadows on the ground near you.",
 			Cost.HIGH, false, () -> c.sunShadows, value -> c.sunShadows = value));
+		all.add(new ToggleSetting(SHADOWS, "Entity shadows",
+			"Lets players and mobs cast sun shadows shaped like their bodies. Needs Sun shadows.",
+			Cost.LOW, false, () -> c.entityShadows, value -> c.entityShadows = value));
 		all.add(new SliderSetting(SHADOWS, "Sun shadow strength",
 			"Sets how dark sun shadows are.",
 			Cost.NONE, false, 0.0F, 1.0F, 0.05F, "", () -> c.sunShadowStrength, value -> c.sunShadowStrength = value));
@@ -294,6 +297,7 @@ public final class LuceatSettings {
 			{"Clouds", "Clouds", "Draws Fancy clouds with thick centres, thin see-through edges and darker undersides. Off uses Minecraft's clouds. Fast clouds are not changed."},
 			{"Bloom", "Bloom", "A soft glow around bright things such as the sun, lanterns and glowstone."},
 			{"Sun shadows", "Sun Shadows", "Trees, roofs and cliffs cast sun shadows near you."},
+			{"Entity shadows", "Entity Shadows", "Players and mobs cast sun shadows shaped like their bodies. Needs Sun shadows."},
 			{"Sun shadow strength", "Sun Shadow Darkness", "How dark sun shadows are."},
 			{"Water light patterns", "Water Patterns", "Moving streaks of sunlight show on pool and sea floors."},
 			{"Shadows", "Light Shadows", "Lights cast shadows. Blocks stop their light."},

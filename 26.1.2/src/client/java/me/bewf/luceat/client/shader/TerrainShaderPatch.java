@@ -6,6 +6,7 @@ import me.bewf.luceat.client.light.LightBuffer;
 import me.bewf.luceat.client.light.LightGrid;
 import me.bewf.luceat.client.light.LightSpread;
 import me.bewf.luceat.client.light.LightVolume;
+import me.bewf.luceat.client.shadow.EntityShadows;
 import me.bewf.luceat.client.shadow.PatternAtlas;
 import me.bewf.luceat.client.shadow.ShadowCache;
 import me.bewf.luceat.client.shadow.SunCache;
@@ -109,6 +110,13 @@ public final class TerrainShaderPatch {
 			in vec4 v_LuceatBase;
 
 			@UBO@
+
+			layout(std140) uniform @ENTBLOCK@ {
+			    vec4 u_EntHead;
+			    vec4 u_EntSphere[@CASTERS@];
+			    vec4 u_EntInfo[@CASTERS@];
+			    vec4 u_EntBox[@BOXVEC@];
+			};
 
 			uniform usampler3D @SAMPLER@;
 			uniform usampler3D @GRID@;
@@ -420,6 +428,60 @@ public final class TerrainShaderPatch {
 			    return pow(clamp(1.0 - abs(a * b), 0.0, 1.0), 5.0);
 			}
 
+			bool luceatRayBox(vec3 origin, vec3 dir, int index, float reach) {
+			    vec4 first = u_EntBox[index * 5];
+			    vec4 second = u_EntBox[index * 5 + 1];
+			    mat3 axes = mat3(u_EntBox[index * 5 + 2].xyz, u_EntBox[index * 5 + 3].xyz, u_EntBox[index * 5 + 4].xyz);
+			    vec3 local = (origin - first.xyz) * axes;
+			    vec3 along = dir * axes;
+			    along = mix(along, vec3(1.0e-5), lessThan(abs(along), vec3(1.0e-5)));
+			    vec3 extent = vec3(first.w, second.x, second.y);
+			    vec3 rcp = 1.0 / along;
+			    vec3 t1 = (-extent - local) * rcp;
+			    vec3 t2 = (extent - local) * rcp;
+			    vec3 enter = min(t1, t2);
+			    vec3 leave = max(t1, t2);
+			    float tNear = max(enter.x, max(enter.y, enter.z));
+			    float tFar = min(leave.x, min(leave.y, leave.z));
+			    return tFar > max(tNear, 0.0) && tNear < reach;
+			}
+
+			float luceatEntitySee(vec3 origin, vec3 dir, float reach) {
+			    int count = int(u_EntHead.x + 0.5);
+			    for (int k = 0; k < count; k++) {
+			        vec4 sphere = u_EntSphere[k];
+			        vec3 toCentre = sphere.xyz - origin;
+			        float run = dot(toCentre, dir);
+			        if (run < -sphere.w || run > reach + sphere.w) {
+			            continue;
+			        }
+			        vec3 off = toCentre - dir * run;
+			        if (dot(off, off) > sphere.w * sphere.w) {
+			            continue;
+			        }
+			        vec4 info = u_EntInfo[k];
+			        int firstBox = int(info.x + 0.5);
+			        int boxes = int(info.y + 0.5);
+			        for (int b = 0; b < boxes; b++) {
+			            if (luceatRayBox(origin, dir, firstBox + b, reach)) {
+			                return 0.0;
+			            }
+			        }
+			    }
+			    return 1.0;
+			}
+
+			float luceatEntityShadow(vec3 origin, vec3 dir, float reach) {
+			    float noise = fract(52.9829189 * fract(dot(gl_FragCoord.xy, vec2(0.06711056, 0.00583715))));
+			    float turn = noise * 6.2831853;
+			    vec3 sideA = normalize(cross(dir, vec3(0.0, 0.0, 1.0)));
+			    vec3 sideB = cross(dir, sideA);
+			    vec3 spread = (sideA * cos(turn) + sideB * sin(turn)) * 0.03;
+			    float a = luceatEntitySee(origin, normalize(dir + spread), reach);
+			    float b = luceatEntitySee(origin, normalize(dir - spread), reach);
+			    return 0.5 * (a + b);
+			}
+
 			vec3 luceatSun(vec3 pos, vec3 normal, vec4 baseColor) {
 			    float power = u_LuceatSun.w;
 			    float sky = max(baseColor.r, max(baseColor.g, baseColor.b));
@@ -482,6 +544,9 @@ public final class TerrainShaderPatch {
 			                if (volume && closeBlend < 0.999) {
 			                    seen = mix(distant, seen, closeBlend);
 			                }
+			            }
+			            if (u_EntHead.x > 0.5) {
+			                seen *= luceatEntityShadow(pos + normal * 0.04, sun, 40.0);
 			            }
 			            float grip = base * lit;
 			            vec3 dark = vec3(1.0) - seen;
@@ -898,6 +963,9 @@ public final class TerrainShaderPatch {
 			.replace("@PATTERNS@", PatternAtlas.SAMPLER)
 			.replace("@SHAPES@", ShapeMasks.SAMPLER)
 			.replace("@GRID@", LightGrid.SAMPLER)
+			.replace("@ENTBLOCK@", EntityShadows.BLOCK_NAME)
+			.replace("@CASTERS@", Integer.toString(EntityShadows.MAX_CASTERS))
+			.replace("@BOXVEC@", Integer.toString(EntityShadows.BOX_VECTORS))
 			.replace("@SHINE@", ShadowVolume.SHINE_SAMPLER)
 			.replace("@SAND@", Float.toString(Shine.SAND))
 			.replace("@SNOW@", Float.toString(Shine.SNOW))
