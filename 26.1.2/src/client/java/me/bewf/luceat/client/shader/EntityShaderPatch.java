@@ -8,13 +8,18 @@ public final class EntityShaderPatch {
 	private static final String FRAGMENT_ENTRY = "void main() {";
 
 	private static final String GLOW = """
-		vec3 luceatItemGlow(vec3 lit, float lum, float tag) {
+		vec3 luceatItemGlow(vec3 lit, vec3 albedo, float tag) {
 		    if (tag < 0.5) {
 		        return lit;
 		    }
-		    float glow = tag < 1.5 ? 0.5 : (tag < 2.5 ? 1.0 : 2.0);
-		    float k = smoothstep(0.42, 0.8, lum) * glow;
-		    return mix(lit * (1.0 + 0.7 * k), vec3(1.0, 0.96, 0.88), clamp(0.4 * k, 0.0, 0.8));
+		    bool whole = tag > 3.5;
+		    float level = whole ? tag - 4.0 : tag;
+		    float glow = level < 1.5 ? 0.6 : (level < 2.5 ? 1.0 : 1.5);
+		    float peak = max(albedo.r, max(albedo.g, albedo.b));
+		    float hot = whole ? 1.0 : smoothstep(0.6, 0.92, peak);
+		    vec3 emit = albedo * (1.0 + 0.5 * glow);
+		    emit = mix(emit, vec3(1.0, 0.96, 0.88), clamp(0.3 * glow * peak * hot, 0.0, 0.6));
+		    return mix(lit, emit, clamp(hot * glow, 0.0, 1.0));
 		}
 
 		""";
@@ -41,10 +46,10 @@ public final class EntityShaderPatch {
 		if (source.indexOf(FRAGMENT_LIGHT) < 0 || source.indexOf(FRAGMENT_ENTRY) < 0 || source.contains("luceatItemGlow")) {
 			return source;
 		}
-		String lit = "    float luceatLum = dot(color.rgb, vec3(0.299, 0.587, 0.114));\n"
+		String lit = "    vec3 luceatAlbedo = color.rgb;\n"
 			+ "    float luceatTag = floor((1.0 - lightMapColor.a) * 10.0 + 0.5);\n"
 			+ "    color *= vec4(lightMapColor.rgb, 1.0);\n"
-			+ "    color.rgb = luceatItemGlow(color.rgb, luceatLum, luceatTag);";
+			+ "    color.rgb = luceatItemGlow(color.rgb, luceatAlbedo, luceatTag);";
 		return source.replace(FRAGMENT_LIGHT, lit).replace(FRAGMENT_ENTRY, GLOW + FRAGMENT_ENTRY);
 	}
 
@@ -68,9 +73,9 @@ public final class EntityShaderPatch {
 		if (source.indexOf(in) < 0 || source.indexOf(mul) < 0 || source.indexOf(FRAGMENT_ENTRY) < 0) {
 			return source;
 		}
-		String lit = "    float luceatLum = dot(color.rgb, vec3(0.299, 0.587, 0.114));\n"
+		String lit = "    vec3 luceatAlbedo = color.rgb;\n"
 			+ "    color *= vertexColor * ColorModulator;\n"
-			+ "    color.rgb = luceatItemGlow(color.rgb, luceatLum, luceatTag);";
+			+ "    color.rgb = luceatItemGlow(color.rgb, luceatAlbedo, luceatTag);";
 		return source.replace(in, in + "\nflat in float luceatTag;").replace(mul, lit).replace(FRAGMENT_ENTRY, GLOW + FRAGMENT_ENTRY);
 	}
 }

@@ -5,11 +5,18 @@ import me.bewf.luceat.client.config.LuceatConfig;
 
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.decoration.GlowItemFrame;
+import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemDisplayContext;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Items;
+
+import java.util.Set;
 
 public final class ItemGlow {
 	private static final int MIN_LEVEL = 6;
+	private static final int WHOLE_ITEM = 4;
+	private static final Set<Item> FULLY_LIT = Set.of(Items.BLAZE_ROD, Items.BLAZE_POWDER, Items.FIRE_CHARGE, Items.GLOWSTONE_DUST,
+		Items.MAGMA_CREAM, Items.GLOW_BERRIES, Items.GLOW_INK_SAC, Items.NETHER_STAR);
 
 	private ItemGlow() {
 	}
@@ -22,7 +29,7 @@ public final class ItemGlow {
 		if (LightSpecs.of(stack, false).level() < MIN_LEVEL) {
 			return 0;
 		}
-		return scale(config);
+		return scale(config) | (FULLY_LIT.contains(stack.getItem()) ? WHOLE_ITEM : 0);
 	}
 
 	public static int tag(ItemStack stack, ItemDisplayContext context, Entity holder) {
