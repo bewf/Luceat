@@ -57,6 +57,10 @@ loom {
 	}
 
 	runs {
+		client {
+			vmArg "-Ddevauth.enabled=1"
+		}
+
 		exporter {
 			inherit client
 			displayName = "Luceat Item Exporter"
@@ -72,6 +76,7 @@ dependencies {
 	implementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_api_version}"
 
 	clientImplementation "maven.modrinth:sodium:${project.sodium_version}"
+	localRuntime "maven.modrinth:dev-auth-neo:${project.devauth_version}"
 	clientCompileOnly "org.polyfrost.oneconfig:mod-toggles:${project.oneconfig_toggles_version}"
 	clientCompileOnly "maven.modrinth:modmenu:${project.modmenu_version}"
 }
