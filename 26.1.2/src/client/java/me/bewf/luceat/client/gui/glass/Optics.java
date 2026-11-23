@@ -83,22 +83,31 @@ public final class Optics {
 
 	public static void shadow(int[] px, int pw, int ph, int x0, int y0, int x1, int y1, int rTop, int rBottom, int k, int clipX0, int clipY0, int clipX1, int clipY1) {
 		int size = 14 * k;
-		int feather = Math.max(1, 8 * k);
 		for (int side = 0; side < 2; side++) {
 			boolean below = side == 0;
-			if ((below ? rBottom : rTop) <= 0) {
+			int radius = Math.min(below ? rBottom : rTop, Math.min(x1 - x0, y1 - y0) / 2);
+			if (radius <= 0) {
 				continue;
 			}
-			for (int i = 0; i < size; i++) {
-				int y = below ? y1 + i : y0 - 1 - i;
-				if (y < Math.max(0, clipY0) || y >= Math.min(ph, clipY1)) {
-					continue;
-				}
-				float d = (i + 0.5F) / size;
-				float base = 0.34F * (1.0F - d) * (1.0F - d);
-				for (int x = Math.max(Math.max(0, x0), clipX0); x < Math.min(Math.min(pw, x1), clipX1); x++) {
-					float edge = Math.min(smooth((x - x0) / (float) feather), smooth((x1 - 1 - x) / (float) feather));
-					float a = base * edge;
+			int yStart = below ? y1 - radius : y0 - size;
+			int yEnd = below ? y1 + size : y0 + radius;
+			int xStart = Math.max(Math.max(0, x0 - size), clipX0);
+			int xEnd = Math.min(Math.min(pw, x1 + size), clipX1);
+			float centreX = (x0 + x1) * 0.5F;
+			float centreY = (y0 + y1) * 0.5F;
+			float halfW = (x1 - x0) * 0.5F - radius;
+			float halfH = (y1 - y0) * 0.5F - radius;
+			for (int y = Math.max(Math.max(0, yStart), clipY0); y < Math.min(Math.min(ph, yEnd), clipY1); y++) {
+				float lean = below ? smooth((y + 0.5F - (y1 - radius)) / radius) : smooth((y0 + radius - (y + 0.5F)) / radius);
+				for (int x = xStart; x < xEnd; x++) {
+					float qx = Math.max(Math.abs(x + 0.5F - centreX) - halfW, 0.0F);
+					float qy = Math.max(Math.abs(y + 0.5F - centreY) - halfH, 0.0F);
+					float d = qx == 0.0F ? qy - radius : qy == 0.0F ? qx - radius : (float) Math.sqrt(qx * qx + qy * qy) - radius;
+					if (d <= 0.0F || d >= size) {
+						continue;
+					}
+					float fall = 1.0F - d / size;
+					float a = 0.34F * fall * fall * lean;
 					if (a < 0.004F) {
 						continue;
 					}

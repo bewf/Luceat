@@ -1,6 +1,7 @@
 package me.bewf.luceat.client.shadow;
 
 import me.bewf.luceat.Luceat;
+import me.bewf.luceat.client.gui.TextBoost;
 import me.bewf.luceat.client.gui.preview.BlockVoxels;
 import me.bewf.luceat.client.gui.preview.Scenes;
 import me.bewf.luceat.client.light.block.BlockRules;
@@ -26,5 +27,6 @@ public final class ShadowReload extends SimplePreparableReloadListener<Object> {
 		BlockRules.rebuild();
 		ShadowVolume.reset();
 		LuceatClouds.reload();
+		TextBoost.reload();
 	}
 }
