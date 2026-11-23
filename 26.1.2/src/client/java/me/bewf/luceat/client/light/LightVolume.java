@@ -42,13 +42,13 @@ public final class LightVolume {
 	private static final int VOXELS = SIDE_X * SIDE_Y * SIDE_Z;
 	private static final int SLICE_SHORTS = SIDE_X * SIDE_Y * 4;
 	private static final int SLICE_BYTES = SIDE_X * SIDE_Y;
-	private static final int SLICES_PER_FRAME = 16;
+	private static final int SLICES_PER_FRAME = 28;
 	private static final int BIAS_Y = 40;
 	private static final int DRIFT_XZ = 16;
 	private static final int DRIFT_Y = 10;
 	private static final int MARGIN = 3;
 	private static final int CHECK_INTERVAL = 8;
-	private static final long MIN_GAP_NANOS = 350_000_000L;
+	private static final long MIN_GAP_NANOS = 100_000_000L;
 	private static final int HALF_RES = ShapeMasks.RES / 2;
 	private static final double[][] TAPS = {{0.28, 0.28, 0.28}, {0.28, -0.28, -0.28}, {-0.28, 0.28, -0.28}, {-0.28, -0.28, 0.28}};
 	private static final int[] UNPACK = {
@@ -79,6 +79,7 @@ public final class LightVolume {
 	private static Boolean capable;
 	private static ClientLevel level;
 	private static boolean inFlight;
+	private static int checkedRevision = -1;
 	private static boolean active;
 	private static int front = -1;
 	private static int originX;
@@ -318,7 +319,9 @@ public final class LightVolume {
 		Map<Long, Integer> insideHashes = hashesOf(inside, hashes);
 		boolean need = front < 0 ? !inside.isEmpty() : !insideHashes.equals(builtHashes);
 		int signature = builtBlockSignature;
-		if (!need && front >= 0 && frame % CHECK_INTERVAL == 0 && !builtHashes.isEmpty()) {
+		int revision = ShadowVolume.revision();
+		if (!need && front >= 0 && (frame % CHECK_INTERVAL == 0 || revision != checkedRevision) && !builtHashes.isEmpty()) {
+			checkedRevision = revision;
 			signature = ShadowVolume.looseSignature(ox, oy, oz, ox + SIDE_X - 1, oy + SIDE_Y - 1, oz + SIDE_Z - 1);
 			need = signature != builtBlockSignature;
 		} else if (need) {

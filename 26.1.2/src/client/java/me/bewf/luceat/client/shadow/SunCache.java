@@ -32,7 +32,7 @@ public final class SunCache {
 
 	private static final int VOXELS = SIDE_X * SIDE_Y * SIDE_Z;
 	private static final int SLICE_BYTES = SIDE_X * SIDE_Y * 4;
-	private static final int SLICES_PER_FRAME = 12;
+	private static final int SLICES_PER_FRAME = 32;
 	private static final double RAY_LENGTH = 40.0;
 	private static final double SUN_TURN = 0.99998;
 	private static final int DRIFT = 10;
@@ -58,6 +58,7 @@ public final class SunCache {
 	private static volatile boolean failed;
 	private static volatile int generation;
 	private static boolean inFlight;
+	private static int checkedRevision = -1;
 	private static boolean active;
 	private static int front = -1;
 	private static int originX;
@@ -174,7 +175,9 @@ public final class SunCache {
 				|| Math.abs(camY - (originY + BIAS_Y)) > DRIFT - 2;
 		}
 		int signature = 0;
-		if (need || frame % CHECK_INTERVAL == 0) {
+		int revision = ShadowVolume.revision();
+		if (need || frame % CHECK_INTERVAL == 0 || revision != checkedRevision) {
+			checkedRevision = revision;
 			int x0 = need ? wantX : originX;
 			int y0 = need ? wantY : originY;
 			int z0 = need ? wantZ : originZ;

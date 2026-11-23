@@ -36,8 +36,8 @@ public final class ShadowCache {
 	private static final int UNIT = 8;
 	private static final int VOXELS = SIDE * SIDE * SIDE;
 	public static final double RADIUS = HALF - 0.5;
-	private static final int UPLOADS_PER_FRAME = 2;
-	private static final int JOBS_PER_FRAME = 3;
+	private static final int UPLOADS_PER_FRAME = 4;
+	private static final int JOBS_PER_FRAME = 4;
 	private static final int QUEUE_LIMIT = 10;
 	private static final double SWAP_MARGIN = 6.0;
 	private static final int HALF_RES = ShapeMasks.RES / 2;

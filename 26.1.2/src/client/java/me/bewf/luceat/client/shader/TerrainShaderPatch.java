@@ -613,6 +613,21 @@ public final class TerrainShaderPatch {
 			}
 
 #ifdef LUCEAT_BAKE
+			float luceatFlickerHash(vec3 c) {
+			    return fract(sin(dot(c, vec3(12.9898, 78.233, 37.719))) * 43758.5453);
+			}
+
+			float luceatFlickerField(vec3 p) {
+			    vec3 i = floor(p);
+			    vec3 f = fract(p);
+			    f = f * f * (3.0 - 2.0 * f);
+			    float lower = mix(mix(luceatFlickerHash(i), luceatFlickerHash(i + vec3(1.0, 0.0, 0.0)), f.x),
+			        mix(luceatFlickerHash(i + vec3(0.0, 1.0, 0.0)), luceatFlickerHash(i + vec3(1.0, 1.0, 0.0)), f.x), f.y);
+			    float upper = mix(mix(luceatFlickerHash(i + vec3(0.0, 0.0, 1.0)), luceatFlickerHash(i + vec3(1.0, 0.0, 1.0)), f.x),
+			        mix(luceatFlickerHash(i + vec3(0.0, 1.0, 1.0)), luceatFlickerHash(i + vec3(1.0, 1.0, 1.0)), f.x), f.y);
+			    return mix(lower, upper, f.z);
+			}
+
 			void luceatBake(vec3 pos, vec3 normal, out vec3 term, out float cover) {
 			    term = vec3(0.0);
 			    cover = 0.0;
@@ -641,7 +656,7 @@ public final class TerrainShaderPatch {
 			    float flicker = 1.0;
 			    if (u_LuceatBakeParams.x > 0.0 && pull.w > 0.0) {
 			        vec3 world = pos + vec3(u_LuceatCamBlock.xyz) + u_LuceatCamFrac.xyz;
-			        float phase = dot(world, vec3(0.37, 0.53, 0.41));
+			        float phase = 14.0 * luceatFlickerField(world * 0.5);
 			        float t = u_LuceatCamFrac.w;
 			        float noise = 0.55 * sin(t * 9.0 + phase) + 0.3 * sin(t * 17.3 + phase * 1.7) + 0.15 * sin(t * 31.0 + phase * 2.3);
 			        flicker = 1.0 + u_LuceatBakeParams.x * pull.w * noise;
