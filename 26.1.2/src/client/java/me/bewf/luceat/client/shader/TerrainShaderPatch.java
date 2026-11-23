@@ -853,6 +853,8 @@ public final class TerrainShaderPatch {
 			    vec3 viewDir = normalize(-pos);
 			    int probes = 0;
 			    int probeCap = int(u_LuceatMore.z * quality + 0.5);
+			    vec3 live = vec3(0.0);
+			    vec3 liveSquares = vec3(0.0);
 			    taken = 0;
 			    for (int g = 0; g < luceatTexels && taken < slotCap; g++) {
 			        uvec4 slots = texelFetch(@GRID@, ivec3(gc.x * @TEXELS@ + g, gc.y, gc.z), 0);
@@ -905,7 +907,7 @@ public final class TerrainShaderPatch {
 			            vec3 kept = vec3(1.0);
 			            if (storedOn) {
 			                kept = luceatCached(pos, normal, light.xyz, stored);
-			            } else if (shadowAny && probes < probeCap && share > 0.08) {
+			            } else if (shadowAny && probes < probeCap && curved * max(tint.r, max(tint.g, tint.b)) * strength > 0.025) {
 			                probes++;
 			                kept = vec3(luceatProbe(pos, normal, light.xyz, dist));
 			            }
@@ -922,7 +924,9 @@ public final class TerrainShaderPatch {
 			                    visible = mix(vec3(1.0), kept, u_LuceatOptions.z * shadowFade);
 			                }
 #endif
-			                total += tint * (u_LuceatState.z * power) * visible;
+			                vec3 direct = tint * (u_LuceatState.z * power) * visible;
+			                live += direct;
+			                liveSquares += direct * direct;
 #ifdef LUCEAT_RAYS
 			                if (gloss > 0.01 && ndotl > 0.0) {
 			                    float spec = pow(max(dot(normal, normalize(dirToLight + viewDir)), 0.0), 28.0) * 0.8 * gloss * curved * strength;
@@ -938,17 +942,26 @@ public final class TerrainShaderPatch {
 			                    seen = mix(1.0, dot(kept, vec3(0.3333333)), u_LuceatOptions.z * shadowFade);
 			                }
 #endif
-			                total += tint * (u_LuceatState.z * bounce * 0.2 * curvedBounce * (1.0 - clamp(ndotl, 0.0, 1.0)) * strength * seen);
+			                vec3 reflected = tint * (u_LuceatState.z * bounce * 0.2 * curvedBounce * (1.0 - clamp(ndotl, 0.0, 1.0)) * strength * seen);
+			                live += reflected;
+			                liveSquares += reflected * reflected;
 			            }
 			        }
 			    }
+			    total += mix(live, sqrt(liveSquares), 0.7);
 #ifdef LUCEAT_SPREAD
 			    if (u_LuceatExtra.w > 0.001) {
 			        vec3 q = pos + normal * 0.6;
 			        vec3 tc = (vec3(u_LuceatCamBlock.xyz & 63) + q + u_LuceatCamFrac.xyz) / 64.0;
 			        float edge = 1.0 - smoothstep(20.0, 28.0, max(abs(q.x), max(abs(q.y), abs(q.z))));
 			        float direct = max(total.r, max(total.g, total.b));
-			        total += texture(@SPREAD@, tc).rgb * (u_LuceatState.z * u_LuceatExtra.w * edge * (1.0 - smoothstep(0.0, 0.6, direct)));
+			        vec3 field = texture(@SPREAD@, tc).rgb * 1.4667;
+			        float peak = max(field.r, max(field.g, field.b));
+			        if (peak > 0.001) {
+			            float level = min(peak, 1.0);
+			            field *= pow(level / (4.0 - 3.0 * level), u_LuceatBakeParams.z) / peak;
+			        }
+			        total += field * (u_LuceatState.z * u_LuceatExtra.w * edge * (1.0 - smoothstep(0.0, 0.6, direct)));
 			    }
 #endif
 			    luceatSpec = min(shiny, vec3(1.0)) * fade;

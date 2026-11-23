@@ -449,6 +449,9 @@ public final class LightVolume {
 		private final float[] red = new float[VOXELS];
 		private final float[] green = new float[VOXELS];
 		private final float[] blue = new float[VOXELS];
+		private final float[] redSquares = new float[VOXELS];
+		private final float[] greenSquares = new float[VOXELS];
+		private final float[] blueSquares = new float[VOXELS];
 		private final float[] cover = new float[VOXELS];
 		private final float[] weight = new float[VOXELS];
 		private final float[] fire = new float[VOXELS];
@@ -465,6 +468,9 @@ public final class LightVolume {
 			java.util.Arrays.fill(red, 0.0F);
 			java.util.Arrays.fill(green, 0.0F);
 			java.util.Arrays.fill(blue, 0.0F);
+			java.util.Arrays.fill(redSquares, 0.0F);
+			java.util.Arrays.fill(greenSquares, 0.0F);
+			java.util.Arrays.fill(blueSquares, 0.0F);
 			java.util.Arrays.fill(cover, 0.0F);
 			java.util.Arrays.fill(weight, 0.0F);
 			java.util.Arrays.fill(fire, 0.0F);
@@ -490,9 +496,9 @@ public final class LightVolume {
 			short[] direction = new short[VOXELS * 4];
 			int at = 0;
 			for (int v = 0; v < VOXELS; v++, at += 4) {
-				light[at] = Float.floatToFloat16(red[v]);
-				light[at + 1] = Float.floatToFloat16(green[v]);
-				light[at + 2] = Float.floatToFloat16(blue[v]);
+				light[at] = Float.floatToFloat16(overlap(red[v], redSquares[v]));
+				light[at + 1] = Float.floatToFloat16(overlap(green[v], greenSquares[v]));
+				light[at + 2] = Float.floatToFloat16(overlap(blue[v], blueSquares[v]));
 				light[at + 3] = Float.floatToFloat16(cover[v]);
 				float total = weight[v];
 				if (total > 1.0E-6F) {
@@ -504,6 +510,10 @@ public final class LightVolume {
 				}
 			}
 			return new Result(job, light, direction, emit.clone());
+		}
+
+		private static float overlap(float sum, float squares) {
+			return sum * 0.3F + (float) Math.sqrt(squares) * 0.7F;
 		}
 
 		private void add(Bake bake, Job job) {
@@ -562,6 +572,9 @@ public final class LightVolume {
 						red[index] += addRed;
 						green[index] += addGreen;
 						blue[index] += addBlue;
+						redSquares[index] += addRed * addRed;
+						greenSquares[index] += addGreen * addGreen;
+						blueSquares[index] += addBlue * addBlue;
 						float share = 0.299F * addRed + 0.587F * addGreen + 0.114F * addBlue;
 						if (share > 0.0F && distance > 0.01) {
 							weight[index] += share;
