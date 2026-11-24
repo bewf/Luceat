@@ -35,6 +35,7 @@ public final class LuceatConfig {
 	public boolean caustics = false;
 	public float spillStrength = 0.6F;
 	public boolean textureColours = true;
+	public boolean candleColours = false;
 
 	public boolean heldLights = true;
 	public boolean otherPlayers = true;

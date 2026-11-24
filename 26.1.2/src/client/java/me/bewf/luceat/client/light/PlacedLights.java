@@ -357,10 +357,15 @@ public final class PlacedLights {
 		if (forced != null) {
 			return forced;
 		}
-		if (!LuceatConfig.get().textureColours) {
-			return DEFAULT_COLOUR;
-		}
+		boolean fromTexture = LuceatConfig.get().textureColours;
 		return colours.computeIfAbsent(state, key -> {
+			float[] named = FlameColours.of(key, fromTexture);
+			if (named != null) {
+				return named;
+			}
+			if (!fromTexture) {
+				return DEFAULT_COLOUR;
+			}
 			float[] estimate = ColourEstimator.estimateBlock(key);
 			return estimate == null ? DEFAULT_COLOUR : estimate;
 		});

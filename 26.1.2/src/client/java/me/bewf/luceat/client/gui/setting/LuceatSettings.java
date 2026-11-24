@@ -9,6 +9,7 @@ import me.bewf.luceat.client.config.ShaderPackMode;
 import me.bewf.luceat.client.config.ShadowQuality;
 import me.bewf.luceat.client.light.LightSpecs;
 import me.bewf.luceat.client.light.LightSpread;
+import me.bewf.luceat.client.light.PlacedLights;
 import me.bewf.luceat.client.shadow.ShadowVolume;
 
 public final class LuceatSettings {
@@ -71,6 +72,13 @@ public final class LuceatSettings {
 			Cost.NONE, false, () -> c.textureColours, value -> {
 				c.textureColours = value;
 				LightSpecs.clearCache();
+				PlacedLights.clear();
+			}));
+		all.add(new ToggleSetting(PLACED, "Coloured candles",
+			"Candles burn in their dye colour instead of the usual warm flame.",
+			Cost.NONE, false, () -> c.candleColours, value -> {
+				c.candleColours = value;
+				PlacedLights.clear();
 			}));
 		all.add(new ToggleSetting(LIGHTING, "Glow on enchanted items",
 			"Gives enchanted items a faint purple glow in your hand.",
@@ -320,6 +328,7 @@ public final class LuceatSettings {
 			{"Placed light strength", "Placed Strength", "How bright placed lights are."},
 			{"Placed light reach", "Placed Reach", "How far placed light travels before it fades."},
 			{"Directional light", "Directional Light", "Lights with a body, like a campfire, shine from where light can escape instead of evenly from one point."},
+			{"Coloured candles", "Coloured Candles", "Candles burn in their dye colour instead of the usual warm flame."},
 			{"Blocks from other mods", "Modded Blocks", "Glowing blocks from other mods get a Luceat light, coloured from their texture."},
 			{"Replace normal light", "Replace Vanilla Light", "How much of Minecraft's block light Luceat replaces near its own lights. At 1 only Luceat's light shows there. At 0 Minecraft's block light stays."},
 			{"Smallest light", "Minimum Level", "Skips light blocks dimmer than this level, like candles and small buds."},
