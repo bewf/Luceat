@@ -154,6 +154,9 @@ public final class LuceatSettings {
 				c.placedReach = value;
 				ShadowVolume.reset();
 			}));
+		all.add(new ToggleSetting(PLACED, "Directional light",
+			"Lights with a body, like a campfire, shine from where light can escape instead of evenly from one point.",
+			Cost.NONE, false, () -> c.directionalLights, value -> c.directionalLights = value));
 		all.add(new ToggleSetting(PLACED, "Blocks from other mods",
 			"Gives glowing blocks from other mods a Luceat light, coloured from their texture.",
 			Cost.LOW, false, () -> c.autoLights, value -> {
@@ -316,6 +319,7 @@ public final class LuceatSettings {
 			{"Emissive glow", "Emissive Glow", "How much the glowing parts of lanterns, torches, glowstone and similar blocks and items brighten and turn white."},
 			{"Placed light strength", "Placed Strength", "How bright placed lights are."},
 			{"Placed light reach", "Placed Reach", "How far placed light travels before it fades."},
+			{"Directional light", "Directional Light", "Lights with a body, like a campfire, shine from where light can escape instead of evenly from one point."},
 			{"Blocks from other mods", "Modded Blocks", "Glowing blocks from other mods get a Luceat light, coloured from their texture."},
 			{"Replace normal light", "Replace Vanilla Light", "How much of Minecraft's block light Luceat replaces near its own lights. At 1 only Luceat's light shows there. At 0 Minecraft's block light stays."},
 			{"Smallest light", "Minimum Level", "Skips light blocks dimmer than this level, like candles and small buds."},

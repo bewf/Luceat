@@ -5,6 +5,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.Map;
 
 import me.bewf.luceat.client.config.LuceatConfig;
@@ -53,7 +54,7 @@ public final class ShapeMasks {
 	private static final Direction[] SIDES = Direction.values();
 
 	private static final Map<Integer, List<Integer>> BUCKETS = new HashMap<>();
-	private static final List<byte[]> STORED = new ArrayList<>();
+	private static final List<byte[]> STORED = new CopyOnWriteArrayList<>();
 	private static final ByteBuffer TILE_DATA = BufferUtils.createByteBuffer(TILE_WIDTH * TILE_HEIGHT * 4);
 	private static final float[] sum = new float[VOXELS * 3];
 	private static final int[] count = new int[VOXELS];
@@ -66,6 +67,11 @@ public final class ShapeMasks {
 
 	public static long bytes() {
 		return texture == 0 ? 0L : (long) ATLAS_WIDTH * ATLAS_HEIGHT * 4L;
+	}
+
+	public static byte[] tile(int id) {
+		int index = id & (SOFT - 1);
+		return index < STORED.size() ? STORED.get(index) : null;
 	}
 
 	public static void clear() {

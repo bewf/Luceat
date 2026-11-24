@@ -61,6 +61,7 @@ public final class LightSmoother {
 		lastNanos = now;
 		frame++;
 		float flicker = LuceatConfig.get().flicker;
+		boolean directional = LuceatConfig.get().directionalLights;
 		float seconds = (float) ((now / 1_000_000L) % 1_000_000L / 1000.0);
 		float ease = LuceatConfig.get().lightEase;
 		boolean instant = ease < 0.02F;
@@ -90,7 +91,7 @@ public final class LightSmoother {
 			state.fire = light.fire();
 			state.noShadow = light.noShadow();
 			state.vanilla = light.vanilla();
-			state.shape = light.shape();
+			state.shape = directional ? light.shape() : 0;
 			state.target = light.radius();
 			state.radius += (light.radius() - state.radius) * easeRadius;
 			state.fade = Math.min(1.0F, state.fade + fadeIn);

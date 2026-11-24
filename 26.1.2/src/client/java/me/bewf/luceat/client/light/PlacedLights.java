@@ -92,6 +92,8 @@ public final class PlacedLights {
 
 	private static final Map<Long, Section> SECTIONS = new HashMap<>();
 	private static final Set<Long> dirty = new HashSet<>();
+	private static final Map<Long, Long> FRESH = new HashMap<>();
+	private static final long FRESH_NANOS = 1_500_000_000L;
 	private static final List<long[]> queue = new ArrayList<>();
 	private static final Map<BlockState, float[]> colours = new IdentityHashMap<>();
 	private static final BlockPos.MutableBlockPos probe = new BlockPos.MutableBlockPos();
@@ -157,6 +159,7 @@ public final class PlacedLights {
 	public static void clear() {
 		SECTIONS.clear();
 		dirty.clear();
+		FRESH.clear();
 		queue.clear();
 		colours.clear();
 		sweepCellX = Integer.MIN_VALUE;
@@ -168,7 +171,9 @@ public final class PlacedLights {
 	}
 
 	public static void markDirty(BlockPos pos) {
-		dirty.add(key(Math.floorDiv(pos.getX(), SECTION), Math.floorDiv(pos.getY(), SECTION), Math.floorDiv(pos.getZ(), SECTION)));
+		long section = key(Math.floorDiv(pos.getX(), SECTION), Math.floorDiv(pos.getY(), SECTION), Math.floorDiv(pos.getZ(), SECTION));
+		dirty.add(section);
+		FRESH.put(section, System.nanoTime() + FRESH_NANOS);
 	}
 
 	public static void update(ClientLevel level, Vec3 camera) {
@@ -182,6 +187,12 @@ public final class PlacedLights {
 		}
 		minLevel = config.placedMinLevel;
 		frame++;
+		if (!FRESH.isEmpty()) {
+			long nowNanos = System.nanoTime();
+			if (FRESH.values().removeIf(until -> until < nowNanos)) {
+				version++;
+			}
+		}
 		int sx = Math.floorDiv((int) Math.floor(camera.x), SECTION);
 		int sy = Math.floorDiv((int) Math.floor(camera.y), SECTION);
 		int sz = Math.floorDiv((int) Math.floor(camera.z), SECTION);
@@ -431,7 +442,7 @@ public final class PlacedLights {
 						cl[total] = level;
 						cf[total] = section.fire[i];
 						cn[total] = section.noShadow[i];
-						cv[total] = section.vanilla[i];
+						cv[total] = FRESH.containsKey(key) ? 0 : section.vanilla[i];
 						csh[total] = section.shape[i];
 						cid[total] = 0L;
 						ck[total] = key((int) Math.floor(section.x[i]), (int) Math.floor(section.y[i]), (int) Math.floor(section.z[i]));

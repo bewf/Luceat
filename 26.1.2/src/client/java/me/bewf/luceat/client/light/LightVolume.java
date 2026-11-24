@@ -50,6 +50,7 @@ public final class LightVolume {
 	private static final int CHECK_INTERVAL = 8;
 	private static final long MIN_GAP_NANOS = 100_000_000L;
 	private static final int HALF_RES = ShapeMasks.RES / 2;
+	private static final int MARCH_STEPS = ShapeMasks.RES * 3;
 	private static final double[][] TAPS = {{0.28, 0.28, 0.28}, {0.28, -0.28, -0.28}, {-0.28, 0.28, -0.28}, {-0.28, -0.28, 0.28}};
 	private static final int[] UNPACK = {
 		GL11.GL_UNPACK_ALIGNMENT, GL11.GL_UNPACK_ROW_LENGTH, GL11.GL_UNPACK_SKIP_ROWS,
@@ -568,7 +569,7 @@ public final class LightVolume {
 							seenGreen = passGreen;
 							seenBlue = passBlue;
 						}
-						float aim = bake.shape() == 0 || distance < 0.01 ? 1.0F : EmissionShape.gain(bake.shape(), -dy / distance);
+						float aim = bake.shape() == 0 ? 1.0F : (float) surfaceAim(bake, x, y, z, job);
 						float addRed = (float) (bake.red() * curved * seenRed) * aim;
 						float addGreen = (float) (bake.green() * curved * seenGreen) * aim;
 						float addBlue = (float) (bake.blue() * curved * seenBlue) * aim;
@@ -591,6 +592,27 @@ public final class LightVolume {
 					}
 				}
 			}
+		}
+
+		private double surfaceAim(Bake bake, int x, int y, int z, Job job) {
+			double rx = x + 0.5 - bake.x();
+			double ry = y + 0.5 - bake.y();
+			double rz = z + 0.5 - bake.z();
+			double sum = 0.0;
+			int faces = 0;
+			for (int side = 0; side < 6; side++) {
+				int nx = x + (side == 0 ? -1 : side == 1 ? 1 : 0);
+				int ny = y + (side == 2 ? -1 : side == 3 ? 1 : 0);
+				int nz = z + (side == 4 ? -1 : side == 5 ? 1 : 0);
+				if (nx < job.originX() || nx >= job.originX() + SIDE_X || ny < job.originY() || ny >= job.originY() + SIDE_Y || nz < job.originZ() || nz >= job.originZ() + SIDE_Z) {
+					continue;
+				}
+				if (solid[((nz - job.originZ()) * SIDE_Y + (ny - job.originY())) * SIDE_X + (nx - job.originX())]) {
+					sum += EmissionShape.transmit(bake.shape(), rx + (nx - x) * 0.5, ry + (ny - y) * 0.5, rz + (nz - z) * 0.5);
+					faces++;
+				}
+			}
+			return faces == 0 ? EmissionShape.transmit(bake.shape(), rx, ry, rz) : sum / faces;
 		}
 
 		private void markEmitter(Bake bake, Job job) {
@@ -678,11 +700,13 @@ public final class LightVolume {
 			int mx = Math.floorMod(x, ShadowVolume.DIMENSION);
 			int my = Math.floorMod(y, ShadowVolume.DIMENSION);
 			int mz = Math.floorMod(z, ShadowVolume.DIMENSION);
+			double entry = 0.0;
 			for (int guard = 0; guard < 64; guard++) {
 				if (nextX <= nextY && nextX <= nextZ) {
 					if (nextX >= length) {
 						return;
 					}
+					entry = nextX;
 					x += stepX;
 					mx = wrap(mx + stepX);
 					nextX += deltaX;
@@ -690,6 +714,7 @@ public final class LightVolume {
 					if (nextY >= length) {
 						return;
 					}
+					entry = nextY;
 					y += stepY;
 					my = wrap(my + stepY);
 					nextY += deltaY;
@@ -697,6 +722,7 @@ public final class LightVolume {
 					if (nextZ >= length) {
 						return;
 					}
+					entry = nextZ;
 					z += stepZ;
 					mz = wrap(mz + stepZ);
 					nextZ += deltaZ;
@@ -718,9 +744,18 @@ public final class LightVolume {
 					return;
 				}
 				if ((id & ShapeMasks.FLAG) != 0) {
-					passRed *= Math.pow(Math.max(Transmit.red(id), 0.03F), HALF_RES);
-					passGreen *= Math.pow(Math.max(Transmit.green(id), 0.03F), HALF_RES);
-					passBlue *= Math.pow(Math.max(Transmit.blue(id), 0.03F), HALF_RES);
+					int gap = Math.max(Math.abs(x - lightX), Math.max(Math.abs(y - lightY), Math.abs(z - lightZ)));
+					if (gap > 1) {
+						double exit = Math.min(length, Math.min(nextX, Math.min(nextY, nextZ)));
+						if ((id & ShapeMasks.SOFT) != 0) {
+							double chord = Math.max(exit - entry, 0.0) * HALF_RES;
+							passRed *= Math.pow(Math.max(Transmit.red(id), 0.03F), chord);
+							passGreen *= Math.pow(Math.max(Transmit.green(id), 0.03F), chord);
+							passBlue *= Math.pow(Math.max(Transmit.blue(id), 0.03F), chord);
+						} else {
+							marchShape(id, ox, oy, oz, dx, dy, dz, x, y, z, entry, exit);
+						}
+					}
 				} else {
 					passRed *= Transmit.red(id) * Transmit.red(id);
 					passGreen *= Transmit.green(id) * Transmit.green(id);
@@ -730,6 +765,73 @@ public final class LightVolume {
 					passRed = 0.0;
 					passGreen = 0.0;
 					passBlue = 0.0;
+					return;
+				}
+			}
+		}
+
+		private void marchShape(int id, double ox, double oy, double oz, double dx, double dy, double dz, int cellX, int cellY, int cellZ, double t0, double t1) {
+			byte[] tile = ShapeMasks.tile(id);
+			if (tile == null) {
+				return;
+			}
+			int res = ShapeMasks.RES;
+			double sx = Math.abs(dx) < 1.0E-5 ? 1.0E-5 : Math.abs(dx);
+			double sy = Math.abs(dy) < 1.0E-5 ? 1.0E-5 : Math.abs(dy);
+			double sz = Math.abs(dz) < 1.0E-5 ? 1.0E-5 : Math.abs(dz);
+			double top = res - 0.001;
+			double lx = Math.min(top, Math.max(0.0, (ox + dx * t0 - cellX) * res + dx * 0.01));
+			double ly = Math.min(top, Math.max(0.0, (oy + dy * t0 - cellY) * res + dy * 0.01));
+			double lz = Math.min(top, Math.max(0.0, (oz + dz * t0 - cellZ) * res + dz * 0.01));
+			int vx = (int) Math.floor(lx);
+			int vy = (int) Math.floor(ly);
+			int vz = (int) Math.floor(lz);
+			int stepX = dx >= 0.0 ? 1 : -1;
+			int stepY = dy >= 0.0 ? 1 : -1;
+			int stepZ = dz >= 0.0 ? 1 : -1;
+			double deltaX = 1.0 / (sx * res);
+			double deltaY = 1.0 / (sy * res);
+			double deltaZ = 1.0 / (sz * res);
+			double nextX = t0 + (vx + (stepX > 0 ? 1 : 0) - lx) * stepX / (sx * res);
+			double nextY = t0 + (vy + (stepY > 0 ? 1 : 0) - ly) * stepY / (sy * res);
+			double nextZ = t0 + (vz + (stepZ > 0 ? 1 : 0) - lz) * stepZ / (sz * res);
+			double t = t0;
+			for (int k = 0; k < MARCH_STEPS; k++) {
+				double next = Math.min(nextX, Math.min(nextY, nextZ));
+				double end = Math.min(next, t1);
+				if (end > 0.02) {
+					int at = (vy * ShapeMasks.TILE_WIDTH + vz * res + vx) * 4;
+					float tr = (tile[at] & 255) / 255.0F;
+					float tg = (tile[at + 1] & 255) / 255.0F;
+					float tb = (tile[at + 2] & 255) / 255.0F;
+					if (tr < 0.999F || tg < 0.999F || tb < 0.999F) {
+						if (Math.max(tr, Math.max(tg, tb)) < 0.03F) {
+							passRed = 0.0;
+							passGreen = 0.0;
+							passBlue = 0.0;
+							return;
+						}
+						double run = Math.max(end - Math.max(t, 0.02), 0.0) * res;
+						passRed *= Math.pow(Math.max(tr, 0.03F), run);
+						passGreen *= Math.pow(Math.max(tg, 0.03F), run);
+						passBlue *= Math.pow(Math.max(tb, 0.03F), run);
+					}
+				}
+				if (next >= t1) {
+					return;
+				}
+				t = next;
+				if (nextX <= nextY && nextX <= nextZ) {
+					vx += stepX;
+					nextX += deltaX;
+				} else if (nextY <= nextZ) {
+					vy += stepY;
+					nextY += deltaY;
+				} else {
+					vz += stepZ;
+					nextZ += deltaZ;
+				}
+				if (vx < 0 || vy < 0 || vz < 0 || vx >= res || vy >= res || vz >= res) {
 					return;
 				}
 			}

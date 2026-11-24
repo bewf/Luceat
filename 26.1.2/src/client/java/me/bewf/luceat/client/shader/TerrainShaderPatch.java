@@ -1,6 +1,7 @@
 package me.bewf.luceat.client.shader;
 
 import me.bewf.luceat.Luceat;
+import me.bewf.luceat.client.light.EmissionShape;
 import me.bewf.luceat.client.light.EmitterMap;
 import me.bewf.luceat.client.light.LightBuffer;
 import me.bewf.luceat.client.light.LightGrid;
@@ -585,15 +586,35 @@ public final class TerrainShaderPatch {
 #endif
 
 
-			const vec3 LUCEAT_SHAPES[3] = vec3[3](vec3(1.0), vec3(1.0, 0.55, 0.75), vec3(0.85, 1.0, 0.35));
-
-			float luceatAim(int shape, float upward) {
-			    if (shape <= 0 || shape > 2) {
+			@AIM@
+			float luceatAim(int shape, vec3 rel) {
+			    if (shape <= 0 || shape >= @SHAPE_COUNT@) {
 			        return 1.0;
 			    }
-			    vec3 profile = LUCEAT_SHAPES[shape];
-			    float blend = smoothstep(0.25, 0.9, abs(upward));
-			    return mix(profile.x, upward > 0.0 ? profile.y : profile.z, blend);
+			    vec3 d = rel - LUCEAT_ORIGIN[shape];
+			    float len = length(d);
+			    if (len < 1.0e-4) {
+			        return 1.0;
+			    }
+			    d /= len;
+			    vec3 safe = vec3(abs(d.x) < 1.0e-6 ? 1.0e-6 : d.x, abs(d.y) < 1.0e-6 ? 1.0e-6 : d.y, abs(d.z) < 1.0e-6 ? 1.0e-6 : d.z);
+			    float kept = 1.0;
+			    for (int b = 0; b < 2; b++) {
+			        vec4 centre = LUCEAT_PART_CENTRE[shape * 2 + b];
+			        if (centre.w <= 0.0) {
+			            continue;
+			        }
+			        vec3 half3 = LUCEAT_PART_HALF[shape * 2 + b];
+			        vec3 from = LUCEAT_ORIGIN[shape] - centre.xyz;
+			        vec3 a = (-half3 - from) / safe;
+			        vec3 c = (half3 - from) / safe;
+			        float tNear = max(0.0, max(min(a.x, c.x), max(min(a.y, c.y), min(a.z, c.z))));
+			        float tFar = min(len, min(max(a.x, c.x), min(max(a.y, c.y), max(a.z, c.z))));
+			        if (tFar > tNear) {
+			            kept *= exp(-centre.w * (tFar - tNear));
+			        }
+			    }
+			    return kept;
 			}
 
 			float luceatRamp(float x, float low, float inverseWidth) {
@@ -932,7 +953,7 @@ public final class TerrainShaderPatch {
 			            }
 			            if (level > 0.0 && facing > 0.0) {
 			                float lambert = mix(1.0, 0.4 + 0.6 * clamp(ndotl, 0.0, 1.0), u_LuceatOptions.y);
-			                float power = curved * lambert * facing * strength * luceatAim(shape, -dirToLight.y);
+			                float power = curved * lambert * facing * strength * luceatAim(shape, -toLight);
 			                vec3 visible = vec3(1.0);
 #ifdef LUCEAT_RAYS
 			                if (shadowAny && power * u_LuceatState.z * fade * max(tint.r, max(tint.g, tint.b)) > 0.02) {
@@ -983,6 +1004,8 @@ public final class TerrainShaderPatch {
 			    return luceatFinish(total, placedCover, blockPart, fade);
 			}
 			"""
+			.replace("@AIM@", EmissionShape.glsl())
+			.replace("@SHAPE_COUNT@", Integer.toString(EmissionShape.COUNT))
 			.replace("@UBO@", BLOCK_DECL)
 			.replace("@WAVES@", WAVES)
 			.replace("@BLOCK@", LightBuffer.BLOCK_NAME)

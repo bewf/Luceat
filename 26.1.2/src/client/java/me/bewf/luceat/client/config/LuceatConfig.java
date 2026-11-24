@@ -62,6 +62,7 @@ public final class LuceatConfig {
 	public float lightFalloff = 2.0F;
 	public float vanillaReplace = 1.0F;
 	public int placedMinLevel = 3;
+	public boolean directionalLights = true;
 
 	public boolean shadows = true;
 	public int shadowDistance = 48;
