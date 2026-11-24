@@ -13,9 +13,13 @@ in vec2 texCoord0;
 out vec4 fragColor;
 
 void main() {
-    float coverage = 1.0 - pow(1.0 - texture(Sampler0, texCoord0).r, 1.7);
+    vec2 reach = fwidth(texCoord0) * 0.25;
+    float centre = texture(Sampler0, texCoord0).r;
+    float across = max(texture(Sampler0, texCoord0 + vec2(reach.x, 0.0)).r, texture(Sampler0, texCoord0 - vec2(reach.x, 0.0)).r);
+    float along = max(texture(Sampler0, texCoord0 + vec2(0.0, reach.y)).r, texture(Sampler0, texCoord0 - vec2(0.0, reach.y)).r);
+    float coverage = 1.0 - pow(1.0 - max(centre, max(across * 0.8, along * 0.4)), 1.7);
     vec4 color = vec4(coverage) * vertexColor * ColorModulator;
-    if (color.a < 0.1) {
+    if (color.a < 0.004) {
         discard;
     }
     fragColor = apply_fog(color, sphericalVertexDistance, cylindricalVertexDistance, FogEnvironmentalStart, FogEnvironmentalEnd, FogRenderDistanceStart, FogRenderDistanceEnd, FogColor);

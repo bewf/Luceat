@@ -127,6 +127,26 @@ public final class BlocksTab {
 		filterInput.focus(false);
 	}
 
+	public void setFilter(String text) {
+		filterInput.set(text);
+		modFilter = null;
+		dirty = true;
+	}
+
+	public int countMatching(String text) {
+		if (all == null) {
+			build();
+		}
+		String query = text.toLowerCase(Locale.ROOT).trim();
+		int found = 0;
+		for (Entry entry : all) {
+			if (entry.search.contains(query)) {
+				found++;
+			}
+		}
+		return found;
+	}
+
 	public boolean consumeDirty() {
 		boolean was = dirty;
 		dirty = false;

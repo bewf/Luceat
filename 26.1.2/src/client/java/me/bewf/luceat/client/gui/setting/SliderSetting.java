@@ -68,7 +68,18 @@ public final class SliderSetting extends Setting {
 
 	@Override
 	public String valueText() {
-		float value = value();
+		return valueText(value());
+	}
+
+	public String[] sampleTexts() {
+		String[] out = new String[9];
+		for (int i = 0; i < out.length; i++) {
+			out[i] = valueText(min + (max - min) * i / (out.length - 1));
+		}
+		return out;
+	}
+
+	private String valueText(float value) {
 		if (step >= 1.0F) {
 			return String.format(Locale.ROOT, "%d%s", Math.round(value), unit);
 		}

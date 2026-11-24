@@ -1,0 +1,7 @@
+-proc:none
+-Xmaxerrs
+2000
+-d
+/tmp/jc
+LuceatScreen.java
+BlocksTab.java

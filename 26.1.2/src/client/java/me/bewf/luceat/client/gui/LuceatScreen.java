@@ -121,6 +121,8 @@ public final class LuceatScreen extends Screen {
 	private boolean pickerShown;
 	private final PerfTest perf = new PerfTest();
 	private final TextInput search = new TextInput(32);
+	private String blockHitsQuery = "";
+	private int blockHitsCount;
 	private final List<String> undo = new ArrayList<>();
 	private PreviewPanel panel;
 	private BlocksTab blocks;
@@ -516,7 +518,19 @@ public final class LuceatScreen extends Screen {
 	}
 
 	private int popupY1() {
-		return popupY0() + popupRows() * DROPDOWN_ROW + 12 + (matches().size() > DROPDOWN_ROWS ? 20 : 0);
+		return popupY0() + popupRows() * DROPDOWN_ROW + 12 + (matches().size() > DROPDOWN_ROWS ? 20 : 0) + (blockHits() > 0 ? DROPDOWN_ROW + 4 : 0);
+	}
+
+	private int blockHits() {
+		String query = search.text().trim();
+		if (query.length() < 2 || blocks == null) {
+			return 0;
+		}
+		if (!query.equals(blockHitsQuery)) {
+			blockHitsQuery = query;
+			blockHitsCount = blocks.countMatching(query);
+		}
+		return blockHitsCount;
 	}
 
 	private String version() {
@@ -712,11 +726,12 @@ public final class LuceatScreen extends Screen {
 		dropdownScroll = Math.max(0, Math.min(dropdownScroll, Math.max(0, found.size() - DROPDOWN_ROWS)));
 		Paint.vertical(s, x0, y0, x1, y1, 10, Paint.argb(250, 28, 20, 54), Paint.argb(250, 16, 11, 32));
 		Paint.outline(s, x0, y0, x1, y1, 10, Paint.argb(110, 205, 187, 255));
+		int blockHits = blockHits();
+		int blockRowY = y0 + 6 + rows * DROPDOWN_ROW + (found.size() > DROPDOWN_ROWS ? 20 : 0);
 		if (found.isEmpty()) {
 			s.text(BODY, "Nothing matches.", x0 + 12, y0 + 10, Glass.MUTED);
-			return;
 		}
-		for (int i = 0; i < rows; i++) {
+		for (int i = 0; i < rows && dropdownScroll + i < found.size(); i++) {
 			Setting setting = found.get(dropdownScroll + i);
 			int ry = y0 + 6 + i * DROPDOWN_ROW;
 			String key = "dd:" + (dropdownScroll + i);
@@ -730,7 +745,15 @@ public final class LuceatScreen extends Screen {
 		}
 		if (found.size() > DROPDOWN_ROWS) {
 			String more = (found.size() - DROPDOWN_ROWS - dropdownScroll) + " more, scroll";
-			s.text(BODY, more, x0 + 12, y1 - 22, Glass.FAINT);
+			s.text(BODY, more, x0 + 12, y0 + 6 + rows * DROPDOWN_ROW + 2, Glass.FAINT);
+		}
+		if (blockHits > 0) {
+			float over = hoverOf("dd:blocks");
+			Paint.round(s, x0 + 4, blockRowY, x1 - 4, blockRowY + DROPDOWN_ROW, 7, Paint.argb(Math.round(40 + 40 * over), 123, 99, 255));
+			String label = Glass.fit(s, BODY, "Search blocks for " + search.text().trim(), x1 - x0 - 24 - s.width(BODY, blockHits + ""));
+			s.text(BODY, label, x0 + 12, blockRowY + 6, Paint.mix(Glass.SOFT, Glass.TEXT, over));
+			Glass.right(s, BODY, Integer.toString(blockHits), x1 - 12, blockRowY + 6, Glass.MUTED);
+			hit(x0 + 4, blockRowY, x1 - 4, blockRowY + DROPDOWN_ROW, "dd:blocks", null);
 		}
 	}
 
@@ -750,7 +773,19 @@ public final class LuceatScreen extends Screen {
 				return true;
 			}
 		}
+		int blockRowY = y0 + 6 + rows * DROPDOWN_ROW + (found.size() > DROPDOWN_ROWS ? 20 : 0);
+		if (blockHits() > 0 && LuceatLook.inside(mx, my, x0 + 4, blockRowY, x1 - 4, blockRowY + DROPDOWN_ROW)) {
+			openBlocks(search.text().trim());
+		}
 		return true;
+	}
+
+	private void openBlocks(String query) {
+		search.focus(false);
+		search.set("");
+		fullView = false;
+		setSection(BLOCKS);
+		blocks.setFilter(query);
 	}
 
 	private void jumpTo(Setting setting) {
@@ -1195,7 +1230,11 @@ public final class LuceatScreen extends Screen {
 	}
 
 	private int trackRight(SliderSetting slider) {
-		return listRight - Math.max(44, Texts.width(BODY, slider.valueText()) + 16);
+		int widest = 0;
+		for (String text : slider.sampleTexts()) {
+			widest = Math.max(widest, Texts.width(BODY, text));
+		}
+		return listRight - Math.max(44, widest + 16);
 	}
 
 	private String costText(Setting setting) {
