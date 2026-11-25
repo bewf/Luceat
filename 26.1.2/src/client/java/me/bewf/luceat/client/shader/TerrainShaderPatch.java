@@ -37,6 +37,7 @@ public final class TerrainShaderPatch {
 			    ivec4 u_LuceatSunOrigin;
 			    ivec4 u_LuceatBakeOrigin;
 			    vec4 u_LuceatBakeParams;
+			    vec4 u_LuceatView;
 			    vec4 u_LuceatPosRadius[@LIGHTS@];
 			    vec4 u_LuceatColor[@LIGHTS@];
 			    vec4 u_LuceatWater[2];
@@ -623,8 +624,10 @@ public final class TerrainShaderPatch {
 			}
 
 			float luceatCurve(float level, float top) {
-			    float peak = max(top / (4.0 - 3.0 * top), 1.0e-6);
-			    return peak * pow((level / (4.0 - 3.0 * level)) / peak, u_LuceatBakeParams.z);
+			    float lifted = pow(level, 0.8);
+			    float liftedTop = pow(top, 0.8);
+			    float peak = max(liftedTop / (4.0 - 3.0 * liftedTop), 1.0e-6);
+			    return peak * pow((lifted / (4.0 - 3.0 * lifted)) / peak, u_LuceatBakeParams.z);
 			}
 
 			vec3 luceatSoft(vec3 x, float cap) {
@@ -763,7 +766,7 @@ public final class TerrainShaderPatch {
 			    vec3 sky = mix(fog, fog * vec3(0.72, 0.86, 1.15), smoothstep(0.0, 0.7, r.y));
 			    float aim = max(dot(r, u_LuceatSun.xyz), 0.0);
 			    float glint = pow(aim, 220.0) * 1.8 + pow(aim, 38.0) * 0.2;
-			    float sunPower = u_LuceatSun.w * (1.0 - luceatShade);
+			    float sunPower = u_LuceatSun.w * (1.0 - luceatShade) * u_LuceatView.x;
 			    vec3 shine = sky * fresnel + vec3(1.0, 0.93, 0.8) * (glint * sunPower);
 			    float style = u_LuceatBakeParams.w;
 			    return vec4(shine * (skyLevel * style), fresnel * 0.85 * style);
@@ -811,7 +814,7 @@ public final class TerrainShaderPatch {
 			    float spark = pow(max(dot(facet, bisector), 0.0), tight);
 			    float skyLevel = smoothstep(0.3, 0.85, max(baseColor.r, max(baseColor.g, baseColor.b)));
 			    float fade = 1.0 - smoothstep(24.0, 64.0, dist);
-			    return tint * (spark * gain * shine * power * skyLevel * fade * (1.0 - luceatShade));
+			    return tint * (spark * gain * shine * u_LuceatView.x * power * skyLevel * fade * (1.0 - luceatShade));
 			}
 #else
 			float luceatWaterMask(float alpha, vec3 pos, vec3 normal, vec4 tint) {
@@ -982,7 +985,7 @@ public final class TerrainShaderPatch {
 			                liveSquares += direct * direct;
 #ifdef LUCEAT_RAYS
 			                if (gloss > 0.01 && ndotl > 0.0) {
-			                    float spec = pow(max(dot(normal, normalize(dirToLight + viewDir)), 0.0), 28.0) * 0.8 * gloss * curved * strength;
+			                    float spec = pow(max(dot(normal, normalize(dirToLight + viewDir)), 0.0), 16.0) * 0.8 * gloss * curved * strength * u_LuceatView.x;
 			                    shiny += tint * (spec * u_LuceatState.z) * visible;
 			                }
 #endif

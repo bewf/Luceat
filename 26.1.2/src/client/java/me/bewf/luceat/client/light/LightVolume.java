@@ -550,10 +550,12 @@ public final class LightVolume {
 						double distance = Math.sqrt(distanceSquared);
 						float level = (float) Math.min(1.0, (radius - distance) / 15.0);
 						float basis = level / (4.0F - 3.0F * level);
-						float curved = basis;
+						float lifted = (float) Math.pow(Math.max(level, 0.0F), 0.8);
+						float curved = lifted / (4.0F - 3.0F * lifted);
+						float top = (float) Math.min(1.0, radius / 15.0);
+						float liftedTop = (float) Math.pow(top, 0.8);
+						float peak = Math.max(liftedTop / (4.0F - 3.0F * liftedTop), 1.0E-6F);
 						if (bake.contrast() != 1.0F) {
-							float top = (float) Math.min(1.0, radius / 15.0);
-							float peak = Math.max(top / (4.0F - 3.0F * top), 1.0E-6F);
 							curved = peak * (float) Math.pow(curved / peak, bake.contrast());
 						}
 						if (curved <= 0.0F) {

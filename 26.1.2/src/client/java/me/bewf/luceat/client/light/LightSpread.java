@@ -42,6 +42,7 @@ public final class LightSpread {
 			    ivec4 u_LuceatSunOrigin;
 			    ivec4 u_LuceatBakeOrigin;
 			    vec4 u_LuceatBakeParams;
+			    vec4 u_LuceatView;
 			    vec4 u_LuceatPosRadius[@LIGHTS@];
 			    vec4 u_LuceatColor[@LIGHTS@];
 			};
