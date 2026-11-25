@@ -82,6 +82,18 @@ public final class Shine {
 		if (path.contains("lapis_block") || path.contains("redstone_block")) {
 			return 0.4F;
 		}
+		if (path.equals("honey_block") || path.equals("slime_block") || path.equals("beacon") || path.equals("lodestone")) {
+			return 0.7F;
+		}
+		if (path.contains("prismarine") || path.equals("sea_lantern") || path.equals("coal_block") || path.contains("purpur")) {
+			return 0.35F;
+		}
+		if (path.contains("calcite") || path.equals("bone_block") || path.equals("dripstone_block")) {
+			return 0.2F;
+		}
+		if (path.contains("deepslate") || path.contains("blackstone") || path.contains("stone_bricks") || path.equals("stone") || path.equals("andesite") || path.equals("diorite") || path.equals("granite")) {
+			return 0.1F;
+		}
 		return 0.0F;
 	}
 }

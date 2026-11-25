@@ -51,6 +51,13 @@ public final class EntityShadows {
 		upload();
 	}
 
+	public static boolean replacesVanilla() {
+		Minecraft minecraft = Minecraft.getInstance();
+		LuceatConfig config = LuceatConfig.get();
+		return minecraft.level != null && minecraft.level.dimension() == net.minecraft.world.level.Level.OVERWORLD
+			&& config.enabled && config.entityShadows && config.sunShadows && !me.bewf.luceat.client.compat.IrisCompat.packOn();
+	}
+
 	public static void bind(int program) {
 		if (handle == 0) {
 			return;

@@ -9,6 +9,7 @@
     "CloudRendererMixin",
     "DisplayNameMixin",
     "EntityRendererMixin",
+    "EntityShadowCircleMixin",
     "FontTextureMixin",
     "GameRendererBloomMixin",
     "GlyphRenderStateMixin",

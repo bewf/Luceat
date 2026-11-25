@@ -499,7 +499,7 @@ public final class TerrainShaderPatch {
 			    float strength = u_LuceatSun2.x;
 			    float base = strength * power * fadeOut;
 			    vec3 result = vec3(0.0);
-			    if (strength > 0.0 && u_LuceatMore.w > 0.5) {
+			    if (strength > 0.0) {
 			        if (lit > 0.0) {
 			            float dist = length(pos);
 			            bool volume = u_LuceatSunOrigin.w != 0;
@@ -525,7 +525,7 @@ public final class TerrainShaderPatch {
 			                if (closeBlend > 0.001) {
 			                    seen = luceatVisibility(pos, normal, pos + sun * runLength, volume ? @SUN_STEPS@ : 56);
 			                    float blocked = 1.0 - dot(seen, vec3(0.3333333));
-			                    if (blocked > 0.02 && u_LuceatMore.w > 0.6) {
+			                    if (blocked > 0.02 && u_LuceatMore.w > 0.3) {
 			                        float noise = fract(52.9829189 * fract(dot(gl_FragCoord.xy, vec2(0.06711056, 0.00583715))));
 			                        float turn = noise * 6.2831853;
 			                        vec3 sideA = normalize(cross(sun, vec3(0.0, 0.0, 1.0)));
@@ -769,23 +769,36 @@ public final class TerrainShaderPatch {
 			    float shine = u_LuceatMore.y;
 			    float power = u_LuceatSun.w;
 			    float dist = length(pos);
-			    if (shine <= 0.001 || power < 0.02 || normal.y < 0.7 || dist > 64.0) {
+			    if (shine <= 0.001 || power < 0.02 || dist > 64.0) {
 			        return vec3(0.0);
 			    }
 			    float band = luceatShineAt(pos, normal, 0.05);
-			    float rough = 1.3;
-			    float tight = 120.0;
-			    float gain = 2.2;
+			    if (band < 0.05 || band > 0.99) {
+			        return vec3(0.0);
+			    }
+			    float rough;
+			    float tight;
+			    float gain;
 			    vec3 tint = vec3(1.0, 0.95, 0.82);
 			    if (abs(band - @SAND@) < 0.012) {
+			        if (normal.y < 0.7) {
+			            return vec3(0.0);
+			        }
 			        rough = 1.3;
+			        tight = 120.0;
+			        gain = 2.2;
 			    } else if (abs(band - @SNOW@) < 0.012) {
+			        if (normal.y < 0.7) {
+			            return vec3(0.0);
+			        }
 			        rough = 1.1;
 			        tight = 90.0;
 			        gain = 1.8;
 			        tint = vec3(0.9, 0.96, 1.0);
 			    } else {
-			        return vec3(0.0);
+			        rough = mix(0.5, 0.04, band);
+			        tight = mix(20.0, 260.0, band);
+			        gain = mix(0.5, 1.5, band);
 			    }
 			    vec3 cell = floor((vec3(u_LuceatCamBlock.xyz & 1023) + pos + u_LuceatCamFrac.xyz) * 16.0);
 			    vec3 jitter = vec3(luceatHash(cell), luceatHash(cell + 7.1), luceatHash(cell + 13.7)) - 0.5;

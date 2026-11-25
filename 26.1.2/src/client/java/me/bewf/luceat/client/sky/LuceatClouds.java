@@ -5,6 +5,7 @@ import com.mojang.blaze3d.pipeline.RenderPipeline;
 import com.mojang.blaze3d.shaders.UniformType;
 import com.mojang.blaze3d.systems.RenderSystem;
 
+import me.bewf.luceat.Luceat;
 import me.bewf.luceat.client.compat.IrisCompat;
 import me.bewf.luceat.client.config.LuceatConfig;
 
@@ -54,11 +55,23 @@ public final class LuceatClouds {
 					builder.withUniform(uniform.name(), uniform.type());
 				}
 			}
-			builder.withUniform("Globals", UniformType.UNIFORM_BUFFER);
+			boolean hasGlobals = false;
+			for (RenderPipeline.UniformDescription uniform : base.getUniforms()) {
+				hasGlobals |= uniform.name().equals("Globals");
+			}
+			if (!hasGlobals) {
+				builder.withUniform("Globals", UniformType.UNIFORM_BUFFER);
+			}
 			RenderPipeline built = builder.build();
 			CompiledRenderPipeline compiled = RenderSystem.getDevice().precompilePipeline(built);
 			pipeline = compiled.isValid() ? built : null;
+			if (pipeline == null) {
+				Luceat.LOGGER.warn("Luceat clouds: the cloud shader did not compile, using vanilla clouds");
+			} else {
+				Luceat.LOGGER.info("Luceat clouds: custom cloud pipeline ready");
+			}
 		} catch (RuntimeException | LinkageError error) {
+			Luceat.LOGGER.warn("Luceat clouds: could not build the cloud pipeline, using vanilla clouds", error);
 			pipeline = null;
 		}
 		return pipeline;

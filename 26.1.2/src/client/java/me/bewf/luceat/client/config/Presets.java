@@ -85,7 +85,7 @@ public final class Presets {
 				c.lightBounce = 0.25F;
 				c.lightSpread = false;
 				c.spillStrength = 0.0F;
-				c.sunShadows = false;
+				c.sunShadows = true;
 				c.sunShadowStrength = 0.65F;
 				c.caustics = true;
 				c.shine = 0.35F;
