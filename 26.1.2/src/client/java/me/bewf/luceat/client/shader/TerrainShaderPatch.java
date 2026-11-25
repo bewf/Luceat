@@ -715,7 +715,7 @@ public final class TerrainShaderPatch {
 			    ivec3 inner = ivec3(floor(pos + u_LuceatCamFrac.xyz - normal * depth)) + u_LuceatCamBlock.xyz;
 			    ivec3 away = (inner >> 4) - u_LuceatVol.xyz;
 			    if (any(greaterThan(abs(away), ivec3(u_LuceatVol.w)))) {
-			        return 0.0;
+			        return -1.0;
 			    }
 			    return texelFetch(@SHINE@, luceatWrap(inner), 0).r;
 			}
@@ -727,11 +727,15 @@ public final class TerrainShaderPatch {
 			}
 
 			@WAVES@
-			float luceatWaterMask(float alpha, vec3 pos, vec3 normal) {
+			float luceatWaterMask(float alpha, vec3 pos, vec3 normal, vec4 tint) {
 			    if (u_LuceatBakeParams.w <= 0.001 || alpha > 0.99 || alpha < 0.05) {
 			        return 0.0;
 			    }
-			    return luceatShineAt(pos, normal, 0.25) > 0.99 ? 1.0 : 0.0;
+			    float shine = luceatShineAt(pos, normal, 0.25);
+			    if (shine >= 0.0) {
+			        return shine > 0.99 ? 1.0 : 0.0;
+			    }
+			    return alpha > 0.4 && alpha < 0.95 && tint.b > tint.r * 1.12 ? 1.0 : 0.0;
 			}
 
 			vec4 luceatWaterBase(vec4 colour, vec3 pos) {
@@ -810,7 +814,7 @@ public final class TerrainShaderPatch {
 			    return tint * (spark * gain * shine * power * skyLevel * fade * (1.0 - luceatShade));
 			}
 #else
-			float luceatWaterMask(float alpha, vec3 pos, vec3 normal) {
+			float luceatWaterMask(float alpha, vec3 pos, vec3 normal, vec4 tint) {
 			    return 0.0;
 			}
 
@@ -997,7 +1001,11 @@ public final class TerrainShaderPatch {
 			            }
 			        }
 			    }
-			    total += mix(live, sqrt(liveSquares), 0.7);
+			    vec3 inGrid = pos + u_LuceatCamFrac.xyz + vec3(u_LuceatCamBlock.xyz - u_LuceatGridOrigin.xyz);
+			    vec3 gridSpan = vec3(@GX@.0, @GY@.0, @GZ@.0) * 8.0;
+			    vec3 gridEdge = min(inGrid, gridSpan - inGrid);
+			    float gridFade = smoothstep(0.0, 32.0, min(gridEdge.x, gridEdge.z)) * smoothstep(0.0, 12.0, gridEdge.y);
+			    total += mix(live, sqrt(liveSquares), 0.7) * gridFade;
 #ifdef LUCEAT_SPREAD
 			    if (u_LuceatExtra.w > 0.001) {
 			        vec3 q = pos + normal * 0.6;
@@ -1119,7 +1127,7 @@ public final class TerrainShaderPatch {
 		String defines = (current.rays() ? "\n#define LUCEAT_RAYS 1" : "") + (current.spread() ? "\n#define LUCEAT_SPREAD 1" : "") + (bakeCompiled ? "\n#define LUCEAT_BAKE 1" : "");
 		String lighting = defines + FRAGMENT_LIGHTING;
 		String patched = replaceOnce(source, "flat in uint v_Material;", "flat in uint v_Material;\n" + lighting);
-		patched = replaceOnce(patched, "color *= v_Color;", "vec3 luceatAlbedo = color.rgb;\n    vec3 luceatFaceNormal = luceatNormal(v_LuceatPos);\n    float luceatWater = luceatWaterMask(color.a, v_LuceatPos, luceatFaceNormal);\n    if (luceatWater > 0.0) {\n        color = luceatWaterBase(color, v_LuceatPos);\n        luceatAlbedo = color.rgb;\n    }\n    color *= v_Color;");
+		patched = replaceOnce(patched, "color *= v_Color;", "vec3 luceatAlbedo = color.rgb;\n    vec3 luceatFaceNormal = luceatNormal(v_LuceatPos);\n    float luceatWater = luceatWaterMask(color.a, v_LuceatPos, luceatFaceNormal, v_Color);\n    if (luceatWater > 0.0) {\n        color = luceatWaterBase(color, v_LuceatPos);\n        luceatAlbedo = color.rgb;\n    }\n    color *= v_Color;");
 		return replaceOnce(patched, "fragColor = _linearFog(", "vec3 luceatSunTerm = luceatSun(v_LuceatPos, luceatFaceNormal, v_LuceatBase);\n    color.rgb += luceatAlbedo * luceatLight(v_LuceatPos, luceatFaceNormal, v_Color, v_LuceatBase);\n    color.rgb += luceatAlbedo * luceatSunTerm;\n    color.rgb = max(color.rgb, vec3(0.0));\n    color.rgb += luceatSpec;\n    color.rgb = luceatEmit(color.rgb, luceatAlbedo, v_LuceatPos, luceatFaceNormal);\n    if (luceatWater > 0.0) {\n        vec4 gleam = luceatWaterGleam(v_LuceatPos, luceatFaceNormal, v_LuceatBase);\n        color.rgb += gleam.rgb;\n        color.a = mix(color.a, 1.0, gleam.a);\n    }\n    color.rgb += luceatGlitter(v_LuceatPos, luceatFaceNormal, v_LuceatBase);\n\n    fragColor = _linearFog(");
 	}
 
