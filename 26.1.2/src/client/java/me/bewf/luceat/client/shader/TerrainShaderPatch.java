@@ -711,8 +711,8 @@ public final class TerrainShaderPatch {
 			}
 
 #ifdef LUCEAT_RAYS
-			float luceatShineAt(vec3 pos, vec3 normal) {
-			    ivec3 inner = ivec3(floor(pos + u_LuceatCamFrac.xyz - normal * 0.25)) + u_LuceatCamBlock.xyz;
+			float luceatShineAt(vec3 pos, vec3 normal, float depth) {
+			    ivec3 inner = ivec3(floor(pos + u_LuceatCamFrac.xyz - normal * depth)) + u_LuceatCamBlock.xyz;
 			    ivec3 away = (inner >> 4) - u_LuceatVol.xyz;
 			    if (any(greaterThan(abs(away), ivec3(u_LuceatVol.w)))) {
 			        return 0.0;
@@ -731,7 +731,7 @@ public final class TerrainShaderPatch {
 			    if (u_LuceatBakeParams.w <= 0.001 || alpha > 0.99 || alpha < 0.05) {
 			        return 0.0;
 			    }
-			    return luceatShineAt(pos, normal) > 0.99 ? 1.0 : 0.0;
+			    return luceatShineAt(pos, normal, 0.25) > 0.99 ? 1.0 : 0.0;
 			}
 
 			vec4 luceatWaterBase(vec4 colour, vec3 pos) {
@@ -758,7 +758,7 @@ public final class TerrainShaderPatch {
 			    vec3 fog = u_FogColor.rgb;
 			    vec3 sky = mix(fog, fog * vec3(0.72, 0.86, 1.15), smoothstep(0.0, 0.7, r.y));
 			    float aim = max(dot(r, u_LuceatSun.xyz), 0.0);
-			    float glint = pow(aim, 220.0) * 3.0 + pow(aim, 38.0) * 0.3;
+			    float glint = pow(aim, 220.0) * 1.8 + pow(aim, 38.0) * 0.2;
 			    float sunPower = u_LuceatSun.w * (1.0 - luceatShade);
 			    vec3 shine = sky * fresnel + vec3(1.0, 0.93, 0.8) * (glint * sunPower);
 			    float style = u_LuceatBakeParams.w;
@@ -772,17 +772,17 @@ public final class TerrainShaderPatch {
 			    if (shine <= 0.001 || power < 0.02 || normal.y < 0.7 || dist > 64.0) {
 			        return vec3(0.0);
 			    }
-			    float band = luceatShineAt(pos, normal);
+			    float band = luceatShineAt(pos, normal, 0.05);
 			    float rough = 1.3;
 			    float tight = 120.0;
-			    float gain = 3.0;
+			    float gain = 2.2;
 			    vec3 tint = vec3(1.0, 0.95, 0.82);
 			    if (abs(band - @SAND@) < 0.012) {
 			        rough = 1.3;
 			    } else if (abs(band - @SNOW@) < 0.012) {
 			        rough = 1.1;
 			        tight = 90.0;
-			        gain = 2.2;
+			        gain = 1.8;
 			        tint = vec3(0.9, 0.96, 1.0);
 			    } else {
 			        return vec3(0.0);
