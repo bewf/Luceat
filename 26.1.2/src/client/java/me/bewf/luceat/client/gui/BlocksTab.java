@@ -10,6 +10,7 @@ import me.bewf.luceat.client.light.block.BlockRules;
 import me.bewf.luceat.client.light.item.ItemLightRule;
 import me.bewf.luceat.client.light.item.ItemLightRules;
 
+import me.bewf.luceat.client.config.LuceatConfig;
 import me.bewf.luceat.client.gui.glass.Icons;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
@@ -69,9 +70,14 @@ public final class BlocksTab {
 	private final TextInput filterInput = new TextInput(40);
 	private List<Entry> all;
 	private final List<Entry> shown = new ArrayList<>();
-	private Filter mode = Filter.LIGHT;
+	private static Filter mode = Filter.LIGHT;
+	private static String selectedKey;
+	private static float savedScroll;
+	private static String savedMod;
+	private static String savedQuery = "";
 	private Entry selected;
 	private float scroll;
+	private boolean confirmReset;
 	private boolean dirty;
 	private boolean adding;
 	private String modFilter;
@@ -97,10 +103,10 @@ public final class BlocksTab {
 	private Filter lastMode;
 	private int lastRules = -1;
 	private int slider;
-	private Sort sort = Sort.NAME;
+	private static Sort sort = Sort.NAME;
 	private Sort lastSort;
 	private final ColourPicker picker = new ColourPicker();
-	private final java.util.Set<String> collapsed = new java.util.HashSet<>();
+	private static final java.util.Set<String> collapsed = new java.util.HashSet<>();
 	private final List<Hit> hits = new ArrayList<>();
 	private Slide activeSlide;
 	private float editorScroll;
@@ -117,6 +123,16 @@ public final class BlocksTab {
 
 	public BlocksTab(Font font) {
 		this.font = font;
+		scroll = savedScroll;
+		modFilter = savedMod;
+		filterInput.set(savedQuery);
+	}
+
+	public void remember() {
+		savedScroll = scroll;
+		savedMod = modFilter;
+		savedQuery = filterInput.text();
+		selectedKey = selected == null ? null : selected.key;
 	}
 
 	public boolean typing() {
@@ -205,6 +221,14 @@ public final class BlocksTab {
 			entry.search = (entry.name + " " + entry.key).toLowerCase(Locale.ROOT);
 		}
 		all.sort((a, b) -> a.name.compareToIgnoreCase(b.name));
+		if (selectedKey != null && selected == null) {
+			for (Entry entry : all) {
+				if (entry.key.equals(selectedKey)) {
+					selected = entry;
+					break;
+				}
+			}
+		}
 		java.util.Set<String> seen = new java.util.HashSet<>();
 		for (Entry entry : all) {
 			seen.add(entry.mod);
@@ -357,7 +381,16 @@ public final class BlocksTab {
 		}
 		String count = shown.size() + (shown.size() == 1 ? " entry" : " entries");
 		int countW = inkWidth(count);
-		if (cx + countW + 12 < x1) {
+		int resetW = inkWidth(resetLabel()) + 14;
+		boolean canReset = mode == Filter.EDITED && editedCount() > 0;
+		if (!canReset) {
+			confirmReset = false;
+		}
+		if (canReset && cx + resetW + 8 < x1) {
+			boolean resetOver = free && LuceatLook.inside(mx, my, x1 - resetW, y0 + 24, x1, y0 + 42);
+			LuceatLook.roundOutlined(graphics, x1 - resetW, y0 + 24, x1, y0 + 42, confirmReset ? 0x66FF8A5C : resetOver ? LuceatLook.CARD_HOVER : LuceatLook.CARD, confirmReset ? LuceatLook.WARN : resetOver ? 0x80E4D6FF : LuceatLook.BORDER);
+			ink(graphics, resetLabel(), x1 - resetW + 7, y0 + 29, confirmReset ? LuceatLook.WARN : LuceatLook.SOFT, false);
+		} else if (cx + countW + 12 < x1) {
 			ink(graphics, count, x1 - countW, y0 + 29, LuceatLook.MUTED, false);
 		}
 		String modText = "Mod: " + (modFilter == null ? "All" : modName(modFilter));
@@ -650,7 +683,7 @@ public final class BlocksTab {
 		boolean closed = collapsed.contains(name);
 		boolean over = LuceatLook.inside(mx, my, edX0, y, edX1, y + 16) && my >= edTop && my < edBottom;
 		LuceatLook.round(graphics, edX0, y, edX1, y + 16, over ? LuceatLook.CARD_HOVER : LuceatLook.CARD);
-		ink(graphics, closed ? ">" : "v", edX0 + 6, y + 4, LuceatLook.ACCENT, false);
+		Icons.sprite(graphics, edX0 + 5, y + 3, 10, closed ? Icons.CHEVRON_RIGHT : Icons.CHEVRON, LuceatLook.ACCENT);
 		ink(graphics, name, edX0 + 18, y + 4, LuceatLook.TEXT, false);
 		hit(edX0, y, edX1, y + 16, () -> {
 			if (!collapsed.remove(name)) {
@@ -758,7 +791,7 @@ public final class BlocksTab {
 		boolean enabled = rule == null || rule.enabled;
 		y = header(graphics, "Light", y, mx, my);
 		if (!collapsed.contains("Light")) {
-			y = toggleRow(graphics, "Gives light", enabled, y, () -> setRule(r -> r.enabled = !r.enabled));
+			y = toggleRow(graphics, "Emits light", enabled, y, () -> setRule(r -> r.enabled = !r.enabled));
 			int level = rule != null && rule.level >= 0 ? rule.level : entry.defaultLevel;
 			boolean customLevel = rule != null && rule.level >= 0;
 			y = sliderRow(graphics, "Light level", (customLevel ? "" : "Default ") + level, customLevel, level / 15.0F, y + 2, 1,
@@ -796,7 +829,7 @@ public final class BlocksTab {
 		if (!collapsed.contains("Behaviour")) {
 			boolean customRadius = rule != null && Math.abs(rule.radius - 1.0F) > 0.001F;
 			float radius = rule == null ? 1.0F : rule.radius;
-			y = sliderRow(graphics, "Reach", String.format(Locale.ROOT, "x%.2f", radius), customRadius, (radius - 0.25F) / 2.25F, y + 2, 5,
+			y = sliderRow(graphics, "Light distance", String.format(Locale.ROOT, "%d%%", Math.round(radius * 100.0F)), customRadius, (radius - 0.25F) / 2.25F, y + 2, 5,
 				customRadius ? () -> setRule(r -> r.radius = 1.0F) : null,
 				v -> {
 					float picked = 0.25F + (float) v * 2.25F;
@@ -817,10 +850,10 @@ public final class BlocksTab {
 		}
 		if (!collapsed.contains("Behaviour")) {
 			boolean customHeight = rule != null && rule.heldHeight >= 0.0F;
-			float height = customHeight ? rule.heldHeight : 0.0F;
-			y = sliderRow(graphics, "Height when held", customHeight ? Math.round(height * 100.0F) + "%" : "Automatic", customHeight, (height - 0.3F) / 1.0F, y + 2, 7,
+			float height = customHeight ? rule.heldHeight : LuceatConfig.get().heldHeight;
+			y = sliderRow(graphics, "Held light height", customHeight ? Math.round(height * 100.0F) + "%" : "Default " + Math.round(height * 100.0F) + "%", customHeight, (height - 0.3F) / 0.7F, y + 2, 7,
 				customHeight ? () -> setRule(r -> r.heldHeight = -1.0F) : null,
-				v -> BlockRules.edit(entry.key).heldHeight = Math.round((0.3F + (float) v * 1.0F) * 50.0F) / 50.0F);
+				v -> BlockRules.edit(entry.key).heldHeight = Math.round((0.3F + (float) v * 0.7F) * 50.0F) / 50.0F);
 		}
 		y = header(graphics, "Where it glows", y, mx, my);
 		if (!collapsed.contains("Where it glows")) {
@@ -929,6 +962,30 @@ public final class BlocksTab {
 		return y;
 	}
 
+	private String resetLabel() {
+		return confirmReset ? "Click again to reset all" : "Reset all";
+	}
+
+	private int editedCount() {
+		int found = 0;
+		for (BlockRule rule : BlockRules.all()) {
+			if (!rule.added && rule.edited()) {
+				found++;
+			}
+		}
+		return found;
+	}
+
+	private void resetEdited() {
+		for (BlockRule rule : new ArrayList<>(BlockRules.all())) {
+			if (!rule.added && rule.edited()) {
+				BlockRules.remove(rule.id);
+			}
+		}
+		confirmReset = false;
+		commit();
+	}
+
 	private void commit() {
 		BlockRules.changed();
 		dirty = true;
@@ -969,6 +1026,16 @@ public final class BlocksTab {
 			scroll = 0.0F;
 			return true;
 		}
+		int resetW = inkWidth(resetLabel()) + 14;
+		if (mode == Filter.EDITED && editedCount() > 0 && LuceatLook.inside(mx, my, listX1 - resetW, listY0 + 24, listX1, listY0 + 42)) {
+			if (confirmReset) {
+				resetEdited();
+			} else {
+				confirmReset = true;
+			}
+			return true;
+		}
+		confirmReset = false;
 		int cx = listX0;
 		for (Filter filter : Filter.values()) {
 			int width = inkWidth(filter.label) + 14;

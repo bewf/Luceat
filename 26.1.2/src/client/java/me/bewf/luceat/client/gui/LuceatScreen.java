@@ -271,6 +271,9 @@ public final class LuceatScreen extends Screen {
 		}
 		LuceatConfig.save();
 		flushBlocks();
+		if (blocks != null) {
+			blocks.remember();
+		}
 		if (rebuildPending) {
 			ShadowVolume.reset();
 		}

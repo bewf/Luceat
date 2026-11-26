@@ -96,6 +96,7 @@ public final class Icons {
 	public static final Icon RESET = new Icon(LucideData.RESET);
 	public static final Icon CLOSE = new Icon(LucideData.CLOSE);
 	public static final Icon CHEVRON = new Icon(LucideData.CHEVRON);
+	public static final Icon CHEVRON_RIGHT = new Icon(LucideData.CHEVRON_RIGHT);
 	public static final Icon MOUSE = new Icon(LucideData.MOUSE);
 	public static final Icon EXPAND = new Icon(LucideData.EXPAND);
 	public static final Icon TRASH = new Icon(LucideData.TRASH);
