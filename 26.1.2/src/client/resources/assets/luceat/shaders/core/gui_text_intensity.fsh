@@ -13,11 +13,14 @@ in vec2 texCoord0;
 out vec4 fragColor;
 
 void main() {
-    vec2 reach = fwidth(texCoord0) * 0.25;
-    float centre = texture(Sampler0, texCoord0).r;
-    float across = max(texture(Sampler0, texCoord0 + vec2(reach.x, 0.0)).r, texture(Sampler0, texCoord0 - vec2(reach.x, 0.0)).r);
-    float along = max(texture(Sampler0, texCoord0 + vec2(0.0, reach.y)).r, texture(Sampler0, texCoord0 - vec2(0.0, reach.y)).r);
-    float coverage = 1.0 - pow(1.0 - max(centre, max(across * 0.8, along * 0.4)), 1.7);
+    vec2 foot = fwidth(texCoord0) * 0.33;
+    float seen = 0.0;
+    for (int ix = -1; ix <= 1; ix++) {
+        for (int iy = -1; iy <= 1; iy++) {
+            seen += texture(Sampler0, texCoord0 + vec2(float(ix), float(iy)) * foot).r;
+        }
+    }
+    float coverage = pow(clamp(seen / 9.0, 0.0, 1.0), 0.65);
     vec4 color = vec4(coverage) * vertexColor * ColorModulator;
     if (color.a < 0.004) {
         discard;

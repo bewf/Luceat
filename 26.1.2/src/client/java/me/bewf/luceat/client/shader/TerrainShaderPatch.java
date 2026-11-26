@@ -429,19 +429,21 @@ public final class TerrainShaderPatch {
 			}
 
 			float luceatProbe(vec3 pos, vec3 normal, vec3 lightPos, float dist) {
-			    int count = int(clamp(dist - 0.5, 2.0, 12.0));
-			    vec3 origin = pos + normal * 0.1 + u_LuceatCamFrac.xyz;
-			    vec3 stride = (lightPos + u_LuceatCamFrac.xyz - origin) / float(count + 1);
-			    ivec3 lightCell = ivec3(floor(lightPos + u_LuceatCamFrac.xyz));
-			    vec3 at = origin;
-			    for (int k = 0; k < count; k++) {
-			        at += stride;
-			        ivec3 cell = ivec3(floor(at));
-			        if (cell != lightCell && luceatId(cell) == 1u) {
-			            return 0.0;
-			        }
+			    if (u_LuceatMore.w < 0.5) {
+			        return luceatCheap(pos, normal, lightPos);
 			    }
-			    return 1.0;
+			    vec3 dir = normalize(lightPos - pos);
+			    vec3 side = normalize(cross(dir, abs(dir.y) < 0.9 ? vec3(0.0, 1.0, 0.0) : vec3(1.0, 0.0, 0.0)));
+			    vec3 up = cross(dir, side);
+			    vec3 home = lightPos + u_LuceatCamFrac.xyz;
+			    vec3 base = floor(home);
+			    float seen = 0.0;
+			    for (int k = 0; k < 4; k++) {
+			        vec3 shift = (((k & 1) == 0 ? side : up) * ((k & 2) == 0 ? 0.3 : -0.3));
+			        vec3 tap = clamp(home + shift, base + 0.08, base + 0.92) - u_LuceatCamFrac.xyz;
+			        seen += luceatCheap(pos, normal, tap);
+			    }
+			    return smoothstep(0.0, 1.0, seen * 0.25);
 			}
 
 			float luceatCaustic(vec2 p, float t) {

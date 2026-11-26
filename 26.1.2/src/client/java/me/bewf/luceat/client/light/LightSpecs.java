@@ -88,11 +88,11 @@ public final class LightSpecs {
 			return new LightSpec(4, GLOW_FRAME[0], GLOW_FRAME[1], GLOW_FRAME[2]);
 		}
 		LightSpec own = of(stack, false, Where.FRAMED);
-		if (own.level() >= 7) {
+		if (own.level() > 0) {
 			return own;
 		}
 		float[] item = colourOf(stack, true);
-		return new LightSpec(Math.max(own.level(), 7),
+		return new LightSpec(4,
 			item[0] * 0.75F + GLOW_FRAME[0] * 0.25F,
 			item[1] * 0.75F + GLOW_FRAME[1] * 0.25F,
 			item[2] * 0.75F + GLOW_FRAME[2] * 0.25F);
