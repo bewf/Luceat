@@ -16,6 +16,7 @@ import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
 
 public final class ColourEstimator {
+	private static final float SATURATION_BOOST = 1.6F;
 	private static final int MIN_ALPHA = 128;
 	private static final float TOP_FRACTION = 0.12F;
 
@@ -139,6 +140,15 @@ public final class ColourEstimator {
 		if (peak <= 0.0F) {
 			return null;
 		}
+		return vivid(red / peak, green / peak, blue / peak);
+	}
+
+	private static float[] vivid(float red, float green, float blue) {
+		float luma = 0.299F * red + 0.587F * green + 0.114F * blue;
+		red = Math.max(0.02F, luma + (red - luma) * SATURATION_BOOST);
+		green = Math.max(0.02F, luma + (green - luma) * SATURATION_BOOST);
+		blue = Math.max(0.02F, luma + (blue - luma) * SATURATION_BOOST);
+		float peak = Math.max(red, Math.max(green, blue));
 		return new float[]{red / peak, green / peak, blue / peak};
 	}
 }
