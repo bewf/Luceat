@@ -62,25 +62,47 @@ public final class TerrainShaderPatch {
 			    return 1.0 - 0.7 * smoothstep(40.0, 160.0, length(pos));
 			}
 
+			float luceatWaveHash(vec2 c) {
+			    return fract(sin(dot(c, vec2(127.1, 311.7))) * 43758.5453);
+			}
+
+			float luceatWaveNoise(vec2 p) {
+			    vec2 i = floor(p);
+			    vec2 f = fract(p);
+			    f = f * f * (3.0 - 2.0 * f);
+			    return mix(mix(luceatWaveHash(i), luceatWaveHash(i + vec2(1.0, 0.0)), f.x),
+			        mix(luceatWaveHash(i + vec2(0.0, 1.0)), luceatWaveHash(i + vec2(1.0, 1.0)), f.x), f.y);
+			}
+
+			vec2 luceatWaveWarp(vec2 p, float t) {
+			    return p + 1.6 * vec2(luceatWaveNoise(p * 0.06 + t * 0.03) - 0.5, luceatWaveNoise(p * 0.06 + 19.7 - t * 0.025) - 0.5);
+			}
+
+			float luceatWaveGain(vec2 p, float t, int i) {
+			    return 0.55 + 0.9 * luceatWaveNoise(p * (0.04 + 0.015 * float(i)) + float(i) * 11.3 + t * 0.02);
+			}
+
 			float luceatWaveLift(vec3 pos) {
-			    vec2 p = luceatWaterCoord(pos);
+			    vec2 base = luceatWaterCoord(pos);
 			    float t = u_LuceatCamFrac.w;
+			    vec2 p = luceatWaveWarp(base, t);
 			    float h = 0.0;
 			    for (int i = 0; i < 3; i++) {
 			        vec3 w = LUCEAT_WAVE[i];
-			        h += w.y * cos(w.x * dot(p, LUCEAT_WAVE_DIR[i]) + w.z * t);
+			        h += w.y * luceatWaveGain(base, t, i) * cos(w.x * dot(p, LUCEAT_WAVE_DIR[i]) + w.z * t);
 			    }
 			    return h * luceatWaterCalm(pos) * u_LuceatBakeParams.w;
 			}
 
 			vec2 luceatWaveGrad(vec3 pos, float footprint) {
-			    vec2 p = luceatWaterCoord(pos);
+			    vec2 base = luceatWaterCoord(pos);
 			    float t = u_LuceatCamFrac.w;
+			    vec2 p = luceatWaveWarp(base, t);
 			    vec2 grad = vec2(0.0);
 			    for (int i = 0; i < 5; i++) {
 			        vec3 w = LUCEAT_WAVE[i];
 			        float keep = 1.0 - smoothstep(0.35, 0.9, w.x * footprint);
-			        grad -= LUCEAT_WAVE_DIR[i] * (w.y * w.x * sin(w.x * dot(p, LUCEAT_WAVE_DIR[i]) + w.z * t) * keep);
+			        grad -= LUCEAT_WAVE_DIR[i] * (w.y * luceatWaveGain(base, t, i) * w.x * sin(w.x * dot(p, LUCEAT_WAVE_DIR[i]) + w.z * t) * keep);
 			    }
 			    return grad * (3.0 * luceatWaterCalm(pos) * u_LuceatBakeParams.w);
 			}
@@ -774,9 +796,9 @@ public final class TerrainShaderPatch {
 
 			vec3 luceatGlitter(vec3 pos, vec3 normal, vec4 baseColor) {
 			    float shine = u_LuceatMore.y;
-			    float power = u_LuceatSun.w;
+			    float power = sqrt(u_LuceatSun.w) * mix(1.0, 0.2, smoothstep(0.1, 0.75, u_LuceatSun.y));
 			    float dist = length(pos);
-			    if (shine <= 0.001 || power < 0.02 || dist > 64.0) {
+			    if (shine <= 0.001 || power < 0.03 || dist > 64.0) {
 			        return vec3(0.0);
 			    }
 			    float band = luceatShineAt(pos, normal, 0.05);
