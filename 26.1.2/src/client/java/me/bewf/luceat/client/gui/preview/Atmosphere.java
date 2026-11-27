@@ -1,5 +1,7 @@
 package me.bewf.luceat.client.gui.preview;
 
+import me.bewf.luceat.client.sky.CloudType;
+
 final class Atmosphere {
 	private static final float[] ZENITH_DAY = {0.22F, 0.44F, 0.92F};
 	private static final float[] HORIZON_DAY = {0.64F, 0.80F, 0.99F};
@@ -23,9 +25,27 @@ final class Atmosphere {
 	final float[] sunColour;
 	final float[] ambient = new float[3];
 	final double sunYaw;
+	private final float cloudLow;
+	private final float cloudHigh;
+	private final float cloudAlpha;
+	private final float cloudDark;
+	private final float cloudStretch;
 
-	Atmosphere(float time, double sunYaw) {
+	Atmosphere(float time, double sunYaw, CloudType cloud) {
 		this.time = time;
+		float[] look = switch (cloud == null ? CloudType.CUMULUS : cloud) {
+			case FEW -> new float[]{0.64F, 0.84F, 0.88F, 1.0F, 1.0F};
+			case CUMULUS -> new float[]{0.5F, 0.74F, 0.88F, 1.0F, 1.0F};
+			case STRATUS -> new float[]{0.3F, 0.55F, 0.8F, 0.93F, 1.8F};
+			case CIRRUS -> new float[]{0.5F, 0.72F, 0.45F, 1.0F, 3.0F};
+			case OVERCAST -> new float[]{0.08F, 0.35F, 0.95F, 0.8F, 1.0F};
+			case STORM -> new float[]{0.15F, 0.42F, 0.97F, 0.5F, 1.0F};
+		};
+		this.cloudLow = look[0];
+		this.cloudHigh = look[1];
+		this.cloudAlpha = look[2];
+		this.cloudDark = look[3];
+		this.cloudStretch = look[4];
 		this.sunYaw = sunYaw;
 		double degrees = -30.0 + 88.0 * Math.pow(Math.max(0.0, Math.min(1.0, time)), 0.95);
 		this.elevation = Math.toRadians(degrees);
@@ -111,11 +131,11 @@ final class Atmosphere {
 			double scale = 1.0 / dy;
 			double cx = dx * scale * 0.55 + clock * 0.012;
 			double cz = dz * scale * 0.55;
-			float cloud = fbm(cx * 2.1, cz * 2.1);
-			float density = smooth(0.5F, 0.74F, cloud);
+			float cloud = fbm(cx * 2.1 / cloudStretch, cz * 2.1);
+			float density = smooth(cloudLow, cloudHigh, cloud);
 			if (density > 0.001F) {
 				float fadeHorizon = (float) Math.min(1.0, (dy - 0.035) / 0.2);
-				float lit = 0.1F + 0.9F * Math.max(day, dusk * 0.8F);
+				float lit = (0.1F + 0.9F * Math.max(day, dusk * 0.8F)) * cloudDark;
 				float under = 0.72F + 0.28F * (1.0F - density);
 				float cr = (day + (1.0F - day) * sunColour[0]) * lit * under;
 				float cg = (day + (1.0F - day) * sunColour[1] * 0.9F) * lit * under;
@@ -123,7 +143,7 @@ final class Atmosphere {
 				cr = cr * (1.0F - night) + 0.05F * night;
 				cg = cg * (1.0F - night) + 0.065F * night;
 				cb = cb * (1.0F - night) + 0.12F * night;
-				float amount = density * fadeHorizon * 0.88F;
+				float amount = density * fadeHorizon * cloudAlpha;
 				r += (cr - r) * amount;
 				g += (cg - g) * amount;
 				b += (cb - b) * amount;

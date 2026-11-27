@@ -3,6 +3,7 @@ package me.bewf.luceat.client.gui.preview;
 import java.util.List;
 
 import me.bewf.luceat.client.config.LuceatConfig;
+import me.bewf.luceat.client.sky.LuceatClouds;
 
 public final class PreviewRenderer {
 	public static final float NIGHT = 0.04F;
@@ -50,7 +51,7 @@ public final class PreviewRenderer {
 
 	static Tracer tracer(Scene scene, LuceatConfig config, Occ[] occ, List<Light> lights, double[] eye, double[] target, double fov, float time, double seconds) {
 		float shadowDistance = scene.shadowScale == 1.0F ? config.shadowDistance : config.shadowDistance * scene.shadowScale;
-		Params params = new Params(config.shadows, config.brightness, config.maxBrightness, config.daylightFade, config.directionalShading, config.shadowStrength, config.vanillaReplace, config.placedStrength, config.shadowSoftness * 0.45F, time, scene.vanilla, shadowDistance, config.lightBounce, config.shine);
+		Params params = new Params(config.shadows, config.brightness, config.maxBrightness, config.daylightFade, config.directionalShading, config.shadowStrength, config.vanillaReplace, config.placedStrength, config.shadowSoftness * 0.45F, time, scene.vanilla, shadowDistance, config.lightBounce, config.shine, LuceatClouds.previewType(config));
 		Light[] array = lights.toArray(new Light[0]);
 		Tracer tracer = new Tracer(scene.width, scene.height, scene.depth, scene.voxels(), occ, scene.shine(), array, params, eye, target, fov);
 		Extras extras = new Extras();

@@ -11,6 +11,10 @@ import me.bewf.luceat.client.light.LightSpecs;
 import me.bewf.luceat.client.light.LightSpread;
 import me.bewf.luceat.client.light.PlacedLights;
 import me.bewf.luceat.client.shadow.ShadowVolume;
+import me.bewf.luceat.client.sky.CloudMode;
+import me.bewf.luceat.client.sky.CloudPlace;
+import me.bewf.luceat.client.sky.CloudType;
+import me.bewf.luceat.client.sky.RealWeather;
 
 public final class LuceatSettings {
 	public static final String LIGHTING = "Lighting";
@@ -137,6 +141,34 @@ public final class LuceatSettings {
 		all.add(new ToggleSetting(SKY, "Clouds",
 			"Draws Fancy clouds with thick centres, thin see-through edges and darker undersides. Off uses Minecraft's clouds. Fast clouds are not changed.",
 			Cost.NONE, false, () -> c.luceatClouds, value -> c.luceatClouds = value));
+		all.add(new CardSetting<>(SKY, "Cloud mode",
+			"Sets what decides which kind of cloud is drawn.",
+			CloudMode.values(), new String[]{"Real world", "In game", "Pick your own"},
+			new String[]{CloudMode.REAL_WORLD.note() + " Fetched from Open-Meteo every ten minutes.", CloudMode.IN_GAME.note() + " Clear weather gives cumulus, rain gives overcast, thunder gives storm.", CloudMode.CUSTOM.note()},
+			() -> c.cloudMode, value -> c.cloudMode = value)
+			.visibleWhen(() -> c.luceatClouds));
+		all.add(new CardSetting<>(SKY, "Cloud type",
+			"Sets which kind of cloud is drawn.",
+			CloudType.values(), new String[]{"Few", "Cumulus", "Stratus", "Cirrus", "Overcast", "Storm"},
+			new String[]{CloudType.FEW.note(), CloudType.CUMULUS.note(), CloudType.STRATUS.note(), CloudType.CIRRUS.note(), CloudType.OVERCAST.note(), CloudType.STORM.note()},
+			() -> c.cloudType, value -> c.cloudType = value)
+			.visibleWhen(() -> c.luceatClouds && c.cloudMode == CloudMode.CUSTOM));
+		all.add(new ChoiceSetting<>(SKY, "Weather location",
+			"Sets where the real weather is taken from.",
+			CloudPlace.values(), new String[]{"Automatic", "Manual"}, () -> c.cloudAutoLocation ? CloudPlace.AUTOMATIC : CloudPlace.MANUAL, value -> c.cloudAutoLocation = value == CloudPlace.AUTOMATIC)
+			.withNotes("Finds your approximate location from your IP address, once per session. Nothing else is sent.", "Uses the latitude and longitude set below.")
+			.visibleWhen(() -> c.luceatClouds && c.cloudMode == CloudMode.REAL_WORLD));
+		all.add(new SliderSetting(SKY, "Latitude",
+			"Sets the latitude the weather is taken from. Positive is north.",
+			Cost.NONE, false, -90.0F, 90.0F, 0.5F, "", () -> c.cloudLat, value -> c.cloudLat = value)
+			.visibleWhen(() -> c.luceatClouds && c.cloudMode == CloudMode.REAL_WORLD && !c.cloudAutoLocation));
+		all.add(new SliderSetting(SKY, "Longitude",
+			"Sets the longitude the weather is taken from. Positive is east.",
+			Cost.NONE, false, -180.0F, 180.0F, 0.5F, "", () -> c.cloudLon, value -> c.cloudLon = value)
+			.visibleWhen(() -> c.luceatClouds && c.cloudMode == CloudMode.REAL_WORLD && !c.cloudAutoLocation));
+		all.add(new NoteSetting(SKY, "Current weather",
+			"The weather Luceat last fetched.", RealWeather::status)
+			.visibleWhen(() -> c.luceatClouds && c.cloudMode == CloudMode.REAL_WORLD));
 
 		all.add(new ToggleSetting(PLACED, "Placed lights",
 			"Lights up the area around blocks that glow, in their own colour, with shadows.",

@@ -11,6 +11,10 @@ const int FLAG_USE_TOP_COLOR = 1 << 5;
 const int FLAG_EXTRA_Z = 1 << 6;
 const int FLAG_EXTRA_X = 1 << 7;
 
+#ifndef LUCEAT_THICK
+#define LUCEAT_THICK 1.0
+#endif
+
 const float PERIOD = 720.0;
 const float CELL_PERIOD = 60.0;
 
@@ -101,7 +105,7 @@ void main() {
     cellX = (cellX << 1) | ((dirAndFlags & FLAG_EXTRA_X) >> 7);
     cellZ = (cellZ << 1) | ((dirAndFlags & FLAG_EXTRA_Z) >> 6);
     vec3 faceVertex = vertices[(direction * 4) + (isInsideFace ? 3 - quadVertex : quadVertex)];
-    vec3 pos = (faceVertex * CellSize) + (vec3(cellX, 0, cellZ) * CellSize) + CloudOffset;
+    vec3 pos = (faceVertex * CellSize * vec3(1.0, LUCEAT_THICK, 1.0)) + (vec3(cellX, 0, cellZ) * CellSize) + CloudOffset;
     gl_Position = ProjMat * ModelViewMat * vec4(pos, 1.0);
 
     vec2 camera = cameraInCloudSpace();

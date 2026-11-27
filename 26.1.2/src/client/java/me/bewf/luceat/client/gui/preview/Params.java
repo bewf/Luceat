@@ -1,5 +1,7 @@
 package me.bewf.luceat.client.gui.preview;
 
+import me.bewf.luceat.client.sky.CloudType;
+
 public record Params(
 	boolean shadows,
 	float brightness,
@@ -14,6 +16,7 @@ public record Params(
 	boolean vanilla,
 	float shadowDistance,
 	float bounce,
-	float shine
+	float shine,
+	CloudType cloud
 ) {
 }

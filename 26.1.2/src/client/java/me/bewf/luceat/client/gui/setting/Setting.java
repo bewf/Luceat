@@ -12,6 +12,7 @@ public abstract class Setting {
 	private java.util.function.Supplier<String> blocker = () -> "";
 	private java.util.function.Supplier<String> shortReason = () -> "";
 	private java.util.function.Supplier<String> detail = () -> "";
+	private java.util.function.BooleanSupplier shown = () -> true;
 
 	protected Setting(String section, String label, String help, Cost cost, boolean rebuildsShadows) {
 		this.section = section;
@@ -53,6 +54,20 @@ public abstract class Setting {
 		this.shortReason = shortReason;
 		this.detail = detail;
 		return (T) this;
+	}
+
+	@SuppressWarnings("unchecked")
+	public <T extends Setting> T visibleWhen(java.util.function.BooleanSupplier condition) {
+		this.shown = condition;
+		return (T) this;
+	}
+
+	public boolean visible() {
+		return shown.getAsBoolean();
+	}
+
+	public int rowHeight() {
+		return 0;
 	}
 
 	public String blockedShort() {

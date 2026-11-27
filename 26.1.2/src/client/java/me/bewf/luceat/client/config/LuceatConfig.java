@@ -78,6 +78,11 @@ public final class LuceatConfig {
 	public boolean glassTint = true;
 	public BloomLevel bloom = BloomLevel.OFF;
 	public boolean luceatClouds = true;
+	public me.bewf.luceat.client.sky.CloudMode cloudMode = me.bewf.luceat.client.sky.CloudMode.IN_GAME;
+	public me.bewf.luceat.client.sky.CloudType cloudType = me.bewf.luceat.client.sky.CloudType.CUMULUS;
+	public boolean cloudAutoLocation = true;
+	public double cloudLat = 0.0;
+	public double cloudLon = 0.0;
 	public float cutoutOpacity = 0.9F;
 
 	public boolean entityShadows = true;

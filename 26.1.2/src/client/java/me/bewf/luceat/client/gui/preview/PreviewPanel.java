@@ -6,6 +6,7 @@ import java.util.Objects;
 
 import me.bewf.luceat.Luceat;
 import me.bewf.luceat.client.config.LuceatConfig;
+import me.bewf.luceat.client.sky.LuceatClouds;
 import me.bewf.luceat.client.gui.LuceatLook;
 import me.bewf.luceat.client.gui.glass.Bar;
 import me.bewf.luceat.client.gui.glass.Glass;
@@ -301,7 +302,7 @@ public final class PreviewPanel {
 		}
 		boolean fire = live.flicker > 0.0F && live.enabled && hasFire(scene);
 		long bucket = fire ? System.nanoTime() / 150_000_000L : 0L;
-		int base = Objects.hash(live.asJson(), scene.id, time, lookYaw, lookPitch, zoom, ow, oh, bucket);
+		int base = Objects.hash(live.asJson(), LuceatClouds.previewType(live), scene.id, time, lookYaw, lookPitch, zoom, ow, oh, bucket);
 		long now = System.nanoTime();
 		if (base != lastBase) {
 			lastBase = base;

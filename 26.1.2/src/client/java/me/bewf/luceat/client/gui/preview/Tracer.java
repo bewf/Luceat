@@ -62,13 +62,13 @@ public final class Tracer {
 		cross(forward, worldUp, right);
 		normalize(right);
 		cross(right, forward, up);
-		this.atmosphere = new Atmosphere(params.time(), 0.0);
+		this.atmosphere = new Atmosphere(params.time(), 0.0, params.cloud());
 		atmosphere.fog(fogColour);
 	}
 
 	public void extras(Extras value) {
 		this.extras = value;
-		this.atmosphere = new Atmosphere(params.time(), value.sunYaw);
+		this.atmosphere = new Atmosphere(params.time(), value.sunYaw, params.cloud());
 		atmosphere.fog(fogColour);
 	}
 

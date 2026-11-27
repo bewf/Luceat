@@ -24,7 +24,9 @@ import me.bewf.luceat.client.gui.presets.PresetPicker;
 import me.bewf.luceat.client.gui.preview.PreviewPanel;
 import me.bewf.luceat.client.gui.preview.SceneSpec;
 import me.bewf.luceat.client.gui.preview.Scenes;
+import me.bewf.luceat.client.gui.setting.CardSetting;
 import me.bewf.luceat.client.gui.setting.ChoiceSetting;
+import me.bewf.luceat.client.gui.setting.NoteSetting;
 import me.bewf.luceat.client.gui.setting.Cost;
 import me.bewf.luceat.client.gui.setting.LuceatSettings;
 import me.bewf.luceat.client.gui.setting.Setting;
@@ -712,7 +714,7 @@ public final class LuceatScreen extends Screen {
 		List<Setting> result = new ArrayList<>();
 		String query = search.text().trim();
 		for (Setting setting : settings) {
-			if (query.isEmpty() || setting.matches(query)) {
+			if (setting.visible() && (query.isEmpty() || setting.matches(query))) {
 				result.add(setting);
 			}
 		}
@@ -830,7 +832,7 @@ public final class LuceatScreen extends Screen {
 	private List<Setting> sectionSettings() {
 		List<Setting> result = new ArrayList<>();
 		for (Setting setting : settings) {
-			if (setting.section().equals(section)) {
+			if (setting.visible() && setting.section().equals(section)) {
 				result.add(setting);
 			}
 		}
@@ -863,7 +865,7 @@ public final class LuceatScreen extends Screen {
 				}
 				out.add(name);
 				for (Setting setting : settings) {
-					if (setting.section().equals(name) && setting != master) {
+					if (setting.visible() && setting.section().equals(name) && setting != master) {
 						out.add(setting);
 					}
 				}
@@ -884,6 +886,9 @@ public final class LuceatScreen extends Screen {
 		if (item == NOTICE) {
 			return NOTICE_HEIGHT;
 		}
+		if (item instanceof Setting setting && setting.rowHeight() > 0) {
+			return setting.rowHeight();
+		}
 		return ROW_HEIGHT;
 	}
 
@@ -900,7 +905,7 @@ public final class LuceatScreen extends Screen {
 	private List<Setting> settingsIn(String sectionName) {
 		List<Setting> result = new ArrayList<>();
 		for (Setting setting : settings) {
-			if (setting.section().equals(sectionName)) {
+			if (setting.visible() && setting.section().equals(sectionName)) {
 				result.add(setting);
 			}
 		}
@@ -1345,6 +1350,10 @@ public final class LuceatScreen extends Screen {
 			int valueColour = Paint.mix(Glass.SOFT, Glass.TEXT, Math.max(hoverAny, dragging == setting ? 1.0F : 0.0F));
 			Glass.right(s, BODY, sl.valueText(), listRight, cy - 4, fade(valueColour, cy - 4));
 			clampedHit(trackLeft() - 10, cy - 10, trackRight(sl) + 10, cy + 10, "sl:" + id, setting, hitTop, areaBottom);
+		} else if (setting instanceof NoteSetting note) {
+			s.text(BODY, Glass.fit(this.chrome, BODY, note.valueText(), listRight - listLeft), listLeft, cy - 4, fade(Glass.SOFT, cy - 4));
+		} else if (setting instanceof CardSetting<?> card) {
+			drawCards(s, card, y, hitTop, areaBottom);
 		} else if (setting instanceof ChoiceSetting<?> choice) {
 			int w = choiceWidth(choice);
 			int x = listLeft;
@@ -1358,6 +1367,59 @@ public final class LuceatScreen extends Screen {
 			clampedHit(x, top, x + w, top + 20, "ch:" + id, setting, hitTop, areaBottom);
 			drawTestPill(s, setting, cy, hitTop, areaBottom);
 		}
+	}
+
+	private int cardWidth() {
+		int gaps = (CardSetting.COLUMNS - 1) * CardSetting.GAP;
+		return (listRight - listLeft - gaps) / CardSetting.COLUMNS;
+	}
+
+	private int cardX(int column) {
+		return listLeft + column * (cardWidth() + CardSetting.GAP);
+	}
+
+	private int cardY(int y, int row) {
+		return y + CardSetting.HEAD + row * (CardSetting.CARD_HEIGHT + CardSetting.GAP);
+	}
+
+	private void drawCards(Surface s, CardSetting<?> card, int y, int hitTop, int areaBottom) {
+		int width = cardWidth();
+		for (int i = 0; i < card.count(); i++) {
+			int x0 = cardX(i % CardSetting.COLUMNS);
+			int y0 = cardY(y, i / CardSetting.COLUMNS);
+			int x1 = x0 + width;
+			int y1 = y0 + CardSetting.CARD_HEIGHT;
+			String key = "card:" + card.id() + ":" + i;
+			float over = hoverOf(key);
+			float on = anim("cd:" + card.id() + ":" + i, card.index() == i ? 1.0F : 0.0F, 0.06F);
+			Glass.field(s, x0, y0, x1, y1, 0.0F);
+			int artBottom = y1 - 18;
+			CardArt.draw(s, card.value(i), x0 + 3, y0 + 3, x1 - 3, artBottom, Math.max(on, over * 0.6F));
+			Glass.centred(s, BODY, card.name(i), (x0 + x1) / 2, y1 - 14, fade(Paint.mix(Glass.SOFT, Glass.TEXT, Math.max(on, over)), y1 - 14));
+			if (on > 0.01F) {
+				Paint.outline(s, x0, y0, x1, y1, 8, Paint.argb(Math.round(220 * on), 178, 140, 255));
+			} else if (over > 0.01F) {
+				Paint.outline(s, x0, y0, x1, y1, 8, Paint.argb(Math.round(110 * over), 205, 187, 255));
+			}
+			clampedHit(x0, y0, x1, y1, key, card, hitTop, areaBottom);
+		}
+	}
+
+	private boolean clickCards(CardSetting<?> card, int y, double mx, double my) {
+		for (int i = 0; i < card.count(); i++) {
+			int x0 = cardX(i % CardSetting.COLUMNS);
+			int y0 = cardY(y, i / CardSetting.COLUMNS);
+			if (LuceatLook.inside(mx, my, x0, y0, x0 + cardWidth(), y0 + CardSetting.CARD_HEIGHT)) {
+				if (card.index() != i) {
+					pushUndo();
+					card.choose(i);
+					applyChanged(card);
+					dirty = true;
+				}
+				return true;
+			}
+		}
+		return false;
 	}
 
 	private void clampedHit(int x0, int y0, int x1, int y1, String key, Setting setting, int areaTop, int areaBottom) {
@@ -1867,6 +1929,10 @@ public final class LuceatScreen extends Screen {
 				resetSettings(List.of(setting));
 				return;
 			}
+		}
+		if (setting instanceof CardSetting<?> card) {
+			clickCards(card, y, mx, my);
+			return;
 		}
 		boolean onTest = setting.testable() && LuceatLook.inside(mx, my, listRight - 38, cy - 8, listRight, cy + 8);
 		if (setting instanceof ToggleSetting toggle) {
