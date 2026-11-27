@@ -155,7 +155,7 @@ public final class LuceatSettings {
 			.visibleWhen(() -> c.luceatClouds && c.cloudMode == CloudMode.CUSTOM));
 		all.add(new ChoiceSetting<>(SKY, "Weather location",
 			"Sets where the real weather is taken from.",
-			CloudPlace.values(), new String[]{"Automatic", "Manual"}, () -> c.cloudAutoLocation ? CloudPlace.AUTOMATIC : CloudPlace.MANUAL, value -> c.cloudAutoLocation = value == CloudPlace.AUTOMATIC)
+			Cost.NONE, false, CloudPlace.values(), new String[]{"Automatic", "Manual"}, () -> c.cloudAutoLocation ? CloudPlace.AUTOMATIC : CloudPlace.MANUAL, value -> c.cloudAutoLocation = value == CloudPlace.AUTOMATIC)
 			.withNotes("Finds your approximate location from your IP address, once per session. Nothing else is sent.", "Uses the latitude and longitude set below.")
 			.visibleWhen(() -> c.luceatClouds && c.cloudMode == CloudMode.REAL_WORLD));
 		all.add(new SliderSetting(SKY, "Latitude",
