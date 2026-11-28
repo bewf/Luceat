@@ -80,6 +80,7 @@ public final class LuceatConfig {
 	public boolean luceatClouds = true;
 	public me.bewf.luceat.client.sky.CloudMode cloudMode = me.bewf.luceat.client.sky.CloudMode.IN_GAME;
 	public me.bewf.luceat.client.sky.CloudType cloudType = me.bewf.luceat.client.sky.CloudType.CUMULUS;
+	public me.bewf.luceat.client.sky.CloudQuality cloudQuality = me.bewf.luceat.client.sky.CloudQuality.MEDIUM;
 	public boolean cloudAutoLocation = true;
 	public double cloudLat = 0.0;
 	public double cloudLon = 0.0;
@@ -231,6 +232,9 @@ public final class LuceatConfig {
 		}
 		if (bloom == null) {
 			bloom = BloomLevel.OFF;
+		}
+		if (cloudQuality == null) {
+			cloudQuality = me.bewf.luceat.client.sky.CloudQuality.MEDIUM;
 		}
 	}
 }

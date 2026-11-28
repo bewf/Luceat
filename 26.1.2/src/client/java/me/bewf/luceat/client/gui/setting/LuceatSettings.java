@@ -139,18 +139,23 @@ public final class LuceatSettings {
 			Cost.NONE, true, 0.3F, 1.0F, 0.05F, "", () -> c.cutoutOpacity, value -> c.cutoutOpacity = value));
 
 		all.add(new ToggleSetting(SKY, "Clouds",
-			"Draws Fancy clouds with thick centres, thin see-through edges and darker undersides. Off uses Minecraft's clouds. Fast clouds are not changed.",
-			Cost.NONE, false, () -> c.luceatClouds, value -> c.luceatClouds = value));
+			"Draws soft, rounded clouds with real thickness, lit from above so the undersides are darker. Each pixel is traced through the cloud layer, so this costs some GPU time. Off uses Minecraft's clouds. Fast clouds are not changed.",
+			Cost.MEDIUM, false, () -> c.luceatClouds, value -> c.luceatClouds = value));
+		all.add(new ChoiceSetting<>(SKY, "Cloud quality",
+			"Sets how finely the cloud layer is traced. Lower is faster and a little softer.",
+			Cost.MEDIUM, false, me.bewf.luceat.client.sky.CloudQuality.values(), new String[]{"Low", "Medium", "High"}, () -> c.cloudQuality, value -> c.cloudQuality = value)
+			.withNotes("Fewest steps and no fine detail. Best for integrated graphics.", "A good balance of speed and detail.", "The most steps for the smoothest, most detailed clouds.")
+			.visibleWhen(() -> c.luceatClouds));
 		all.add(new CardSetting<>(SKY, "Cloud mode",
 			"Sets what decides which kind of cloud is drawn.",
 			CloudMode.values(), new String[]{"Real world", "In game", "Pick your own"},
-			new String[]{CloudMode.REAL_WORLD.note() + " Fetched from Open-Meteo every ten minutes.", CloudMode.IN_GAME.note() + " Clear weather gives cumulus, rain gives overcast, thunder gives storm.", CloudMode.CUSTOM.note()},
+			new String[]{CloudMode.REAL_WORLD.note() + " Fetched from Open-Meteo every ten minutes.", CloudMode.IN_GAME.note() + " Clear weather gives cumulus, rain gives nimbostratus, thunder gives storm.", CloudMode.CUSTOM.note()},
 			() -> c.cloudMode, value -> c.cloudMode = value)
 			.visibleWhen(() -> c.luceatClouds));
 		all.add(new CardSetting<>(SKY, "Cloud type",
 			"Sets which kind of cloud is drawn.",
-			CloudType.values(), new String[]{"Few", "Cumulus", "Stratus", "Cirrus", "Overcast", "Storm"},
-			new String[]{CloudType.FEW.note(), CloudType.CUMULUS.note(), CloudType.STRATUS.note(), CloudType.CIRRUS.note(), CloudType.OVERCAST.note(), CloudType.STORM.note()},
+			CloudType.values(), new String[]{"Few", "Cumulus", "Stratus", "Cirrus", "Overcast", "Storm", "Altocumulus", "Cirrocumulus", "Nimbostratus", "Cumulonimbus"},
+			new String[]{CloudType.FEW.note(), CloudType.CUMULUS.note(), CloudType.STRATUS.note(), CloudType.CIRRUS.note(), CloudType.OVERCAST.note(), CloudType.STORM.note(), CloudType.ALTOCUMULUS.note(), CloudType.CIRROCUMULUS.note(), CloudType.NIMBOSTRATUS.note(), CloudType.CUMULONIMBUS.note()},
 			() -> c.cloudType, value -> c.cloudType = value)
 			.visibleWhen(() -> c.luceatClouds && c.cloudMode == CloudMode.CUSTOM));
 		all.add(new ChoiceSetting<>(SKY, "Weather location",
@@ -238,7 +243,7 @@ public final class LuceatSettings {
 			"Lights up smoke, sparks and other particles near a light.",
 			Cost.NONE, false, () -> c.particleLights, value -> c.particleLights = value));
 		all.add(new SliderSetting(SOURCES, "Held light height",
-			"Sets how high your held light sits on your body.",
+			"Sets how high you hold a light. The light and the item in your hand move together, so a torch or lamp rises and drops with the slider. Applies to torches, lamps and any item that gives light.",
 			Cost.NONE, false, 0.3F, 1.0F, 0.02F, "", () -> c.heldHeight, value -> c.heldHeight = value));
 		all.add(new SliderSetting(SOURCES, "Fire flicker",
 			"Sets how hard warm lights like torches flicker.",

@@ -24,6 +24,8 @@ import net.minecraft.world.phys.Vec3;
 
 public final class HeldLights {
 	private static final double MARGIN = 0.4;
+	private static final float DEFAULT_HEIGHT = 0.7F;
+	private static final float ITEM_LIFT = 0.6F;
 
 	private static final class Smooth {
 		float height;
@@ -61,6 +63,16 @@ public final class HeldLights {
 		boolean submerged = entity.isUnderWater();
 		int level = Math.max(LightSpecs.of(entity.getMainHandItem(), submerged).level(), LightSpecs.of(entity.getOffhandItem(), submerged).level());
 		return brighten(level, lightCoords);
+	}
+
+	public static float itemLift(LivingEntity entity, ItemStack stack) {
+		LuceatConfig config = LuceatConfig.get();
+		if (stack.isEmpty() || !config.enabled || !allowed(entity) || LightSpecs.of(stack, entity.isUnderWater()).level() <= 0) {
+			return 0.0F;
+		}
+		BlockRule rule = BlockRules.forItem(stack.getItem());
+		float height = rule != null && rule.heldHeight >= 0.0F ? rule.heldHeight : config.heldHeight;
+		return (height - DEFAULT_HEIGHT) * ITEM_LIFT;
 	}
 
 	public static int brighten(int level, int lightCoords) {

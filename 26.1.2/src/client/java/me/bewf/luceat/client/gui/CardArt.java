@@ -68,6 +68,42 @@ final class CardArt {
 				Paint.round(s, x0 + 2, y0 + 2, x1 - 2, y0 + h * 60 / 100, 5, dim(0xF0B8BEC9, lit));
 				Paint.round(s, x0 + 2, y0 + h * 45 / 100, x1 - 2, y1 - 2, 5, dim(0xF0A4AAB6, lit));
 			}
+			case ALTOCUMULUS -> {
+				sky(s, x0, y0, x1, y1, 0xFF5B96EA, 0xFFAACDF8, lit);
+				for (int row = 0; row < 2; row++) {
+					for (int i = 0; i < 4; i++) {
+						int cx = x0 + w * (14 + i * 22 + row * 9) / 100;
+						int cy = y0 + h * (42 + row * 26) / 100;
+						puff(s, cx, cy, w * 16 / 100, h * 9 / 100, dim(0xFFF4F8FF, lit));
+					}
+				}
+			}
+			case CIRROCUMULUS -> {
+				sky(s, x0, y0, x1, y1, 0xFF4F8CE6, 0xFF9CC4F6, lit);
+				for (int row = 0; row < 3; row++) {
+					for (int i = 0; i < 6; i++) {
+						int cx = x0 + w * (10 + i * 15 + (row % 2) * 7) / 100;
+						int cy = y0 + h * (28 + row * 20) / 100;
+						Paint.round(s, cx, cy, cx + 3, cy + 3, 1, dim(0xCCFFFFFF, lit));
+					}
+				}
+			}
+			case NIMBOSTRATUS -> {
+				sky(s, x0, y0, x1, y1, 0xFF4A4F5E, 0xFF70768A, lit);
+				Paint.round(s, x0 + 2, y0 + 2, x1 - 2, y0 + h * 55 / 100, 5, dim(0xF05E6376, lit));
+				for (int i = 0; i < 5; i++) {
+					int rx = x0 + w * (12 + i * 18) / 100;
+					Paint.round(s, rx, y0 + h * 62 / 100, rx + 1, y0 + h * 88 / 100, 0, dim(0x99B9C6E6, lit));
+				}
+			}
+			case CUMULONIMBUS -> {
+				sky(s, x0, y0, x1, y1, 0xFF5B96EA, 0xFFAACDF8, lit);
+				int tower = dim(0xFFFFFFFF, lit);
+				puff(s, x0 + w * 50 / 100, y0 + h * 80 / 100, w * 46 / 100, h * 20 / 100, tower);
+				puff(s, x0 + w * 50 / 100, y0 + h * 60 / 100, w * 30 / 100, h * 20 / 100, tower);
+				puff(s, x0 + w * 50 / 100, y0 + h * 40 / 100, w * 22 / 100, h * 18 / 100, tower);
+				Paint.round(s, x0 + w * 28 / 100, y0 + h * 24 / 100, x0 + w * 72 / 100, y0 + h * 33 / 100, 4, dim(0xFFEAF1FF, lit));
+			}
 			case STORM -> {
 				sky(s, x0, y0, x1, y1, 0xFF2D3145, 0xFF5A5F78, lit);
 				int slate = dim(0xFF6A6F86, lit);

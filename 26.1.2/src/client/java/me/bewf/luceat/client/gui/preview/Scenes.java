@@ -48,6 +48,7 @@ public final class Scenes {
 		MAKERS.put("showcase", Scenes::showcase);
 		MAKERS.put("bounce", Scenes::bounce);
 		MAKERS.put("shiny", Scenes::shiny);
+		MAKERS.put("sky", Scenes::sky);
 	}
 
 	private Scenes() {
@@ -89,6 +90,7 @@ public final class Scenes {
 			return bound;
 		}
 		return switch (label) {
+			case "Clouds", "Cloud quality", "Cloud mode", "Cloud type", "Weather location" -> spec("sky", "Only the sky is drawn here, so the clouds and the sun are all you see.");
 			case "Luceat" -> spec("room", "Without Luceat the room is dark. With it the lamp lights the room.");
 			case "Light strength" -> spec("room", "Light strength changes how bright every light is.");
 			case "Brightness limit" -> spec("many", "The limit stops stacked lights from turning white.");
@@ -107,7 +109,7 @@ public final class Scenes {
 			case "Placed lights", "Placed light strength" -> spec("placed", "Lamps, torches and other light blocks light the world.");
 			case "Replace normal light" -> spec("placed", "Placed lights replace the flat vanilla light with real light.");
 			case "Smallest light" -> spec("levels", "Lights below the smallest level are ignored. Cheap for lots of small lights.");
-			case "Your held lights", "Held light height" -> spec("held", "Your held light sits in front of you at hand height.");
+			case "Your held lights", "Held light height" -> spec("held", "Your held light sits at hand height. Raise or lower it with the slider.");
 			case "Other players", "Mobs holding items" -> spec("others", "Other players and mobs light up when they hold a light.");
 			case "Dropped items" -> spec("dropped", "Dropped items glow. Items close together join into one light.");
 			case "Items in item frames" -> spec("frames", "Items in item frames light the wall around them.");
@@ -196,6 +198,12 @@ public final class Scenes {
 		s.eye = new double[]{5.5, 2.8, -2.4};
 		s.target = new double[]{5.5, 1.0, 4.5};
 		return s.caption("Metal, ice and glass catch a bright highlight.").movable().build();
+	}
+
+	private static Scene sky() {
+		Scene.Builder s = new Scene.Builder("sky", "Sky", 1, 1, 1);
+		s.camera(new double[]{0.5, 0.5, 0.5}, new double[]{0.5, 0.5 + 0.62, 0.5 + 1.0}, 74.0);
+		return s.time(0.8F).sun(0.0).caption("Clouds and sun only.").build();
 	}
 
 	private static Scene room() {

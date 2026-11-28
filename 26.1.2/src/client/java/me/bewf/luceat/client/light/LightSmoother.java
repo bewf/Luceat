@@ -118,8 +118,7 @@ public final class LightSmoother {
 			float curve = state.fade * state.fade * (3.0F - 2.0F * state.fade);
 			float radius = state.radius * curve;
 			if (state.fire && flicker > 0.0F) {
-				float seed = (float) ((key * 0x9E3779B97F4A7C15L) >>> 40) / 16777216.0F * 100.0F;
-				float noise = Flame.noise(seconds, seed);
+				float noise = Flame.noise(seconds, Flame.seedByte(key));
 				radius += flicker * 1.3F * noise;
 			}
 			result.add(new LightSource(state.x, state.y, state.z, state.red, state.green, state.blue, Math.max(radius, 0.0F), state.placed, state.fire, key, state.noShadow, state.vanilla, state.shape));

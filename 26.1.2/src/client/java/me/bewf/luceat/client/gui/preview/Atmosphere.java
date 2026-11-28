@@ -40,6 +40,10 @@ final class Atmosphere {
 			case CIRRUS -> new float[]{0.5F, 0.72F, 0.45F, 1.0F, 3.0F};
 			case OVERCAST -> new float[]{0.08F, 0.35F, 0.95F, 0.8F, 1.0F};
 			case STORM -> new float[]{0.15F, 0.42F, 0.97F, 0.5F, 1.0F};
+			case ALTOCUMULUS -> new float[]{0.4F, 0.68F, 0.8F, 0.97F, 1.0F};
+			case CIRROCUMULUS -> new float[]{0.5F, 0.72F, 0.6F, 1.0F, 2.0F};
+			case NIMBOSTRATUS -> new float[]{0.08F, 0.3F, 0.97F, 0.6F, 1.0F};
+			case CUMULONIMBUS -> new float[]{0.28F, 0.62F, 0.97F, 0.9F, 1.0F};
 		};
 		this.cloudLow = look[0];
 		this.cloudHigh = look[1];
@@ -131,19 +135,22 @@ final class Atmosphere {
 			double scale = 1.0 / dy;
 			double cx = dx * scale * 0.55 + clock * 0.012;
 			double cz = dz * scale * 0.55;
-			float cloud = fbm(cx * 2.1 / cloudStretch, cz * 2.1);
-			float density = smooth(cloudLow, cloudHigh, cloud);
+			float density = cloudDensity(cx, cz);
 			if (density > 0.001F) {
+				double lean = 0.07 / Math.max(0.25, sunDir[1]);
+				float blocked = 0.5F * (cloudDensity(cx + sunDir[0] * lean, cz + sunDir[2] * lean) + cloudDensity(cx + sunDir[0] * lean * 2.2, cz + sunDir[2] * lean * 2.2));
 				float fadeHorizon = (float) Math.min(1.0, (dy - 0.035) / 0.2);
+				float sunSide = (float) Math.max(0.0, along);
 				float lit = (0.1F + 0.9F * Math.max(day, dusk * 0.8F)) * cloudDark;
-				float under = 0.72F + 0.28F * (1.0F - density);
-				float cr = (day + (1.0F - day) * sunColour[0]) * lit * under;
-				float cg = (day + (1.0F - day) * sunColour[1] * 0.9F) * lit * under;
-				float cb = (day + (1.0F - day) * sunColour[2] * 0.85F) * lit * under;
+				float exposure = 1.0F - 0.5F * blocked * density;
+				float rim = (1.0F - density) * (float) Math.pow(sunSide, 3.0) * 0.5F * sunPower;
+				float cr = (day + (1.0F - day) * sunColour[0]) * lit * exposure + rim * sunColour[0];
+				float cg = (day + (1.0F - day) * sunColour[1] * 0.9F) * lit * exposure + rim * sunColour[1];
+				float cb = (day + (1.0F - day) * sunColour[2] * 0.85F) * lit * (exposure + 0.06F) + rim * sunColour[2];
 				cr = cr * (1.0F - night) + 0.05F * night;
 				cg = cg * (1.0F - night) + 0.065F * night;
 				cb = cb * (1.0F - night) + 0.12F * night;
-				float amount = density * fadeHorizon * cloudAlpha;
+				float amount = Math.min(1.0F, density * 1.15F) * fadeHorizon * cloudAlpha;
 				r += (cr - r) * amount;
 				g += (cg - g) * amount;
 				b += (cb - b) * amount;
@@ -152,6 +159,10 @@ final class Atmosphere {
 		out[0] = r;
 		out[1] = g;
 		out[2] = b;
+	}
+
+	private float cloudDensity(double cx, double cz) {
+		return smooth(cloudLow, cloudHigh, fbm(cx * 2.1 / cloudStretch, cz * 2.1));
 	}
 
 	void fog(float[] out) {

@@ -106,11 +106,20 @@ public final class RealWeather {
 		if (code >= 95) {
 			return CloudType.STORM;
 		}
+		if (code >= 80 && code <= 82) {
+			return CloudType.CUMULONIMBUS;
+		}
 		if (code >= 51 || code == 45 || code == 48) {
-			return code == 45 || code == 48 ? CloudType.STRATUS : CloudType.OVERCAST;
+			if (code == 45 || code == 48) {
+				return CloudType.STRATUS;
+			}
+			return code >= 71 && code <= 77 || code == 85 || code == 86 ? CloudType.OVERCAST : CloudType.NIMBOSTRATUS;
 		}
 		if (high >= 60 && low < 25) {
-			return CloudType.CIRRUS;
+			return cover < 70 ? CloudType.CIRROCUMULUS : CloudType.CIRRUS;
+		}
+		if (cover >= 45 && cover < 75 && low < 15 && high < 40) {
+			return CloudType.ALTOCUMULUS;
 		}
 		if (cover < 45) {
 			return CloudType.FEW;

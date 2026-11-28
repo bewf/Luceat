@@ -459,6 +459,7 @@ public final class LightVolume {
 		private final float[] cover = new float[VOXELS];
 		private final float[] weight = new float[VOXELS];
 		private final float[] fire = new float[VOXELS];
+		private final float[] flameShare = new float[VOXELS];
 		private final float[] pullX = new float[VOXELS];
 		private final float[] pullY = new float[VOXELS];
 		private final float[] pullZ = new float[VOXELS];
@@ -478,6 +479,7 @@ public final class LightVolume {
 			java.util.Arrays.fill(cover, 0.0F);
 			java.util.Arrays.fill(weight, 0.0F);
 			java.util.Arrays.fill(fire, 0.0F);
+			java.util.Arrays.fill(flameShare, 0.0F);
 			java.util.Arrays.fill(pullX, 0.0F);
 			java.util.Arrays.fill(pullY, 0.0F);
 			java.util.Arrays.fill(pullZ, 0.0F);
@@ -494,7 +496,6 @@ public final class LightVolume {
 			}
 			for (Bake bake : job.lights()) {
 				add(bake, job);
-				markEmitter(bake, job);
 			}
 			short[] light = new short[VOXELS * 4];
 			short[] direction = new short[VOXELS * 4];
@@ -589,6 +590,10 @@ public final class LightVolume {
 							pullZ[index] += (float) (dz / distance) * share;
 							if (bake.fire()) {
 								fire[index] += share;
+								if (share > flameShare[index]) {
+									flameShare[index] = share;
+									emit[index * 2] = (byte) Flame.seedByte(bake.id());
+								}
 							}
 						}
 					}
@@ -615,16 +620,6 @@ public final class LightVolume {
 				}
 			}
 			return faces == 0 ? EmissionShape.transmit(bake.shape(), rx, ry, rz) : sum / faces;
-		}
-
-		private void markEmitter(Bake bake, Job job) {
-			int ex = (int) Math.floor(bake.x()) - job.originX();
-			int ey = (int) Math.floor(bake.y()) - job.originY();
-			int ez = (int) Math.floor(bake.z()) - job.originZ();
-			if (ex < 0 || ey < 0 || ez < 0 || ex >= SIDE_X || ey >= SIDE_Y || ez >= SIDE_Z) {
-				return;
-			}
-			emit[((ez * SIDE_Y + ey) * SIDE_X + ex) * 2] = (byte) Math.round(255.0F * Math.min(1.0F, Math.max(0.35F, bake.radius() / 14.0F)));
 		}
 
 		private void soften(Bake bake, int x, int y, int z, int lightX, int lightY, int lightZ, Job job) {
